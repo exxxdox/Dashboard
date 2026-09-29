@@ -216,6 +216,83 @@ export const executionStreamSchema = z.enum(['stdout', 'stderr', 'system']);
 export type ExecutionStream = z.infer<typeof executionStreamSchema>;
 
 // ---------------------------------------------------------------------------
+// IPv6 DNS console
+// ---------------------------------------------------------------------------
+
+export const dnsProviderSchema = z.enum(['cloudflare', 'alibaba']);
+export type DnsProviderName = z.infer<typeof dnsProviderSchema>;
+
+export const dnsActionSchema = z.enum(['created', 'updated', 'unchanged', 'failed']);
+export type DnsAction = z.infer<typeof dnsActionSchema>;
+
+export const dnsCheckSourceSchema = z.enum(['manual', 'scheduled']);
+export type DnsCheckSource = z.infer<typeof dnsCheckSourceSchema>;
+
+/**
+ * Why a run ended with `action: 'failed'`.
+ *
+ * A code rather than a sentence: the client renders it, so the same value reads
+ * the same way in the live result, a history row and the summary, and rewording
+ * one never needs a migration.
+ */
+export const dnsFailureReasonSchema = z.enum([
+  'not_configured',
+  'invalid_settings',
+  'ipv6_detect_failed',
+  'ipv6_not_global',
+  'dns_query_failed',
+  'dns_write_failed',
+  'record_missing',
+  'record_identity_missing',
+]);
+export type DnsFailureReason = z.infer<typeof dnsFailureReasonSchema>;
+
+/** A minute is the floor because anything shorter is a busy loop; a week is the ceiling. */
+export const MIN_DNS_INTERVAL_MINUTES = 1;
+export const MAX_DNS_INTERVAL_MINUTES = 10_080;
+
+/**
+ * A settings update carries only what changed.
+ *
+ * A secret field left out -- or sent blank -- keeps the stored value, because
+ * the API never returns one for the client to send back. Deleting a credential
+ * is therefore its own explicit flag: it has to be asked for, rather than
+ * happening because someone cleared a box and pressed save.
+ */
+export const updateDnsSettingsSchema = z.object({
+  provider: dnsProviderSchema.optional(),
+  scheduleEnabled: z.boolean().optional(),
+  intervalMinutes: z
+    .number()
+    .int()
+    .min(MIN_DNS_INTERVAL_MINUTES)
+    .max(MAX_DNS_INTERVAL_MINUTES)
+    .optional(),
+  cloudflareZoneId: z.string().max(200).optional(),
+  cloudflareRecordName: z.string().max(255).optional(),
+  cloudflareToken: z.string().max(500).optional(),
+  alibabaAccessKeyId: z.string().max(200).optional(),
+  alibabaRecordId: z.string().max(200).optional(),
+  alibabaAccessKeySecret: z.string().max(500).optional(),
+  gotifyAddress: z.string().max(500).optional(),
+  gotifyToken: z.string().max(500).optional(),
+  clearCloudflareToken: z.boolean().optional(),
+  clearAlibabaAccessKeySecret: z.boolean().optional(),
+  clearGotifyToken: z.boolean().optional(),
+});
+export type UpdateDnsSettingsInput = z.infer<typeof updateDnsSettingsSchema>;
+
+/**
+ * The test message is sent with the form's current values, so a credential can
+ * be verified before it is saved. Only the two fields it uses are accepted.
+ */
+export const testDnsNotificationSchema = updateDnsSettingsSchema.pick({
+  gotifyAddress: true,
+  gotifyToken: true,
+});
+export type TestDnsNotificationInput = z.infer<typeof testDnsNotificationSchema>;
+
+// ---------------------------------------------------------------------------
 // Response shapes
 // ---------------------------------------------------------------------------
 
@@ -348,6 +425,147 @@ export type SyncResult = {
   removed: number;
   total: number;
   warnings: string[];
+};
+
+/** How many history rows the state payload previews. */
+export const DNS_CHECK_PREVIEW = 5;
+
+/** How many history rows are kept. Older ones are deleted as new ones arrive. */
+export const MAX_DNS_CHECKS = 500;
+
+/**
+ * The settings as the API returns them.
+ *
+ * No field here can carry a secret: each credential is reduced to whether it is
+ * stored, which is all the form needs to render a password box whose emptiness
+ * means "leave it alone". This is the `TargetSummary` rule applied again --
+ * rather than remembering to strip a field, there is no field to strip.
+ */
+export type DnsSettingsView = {
+  provider: DnsProviderName;
+  scheduleEnabled: boolean;
+  intervalMinutes: number;
+  cloudflareZoneId: string;
+  cloudflareRecordName: string;
+  hasCloudflareToken: boolean;
+  alibabaAccessKeyId: string;
+  alibabaRecordId: string;
+  /** Fixed: updating an IPv6 record is updating an AAAA record. */
+  alibabaRecordType: 'AAAA';
+  hasAlibabaAccessKeySecret: boolean;
+  gotifyAddress: string;
+  hasGotifyToken: boolean;
+  updatedAt: string;
+};
+
+export type DnsRecord = {
+  provider: DnsProviderName;
+  /**
+   * Cloudflare reports the full name; Alibaba reports the host record (`rr`)
+   * because that is what its update call needs back. The two are not
+   * interchangeable, so neither is normalised into the other.
+   */
+  recordName: string;
+  recordType: string;
+  value: string;
+  recordId: string;
+  /** Cloudflare only; null when the API did not report a real boolean. */
+  proxied: boolean | null;
+  /** Cloudflare only; null when the API did not report a real integer. */
+  ttl: number | null;
+};
+
+export type DnsUpdateResult = {
+  provider: DnsProviderName;
+  action: DnsAction;
+  /** The address this run detected; empty when detection is what failed. */
+  ipv6: string;
+  previousValue: string | null;
+  recordName: string;
+  /** Set only alongside `action: 'failed'`. */
+  failureReason: DnsFailureReason | null;
+  /** True when a notification was warranted (created or updated) and attempted. */
+  notificationAttempted: boolean;
+  /** A failed notification is reported, never allowed to fail the run. */
+  notificationFailed: boolean;
+};
+
+export type DnsCheck = {
+  id: string;
+  at: string;
+  source: DnsCheckSource;
+  ok: boolean;
+  action: DnsAction;
+  failureReason: DnsFailureReason | null;
+  ipv6: string;
+  previousValue: string | null;
+  provider: DnsProviderName;
+};
+
+export type DnsCheckSummary = {
+  total: number;
+  succeeded: number;
+  failed: number;
+  /** Created plus updated: a run that actually wrote something. */
+  changed: number;
+  lastRunAt: string | null;
+  lastChangeAt: string | null;
+};
+
+export type DnsCheckList = {
+  items: DnsCheck[];
+  total: number;
+};
+
+export type DnsSchedulerView = {
+  enabled: boolean;
+  /** A check is running right now. */
+  running: boolean;
+  intervalMinutes: number;
+  /** When the next scheduled check is due; null while the schedule is off. */
+  nextRunAt: string | null;
+  lastRunAt: string | null;
+  lastOk: boolean | null;
+  lastFailureReason: DnsFailureReason | null;
+};
+
+export type DnsState = {
+  /**
+   * Null until the settings have been saved once. The page has to tell "never
+   * configured" from "configured and empty", because only the first should send
+   * the operator to the form as the next step.
+   */
+  settings: DnsSettingsView | null;
+  /** The last address a check detected, held in memory and lost on restart. */
+  ipv6: string | null;
+  ipv6CheckedAt: string | null;
+  record: DnsRecord | null;
+  recordCheckedAt: string | null;
+  schedule: DnsSchedulerView | null;
+  history: {
+    summary: DnsCheckSummary;
+    records: DnsCheck[];
+    total: number;
+  };
+  limits: {
+    historyPreviewSize: number;
+    historyMaxRecords: number;
+  };
+};
+
+export type DnsIpv6Probe = {
+  ipv6: string;
+  detectedAt: string;
+};
+
+export type DnsRecordProbe = {
+  /** Null means the provider has no AAAA record yet, which is not an error. */
+  record: DnsRecord | null;
+  queriedAt: string;
+};
+
+export type DnsNotificationTest = {
+  sent: true;
 };
 
 // ---------------------------------------------------------------------------

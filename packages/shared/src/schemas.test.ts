@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 
-import { executeScriptSchema, loginSchema, runDraftSchema, updateSourceSchema } from './schemas.js';
+import {
+  executeScriptSchema,
+  loginSchema,
+  runDraftSchema,
+  testDnsNotificationSchema,
+  updateDnsSettingsSchema,
+  updateSourceSchema,
+} from './schemas.js';
 
 describe('executeScriptSchema', () => {
   test('defaults the positional arguments to none', () => {
@@ -129,5 +136,58 @@ describe('loginSchema', () => {
     expect(loginSchema.safeParse({ username: 'ops', password: 'x'.repeat(1001) }).success).toBe(
       false,
     );
+  });
+});
+
+describe('updateDnsSettingsSchema', () => {
+  test('accepts an empty body, because every field means "leave this alone"', () => {
+    expect(updateDnsSettingsSchema.parse({})).toEqual({});
+  });
+
+  test('takes a blank secret as "keep the stored one"', () => {
+    // The API never returns a credential, so a form cannot round-trip one: it
+    // either sends a new value or sends nothing.
+    const parsed = updateDnsSettingsSchema.parse({ cloudflareToken: '', gotifyToken: '' });
+    expect(parsed.cloudflareToken).toBe('');
+    expect(updateDnsSettingsSchema.parse({}).cloudflareToken).toBeUndefined();
+  });
+
+  test('bounds the interval at both ends', () => {
+    expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: 1 }).success).toBe(true);
+    expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: 10_080 }).success).toBe(true);
+    expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: 0 }).success).toBe(false);
+    expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: 10_081 }).success).toBe(false);
+    // The form sends a number; a string is a bug in the caller, not a value to
+    // coerce, because the interval is one of the few fields with real bounds.
+    expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: '10' }).success).toBe(false);
+  });
+
+  test('restricts the provider to the two implementations that exist', () => {
+    expect(updateDnsSettingsSchema.safeParse({ provider: 'cloudflare' }).success).toBe(true);
+    expect(updateDnsSettingsSchema.safeParse({ provider: 'alibaba' }).success).toBe(true);
+    expect(updateDnsSettingsSchema.safeParse({ provider: 'route53' }).success).toBe(false);
+  });
+
+  test('carries the clear flags as their own fields', () => {
+    const parsed = updateDnsSettingsSchema.parse({
+      clearCloudflareToken: true,
+      clearGotifyToken: false,
+    });
+    expect(parsed.clearCloudflareToken).toBe(true);
+    // False is not the same as absent: absent leaves the decision to the
+    // service, false is an explicit "do not clear".
+    expect(parsed.clearGotifyToken).toBe(false);
+    expect(parsed.clearAlibabaAccessKeySecret).toBeUndefined();
+  });
+});
+
+describe('testDnsNotificationSchema', () => {
+  test('accepts only the two fields a test message can use', () => {
+    const parsed = testDnsNotificationSchema.parse({
+      gotifyAddress: 'notify.test',
+      gotifyToken: 'token',
+      cloudflareZoneId: 'ignored',
+    });
+    expect(parsed).toEqual({ gotifyAddress: 'notify.test', gotifyToken: 'token' });
   });
 });
