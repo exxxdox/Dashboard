@@ -21,8 +21,15 @@ export function Panel({
     <section className={cn('card overflow-hidden', className)}>
       {title ? (
         <header className="border-line bg-panel-2/50 flex h-16 items-center justify-between gap-3 border-b px-5">
-          <h2 className="text-ink text-lead font-semibold tracking-tight">{title}</h2>
-          {aside}
+          {/* A long title truncates and the aside keeps its own width: a title
+              that wraps instead grows past the header's fixed height, and the
+              aside beside it -- a status label, a button -- wraps with it. */}
+          <h2 className="text-ink text-lead min-w-0 truncate font-semibold tracking-tight">
+            {title}
+          </h2>
+          {/* `gap-3` so several children in one aside keep the spacing they had
+              when they were laid out as siblings of the title. */}
+          {aside ? <div className="flex shrink-0 items-center gap-3">{aside}</div> : null}
         </header>
       ) : null}
       <div className={cn(flush ? '' : 'p-5', bodyClassName)}>{children}</div>

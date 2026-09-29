@@ -4,7 +4,7 @@ import type { ScriptTreeNode } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import { useT } from '../lib/i18n';
 
-type FlatRow = {
+export type FlatRow = {
   node: ScriptTreeNode;
   depth: number;
 };
@@ -17,6 +17,24 @@ function flatten(node: ScriptTreeNode, depth: number, collapsed: Set<string>, ou
   out.push({ node, depth });
   if (node.type !== 'dir' || collapsed.has(node.path)) return;
   for (const child of node.children ?? []) flatten(child, depth + 1, collapsed, out);
+}
+
+/**
+ * The rows to draw, starting below the root.
+ *
+ * The pane that holds this tree names the source in its own header, so a root row
+ * would repeat that name and spend a level of indent saying it. A root that is
+ * not a directory cannot happen for a source; flattening it anyway is the only
+ * drawing that would not silently empty the pane.
+ */
+export function childRows(root: ScriptTreeNode, collapsed: Set<string>): FlatRow[] {
+  const out: FlatRow[] = [];
+  if (root.type !== 'dir') {
+    flatten(root, 0, collapsed, out);
+    return out;
+  }
+  for (const child of root.children ?? []) flatten(child, 0, collapsed, out);
+  return out;
 }
 
 function collectDirPaths(node: ScriptTreeNode, out: string[] = []): string[] {
@@ -37,11 +55,7 @@ export function ScriptTree({
   const t = useT();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  const rows = useMemo(() => {
-    const out: FlatRow[] = [];
-    flatten(root, 0, collapsed, out);
-    return out;
-  }, [root, collapsed]);
+  const rows = useMemo(() => childRows(root, collapsed), [root, collapsed]);
 
   function toggle(path: string): void {
     setCollapsed((current) => {
@@ -53,7 +67,9 @@ export function ScriptTree({
   }
 
   function collapseAll(): void {
-    setCollapsed(new Set(collectDirPaths(root)));
+    // From the children, matching what `childRows` draws: collapsing the root
+    // itself would put a path in the set that no row can ever match.
+    setCollapsed(new Set((root.children ?? []).flatMap((child) => collectDirPaths(child))));
   }
 
   function expandAll(): void {

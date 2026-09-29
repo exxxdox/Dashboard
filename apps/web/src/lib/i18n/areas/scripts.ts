@@ -9,7 +9,6 @@
 
 const en = {
   'scripts.eyebrow': 'Library',
-  'scripts.script': 'Script',
   'scripts.description':
     'Every script the dashboard has discovered, grouped by the source it came from.',
   'scripts.loadingSources': 'Loading sources…',
@@ -23,7 +22,6 @@ const en = {
   'scripts.noSelection.description':
     'Pick a script from the tree to see its parameters, its source, and the form that runs it.',
   'scripts.chooseSource': 'Choose a source to see its scripts.',
-  'scripts.fileCount': '{count} files',
   'scripts.loadingTree': 'Loading tree…',
 
   // -- one script ----------------------------------------------------------
@@ -68,7 +66,6 @@ const en = {
 
 const zh: Record<keyof typeof en, string> = {
   'scripts.eyebrow': '脚本库',
-  'scripts.script': '脚本',
   'scripts.description': '仪表盘已发现的所有脚本，按所属脚本源分组。',
   'scripts.loadingSources': '正在加载脚本源…',
   'scripts.noSources.title': '尚未配置脚本源',
@@ -80,7 +77,6 @@ const zh: Record<keyof typeof en, string> = {
   'scripts.noSelection.title': '未选择脚本',
   'scripts.noSelection.description': '在目录树中选一个脚本，即可查看它的参数、源码，以及运行表单。',
   'scripts.chooseSource': '选择一个脚本源以查看其中的脚本。',
-  'scripts.fileCount': '{count} 个文件',
   'scripts.loadingTree': '正在加载目录树…',
 
   'scripts.loadingScript': '正在加载脚本…',
