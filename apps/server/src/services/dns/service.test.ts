@@ -1,0 +1,406 @@
+import { randomBytes } from 'node:crypto';
+import type { DnsRecord } from '@dashboard/shared';
+import { describe, expect, test, vi } from 'vitest';
+
+import { openDatabase, type Db } from '../../db/client.js';
+import { createSecretBox, type SecretBox } from '../../lib/crypto.js';
+import { UpstreamError, ValidationError } from '../../lib/errors.js';
+import { createLogger } from '../../lib/logger.js';
+import { listChecks, summarizeChecks } from './checks.js';
+import { createDnsService, type DnsService } from './service.js';
+import { saveSettings } from './settings.js';
+import { DnsFailureError, type DnsProvider } from './types.js';
+
+const logger = createLogger({ level: 'silent', pretty: false });
+
+const CLOUDFLARE = {
+  provider: 'cloudflare' as const,
+  cloudflareToken: 'token',
+  cloudflareZoneId: 'zone-1',
+  cloudflareRecordName: 'home.example.com',
+};
+
+const EXISTING: DnsRecord = {
+  provider: 'cloudflare',
+  recordName: 'home.example.com',
+  recordType: 'AAAA',
+  value: '2606:4700::1',
+  recordId: 'rec-1',
+  proxied: null,
+  ttl: null,
+};
+
+/**
+ * Overrides are plain functions rather than mocks: `setup` wraps them, so a test
+ * writes the behaviour it wants and the type is the interface's.
+ */
+type ProviderOverrides = {
+  getRecord?: DnsProvider['getRecord'];
+  setIpv6?: DnsProvider['setIpv6'];
+};
+
+type Harness = {
+  db: Db;
+  box: SecretBox;
+  service: DnsService;
+  provider: { getRecord: ReturnType<typeof vi.fn>; setIpv6: ReturnType<typeof vi.fn> };
+  detect: ReturnType<typeof vi.fn>;
+  notify: ReturnType<typeof vi.fn>;
+  save: () => void;
+};
+
+/** Let every already-resolved promise in a run settle. */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+}
+
+function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
+  const db = openDatabase(':memory:');
+  const box = createSecretBox(randomBytes(32));
+
+  const provider = {
+    getRecord: vi.fn(
+      overrides.provider?.getRecord ?? (async (): Promise<DnsRecord | null> => EXISTING),
+    ),
+    setIpv6: vi.fn(overrides.provider?.setIpv6 ?? (async (): Promise<'unchanged'> => 'unchanged')),
+  };
+  const detect = vi.fn(async (): Promise<string> => '2606:4700::1');
+  const notify = vi.fn(async (): Promise<boolean> => true);
+
+  const service = createDnsService({
+    db,
+    box,
+    logger,
+    createProvider: () => ({ name: 'cloudflare', ...provider }) as unknown as DnsProvider,
+    detectIpv6: detect,
+    notify: notify as unknown as (message: unknown) => Promise<boolean>,
+  });
+
+  return {
+    db,
+    box,
+    service,
+    provider,
+    detect,
+    notify,
+    save: () => {
+      saveSettings(db, box, CLOUDFLARE);
+    },
+  };
+}
+
+describe('before anything is configured', () => {
+  test('reports it as a failed run and records why', async () => {
+    const h = setup();
+    try {
+      const result = await h.service.update('manual');
+
+      expect(result).toMatchObject({
+        action: 'failed',
+        failureReason: 'not_configured',
+        provider: null,
+      });
+      expect(h.detect).not.toHaveBeenCalled();
+
+      const { items } = listChecks(h.db, { limit: 10, offset: 0 });
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        source: 'manual',
+        ok: false,
+        failureReason: 'not_configured',
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('refuses a record query, because there is no provider to ask', async () => {
+    const h = setup();
+    try {
+      await expect(h.service.queryRecord()).rejects.toThrow(ValidationError);
+    } finally {
+      h.db.close();
+    }
+  });
+});
+
+describe('update', () => {
+  test('aborts before any write when the query fails, and never reads it as "no record"', async () => {
+    // The one thing that must never happen: a query that failed looking like an
+    // absence, which for Cloudflare means creating a second record.
+    const h = setup({
+      provider: {
+        getRecord: async () => {
+          throw new DnsFailureError('Cloudflare rejected the record query', 'dns_query_failed');
+        },
+      },
+    });
+    try {
+      h.save();
+      const result = await h.service.update('manual');
+
+      expect(result).toMatchObject({ action: 'failed', failureReason: 'dns_query_failed' });
+      expect(h.provider.setIpv6).toHaveBeenCalledTimes(0);
+      expect(listChecks(h.db, { limit: 1, offset: 0 }).items[0]).toMatchObject({ ok: false });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('does not reach the provider when detection fails', async () => {
+    const h = setup();
+    try {
+      h.save();
+      h.detect.mockRejectedValue(
+        new DnsFailureError('The probe returned a private address', 'ipv6_not_global'),
+      );
+
+      const result = await h.service.update('manual');
+
+      expect(result).toMatchObject({ action: 'failed', failureReason: 'ipv6_not_global' });
+      expect(h.provider.getRecord).not.toHaveBeenCalled();
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('handles an unchanged record without notifying anyone', async () => {
+    const h = setup();
+    try {
+      h.save();
+      const result = await h.service.update('manual');
+
+      expect(result).toMatchObject({ action: 'unchanged', notificationAttempted: false });
+      expect(h.notify).not.toHaveBeenCalled();
+      // The record the query returned is the one the write was handed, so a
+      // second read cannot disagree with what the history row says.
+      expect(h.provider.setIpv6).toHaveBeenCalledWith('2606:4700::1', EXISTING, undefined);
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('notifies on a create and on an update, and reports the previous value', async () => {
+    for (const action of ['created', 'updated'] as const) {
+      const h = setup({ provider: { setIpv6: async () => action } });
+      try {
+        h.save();
+        h.provider.getRecord.mockResolvedValue(action === 'created' ? null : EXISTING);
+
+        const result = await h.service.update('manual');
+
+        expect(result).toMatchObject({
+          action,
+          previousValue: action === 'created' ? null : '2606:4700::1',
+          notificationAttempted: true,
+          notificationFailed: false,
+        });
+        expect(h.notify).toHaveBeenCalledTimes(1);
+        const message = h.notify.mock.calls[0]?.[0] as { message: string };
+        expect(message.message).toContain('2606:4700::1');
+      } finally {
+        h.db.close();
+      }
+    }
+  });
+
+  test('carries on when the notification fails', async () => {
+    const h = setup({ provider: { setIpv6: async () => 'updated' } });
+    try {
+      h.save();
+      h.notify.mockRejectedValue(new Error('Gotify answered 500'));
+
+      const result = await h.service.update('manual');
+
+      expect(result).toMatchObject({ action: 'updated', notificationFailed: true });
+      expect(listChecks(h.db, { limit: 1, offset: 0 }).items[0]).toMatchObject({ ok: true });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('reports a notification that was not configured as a skip', async () => {
+    const h = setup({ provider: { setIpv6: async () => 'updated' } });
+    try {
+      h.save();
+      h.notify.mockResolvedValue(false);
+
+      expect(await h.service.update('manual')).toMatchObject({
+        action: 'updated',
+        notificationAttempted: false,
+        notificationFailed: false,
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('records the source it was asked for', async () => {
+    const h = setup();
+    try {
+      h.save();
+      await h.service.update('manual');
+      await h.service.update('scheduled');
+
+      const { items } = listChecks(h.db, { limit: 10, offset: 0 });
+      expect(items.map((item) => item.source)).toEqual(['scheduled', 'manual']);
+      expect(summarizeChecks(h.db).total).toBe(2);
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('returns the real outcome even when the history cannot be written', async () => {
+    const h = setup({ provider: { setIpv6: async () => 'updated' } });
+    try {
+      h.save();
+      // History is a side channel: an operator whose disk is full still deserves
+      // the run's actual result.
+      h.db.exec('DROP TABLE dns_checks');
+
+      await expect(h.service.update('manual')).resolves.toMatchObject({ action: 'updated' });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('runs one check at a time, however many are asked for', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const order: string[] = [];
+    const h = setup({
+      provider: {
+        getRecord: async () => {
+          order.push('query');
+          await gate;
+          return EXISTING;
+        },
+        setIpv6: async () => {
+          order.push('write');
+          return 'unchanged';
+        },
+      },
+    });
+    try {
+      h.save();
+
+      const first = h.service.update('manual');
+      const second = h.service.update('scheduled');
+      await flush();
+      // The second run has not started while the first is between its steps.
+      expect(order).toEqual(['query']);
+
+      release();
+      await Promise.all([first, second]);
+      expect(order).toEqual(['query', 'write', 'query', 'write']);
+    } finally {
+      h.db.close();
+    }
+  });
+});
+
+describe('detect and queryRecord', () => {
+  test('remember what they saw, for the state payload', async () => {
+    const h = setup();
+    try {
+      h.save();
+
+      const probe = await h.service.detect();
+      const queried = await h.service.queryRecord();
+
+      expect(probe.ipv6).toBe('2606:4700::1');
+      expect(queried.record?.value).toBe('2606:4700::1');
+      expect(h.service.state()).toMatchObject({
+        ipv6: '2606:4700::1',
+        ipv6CheckedAt: probe.detectedAt,
+        recordCheckedAt: queried.queriedAt,
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('reports no record as a value rather than an error', async () => {
+    const h = setup({ provider: { getRecord: async () => null } });
+    try {
+      h.save();
+      await expect(h.service.queryRecord()).resolves.toMatchObject({ record: null });
+    } finally {
+      h.db.close();
+    }
+  });
+});
+
+describe('testNotification', () => {
+  test('prefers the form value over the stored one without saving it', async () => {
+    const h = setup();
+    try {
+      saveSettings(h.db, h.box, {
+        ...CLOUDFLARE,
+        gotifyAddress: 'stored.test',
+        gotifyToken: 'stored',
+      });
+
+      await h.service.testNotification({ gotifyAddress: 'typed.test', gotifyToken: 'typed' });
+
+      expect(h.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ address: 'typed.test', token: 'typed' }),
+      );
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('falls back to the stored credential when the form leaves it blank', async () => {
+    const h = setup();
+    try {
+      saveSettings(h.db, h.box, {
+        ...CLOUDFLARE,
+        gotifyAddress: 'stored.test',
+        gotifyToken: 'stored',
+      });
+
+      await h.service.testNotification({ gotifyToken: '' });
+
+      expect(h.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ address: 'stored.test', token: 'stored' }),
+      );
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('refuses when there is nothing to send with', async () => {
+    const h = setup();
+    try {
+      await expect(h.service.testNotification({})).rejects.toThrow(/Gotify address and token/);
+      expect(h.notify).not.toHaveBeenCalled();
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('reports a failed send as an upstream problem, with the token redacted', async () => {
+    const h = setup();
+    try {
+      h.notify.mockRejectedValue(new Error('POST /message?token=secret answered 401'));
+
+      const attempt = h.service.testNotification({
+        gotifyAddress: 'notify.test',
+        gotifyToken: 'secret',
+      });
+      await expect(attempt).rejects.toThrow(UpstreamError);
+
+      try {
+        await h.service.testNotification({ gotifyAddress: 'notify.test', gotifyToken: 'secret' });
+      } catch (error) {
+        expect((error as Error).message).toContain('token=***');
+        expect((error as Error).message).not.toContain('token=secret');
+      }
+    } finally {
+      h.db.close();
+    }
+  });
+});

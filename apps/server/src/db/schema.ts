@@ -212,7 +212,10 @@ export const MIGRATIONS: Migration[] = [
                          'record_missing','record_identity_missing')),
         ipv6           TEXT NOT NULL DEFAULT '',
         previous_value TEXT,
-        provider       TEXT NOT NULL CHECK (provider IN ('cloudflare','alibaba'))
+        -- Nullable because a run can fail before a provider is chosen at all:
+        -- "nothing has been configured yet" is a real outcome to record, and
+        -- writing the schema's default provider there would be a lie.
+        provider       TEXT CHECK (provider IN ('cloudflare','alibaba'))
       );
 
       CREATE INDEX idx_dns_checks_at ON dns_checks(at DESC);

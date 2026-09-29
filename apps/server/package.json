@@ -13,9 +13,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@alicloud/alidns20150109": "^4.6.1",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@darabonba/typescript": "^1.0.5",
+    "@dashboard/shared": "workspace:*",
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.3.1",
-    "@dashboard/shared": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.5",
     "pino": "^10.0.0",

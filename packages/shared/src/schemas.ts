@@ -476,7 +476,8 @@ export type DnsRecord = {
 };
 
 export type DnsUpdateResult = {
-  provider: DnsProviderName;
+  /** Null when the run failed before a provider had been chosen at all. */
+  provider: DnsProviderName | null;
   action: DnsAction;
   /** The address this run detected; empty when detection is what failed. */
   ipv6: string;
@@ -499,7 +500,8 @@ export type DnsCheck = {
   failureReason: DnsFailureReason | null;
   ipv6: string;
   previousValue: string | null;
-  provider: DnsProviderName;
+  /** Null when the run failed before a provider had been chosen at all. */
+  provider: DnsProviderName | null;
 };
 
 export type DnsCheckSummary = {

@@ -65,6 +65,21 @@ export class TargetError extends AppError {
   }
 }
 
+/**
+ * A failure while talking to an external service: a DNS provider, the IPv6
+ * probe, or the notifier.
+ *
+ * Distinct from `TargetError` (a host this application manages) because the two
+ * want different words in the log and different things from the operator: a
+ * target problem is usually the target's, an upstream problem usually is not.
+ */
+export class UpstreamError extends AppError {
+  constructor(message: string, details?: unknown) {
+    super(message, 502, 'upstream_error', details);
+    this.name = 'UpstreamError';
+  }
+}
+
 /** The request was understood but the current state forbids it. */
 export class UnprocessableError extends AppError {
   constructor(message: string, details?: unknown) {

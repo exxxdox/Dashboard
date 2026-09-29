@@ -14,10 +14,17 @@ packages:
 #   * cpu-features fails outright without a compiler, and ssh2 treats it as
 #     optional.
 #   * ssh2's own binding is a performance extra; it falls back to pure JS.
+# @alicloud/openapi-core, pulled in by the Alibaba Cloud DNS SDK, is refused for
+# a different reason: its postinstall only matters on Node 10 and 12, where it
+# runs `npm install` for an older TypeScript and @types/node. On any supported
+# Node it exits immediately, nothing in `dist` reads what it would have written,
+# and allowing it would put a second package manager inside the image build.
+#
 # pnpm 11 replaced `onlyBuiltDependencies` with this map form, and records an
 # explicit `false` rather than omitting the key -- an omitted package leaves the
 # decision pending, which fails an install with ERR_PNPM_IGNORED_BUILDS.
 allowBuilds:
+  '@alicloud/openapi-core': false
   better-sqlite3: false
   cpu-features: false
   esbuild: true
