@@ -126,6 +126,102 @@ describe('before anything is configured', () => {
   });
 });
 
+describe('consistency', () => {
+  test('answers unknown before anything has been looked at', () => {
+    const h = setup();
+    try {
+      // A comparison nobody has performed is not a comparison. The overview
+      // tile is built around being allowed to say exactly this.
+      expect(h.service.consistency()).toEqual({
+        state: 'unknown',
+        ipv6: null,
+        recordValue: null,
+        recordName: null,
+        at: null,
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('stays unknown when only half the pair has been seen', () => {
+    const h = setup();
+    try {
+      h.save();
+      // We know where this host is; nobody has asked the provider anything, and
+      // comparing a known address against an unasked question would read as
+      // "moved" for a record that is probably fine.
+      expect(h.service.consistency()).toMatchObject({
+        state: 'unknown',
+        ipv6: null,
+        recordValue: null,
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('reports a match once both addresses are known', async () => {
+    const h = setup();
+    try {
+      h.save();
+      await h.service.queryRecord();
+      await h.service.detect();
+
+      expect(h.service.consistency()).toMatchObject({
+        state: 'consistent',
+        ipv6: '2606:4700::1',
+        recordValue: '2606:4700::1',
+        recordName: 'home.example.com',
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('reports the record pointing elsewhere when the address has moved', async () => {
+    const h = setup();
+    try {
+      h.save();
+      await h.service.queryRecord();
+      // The host's address changed since the provider was last asked, which is
+      // the one state a check exists to correct.
+      h.detect.mockResolvedValue('2606:4700::9');
+      await h.service.detect();
+
+      expect(h.service.consistency()).toMatchObject({
+        state: 'moved',
+        ipv6: '2606:4700::9',
+        recordValue: '2606:4700::1',
+      });
+    } finally {
+      h.db.close();
+    }
+  });
+
+  test('stamps the verdict with the older of its two halves', async () => {
+    const h = setup();
+    try {
+      h.save();
+      await h.service.queryRecord();
+      const first = h.service.consistency().at;
+
+      await h.service.detect();
+      const second = h.service.consistency().at;
+
+      // The later observation is what the verdict is dated by, and a clock that
+      // moved forward must show up here rather than being pinned to the first.
+      expect(first).not.toBeNull();
+      expect(second).not.toBeNull();
+      expect(new Date(second ?? 0).getTime()).toBeGreaterThanOrEqual(
+        new Date(first ?? 0).getTime(),
+      );
+    } finally {
+      h.db.close();
+    }
+  });
+});
+
 describe('update', () => {
   test('aborts before any write when the query fails, and never reads it as "no record"', async () => {
     // The one thing that must never happen: a query that failed looking like an

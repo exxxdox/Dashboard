@@ -9,6 +9,20 @@
  */
 
 const en = {
+  // -- the DNS tile --------------------------------------------------------
+  // Three states rather than a yes/no: a comparison nobody has performed is not
+  // a "no", and being able to say so is the point of showing the tile at all.
+  'overview.dns.title': 'IPv6 DNS',
+  'overview.dns.consistent': 'In sync',
+  'overview.dns.moved': 'Points elsewhere',
+  'overview.dns.unknown': 'Not compared',
+  'overview.dns.hint.consistent': 'The record points at this host.',
+  'overview.dns.hint.moved': 'The record points at {record}, not at {ipv6}.',
+  'overview.dns.hint.unknown': 'Run a check on the DNS page to compare the two.',
+  'overview.dns.hint.unconfigured': 'No provider or record has been set up yet.',
+  'overview.dns.at': 'compared {when}',
+  'overview.dns.open': 'Open the DNS console',
+
   'overview.eyebrow': 'Dashboard',
   'overview.title': 'Overview',
   'overview.description': 'What is configured, what is running, and what just broke.',
@@ -53,6 +67,17 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
+  'overview.dns.title': 'IPv6 DNS',
+  'overview.dns.consistent': '解析一致',
+  'overview.dns.moved': '解析指向别处',
+  'overview.dns.unknown': '尚未比对',
+  'overview.dns.hint.consistent': '解析记录正指向本机。',
+  'overview.dns.hint.moved': '记录指向 {record}，不是本机的 {ipv6}。',
+  'overview.dns.hint.unknown': '到 DNS 页面执行一次检查即可比对两者。',
+  'overview.dns.hint.unconfigured': '还没有配置服务商与记录。',
+  'overview.dns.at': '比对时间 {when}',
+  'overview.dns.open': '打开 DNS 控制台',
+
   'overview.eyebrow': '仪表盘',
   'overview.title': '总览',
   'overview.description': '当前配置了什么、正在运行什么，以及刚刚出了什么问题。',

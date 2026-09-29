@@ -1,25 +1,25 @@
 /**
  * The IPv6 DNS console.
  *
- * Three parts on one page: what the last checks saw, the settings, and the
- * history. Results render in place rather than as toasts -- there is no toast
- * primitive here, and a result you cannot re-read is the wrong shape for
- * something that rewrites a DNS record.
+ * What the page shows is what a check found and what it decided: the last
+ * look, the result of the last run, and the newest few history rows. The two
+ * things that are configuration rather than state -- the settings, and the
+ * whole history -- are behind buttons, because a page someone opens to see
+ * whether the record is right should not be mostly a form and a table.
  *
- * The settings fold away, because they are what someone fills in once and then
- * reads past on every later visit. The summary beside the title is what keeps
- * that from being a hiding place: a folded panel still says which provider is
- * in use and how often it runs.
+ * Results render in place rather than as toasts: there is no toast primitive
+ * here, and a result you cannot re-read is the wrong shape for something that
+ * rewrites a DNS record.
  */
 
 import { useState } from 'react';
 import type { DnsRecordProbe, DnsSettingsView, DnsUpdateResult } from '@dashboard/shared';
-import { RefreshCw, Search, Zap } from 'lucide-react';
+import { RefreshCw, Search, SlidersHorizontal, Zap } from 'lucide-react';
 
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
-import { CollapsiblePanel } from '../components/Collapsible';
 import { ErrorBanner, LoadingBlock, WarningBanner } from '../components/Feedback';
+import { Modal } from '../components/Modal';
 import { MonoValue } from '../components/MonoValue';
 import { PageHeader } from '../components/PageHeader';
 import { Panel, Stat } from '../components/Panel';
@@ -28,6 +28,7 @@ import { useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } fro
 import { describeUpdate, providerLabel } from '../lib/dns';
 import { formatDateTime, formatRelative } from '../lib/format';
 import { useI18n, type Translate } from '../lib/i18n';
+import { DnsHistoryPreview } from './DnsHistoryPreview';
 import { DnsHistoryTable } from './DnsHistoryTable';
 import { DnsSettingsForm } from './DnsSettingsForm';
 
@@ -44,6 +45,8 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
   // re-reads while deciding what to do next.
   const [probe, setProbe] = useState<DnsRecordProbe | null>(null);
   const [result, setResult] = useState<DnsUpdateResult | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   if (state.isError) {
     return (
@@ -84,8 +87,17 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
         eyebrow={t('dns.eyebrow')}
         title={t('dns.title')}
         description={t('dns.description')}
+        // What is configured, without opening anything: the settings are behind
+        // a button now, so this is what keeps them from being hidden.
+        hints={<StatusChip label={settingsSummary(t, settings)} muted={settings === null} />}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              icon={<SlidersHorizontal className="size-[18px]" aria-hidden />}
+              onClick={() => setSettingsOpen(true)}
+            >
+              {t('dns.action.settings')}
+            </Button>
             <Button
               icon={<RefreshCw className="size-[18px]" aria-hidden />}
               loading={detect.isPending}
@@ -199,7 +211,9 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
             title={t('dns.result.title')}
             className={result.action === 'failed' ? 'card-accent' : undefined}
           >
-            <p className={result.action === 'failed' ? 'text-danger text-body' : 'text-ink text-body'}>
+            <p
+              className={result.action === 'failed' ? 'text-danger text-body' : 'text-ink text-body'}
+            >
               {describeUpdate(t, result)}
             </p>
             {result.notificationFailed ? (
@@ -210,23 +224,52 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
           </Panel>
         )}
 
-        <CollapsiblePanel
-          title={t('dns.settings.title')}
-          subtitle={settingsSummary(t, settings)}
-          // Open when there is nothing configured, because then the form is the
-          // next step rather than something to read past.
-          defaultOpen={settings === null}
-        >
-          {/* Remounted whenever the stored settings change, so the form's
-              one-shot seed of its fields cannot go stale. */}
-          <DnsSettingsForm key={settings?.updatedAt ?? 'new'} settings={settings} />
-        </CollapsiblePanel>
-
         <Panel title={t('dns.history.title')} flush>
-          <DnsHistoryTable search={search} />
+          <DnsHistoryPreview
+            checks={data.history.records}
+            onViewAll={() => setHistoryOpen(true)}
+          />
         </Panel>
       </div>
+
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title={t('dns.settings.title')}
+        description={settingsSummary(t, settings)}
+      >
+        {/* Remounted whenever the stored settings change, so the form's
+            one-shot seed of its fields cannot go stale. */}
+        <DnsSettingsForm key={settings?.updatedAt ?? 'new'} settings={settings} />
+      </Modal>
+
+      <Modal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title={t('dns.history.allTitle')}
+        description={t('dns.history.allDescription')}
+        size="xl"
+      >
+        {/* Paging navigates the hash, which re-renders this page without
+            unmounting it -- so the dialog stays open across a page change. */}
+        <DnsHistoryTable search={search} />
+      </Modal>
     </PageBody>
+  );
+}
+
+/** A small pill for the header: what is configured, at a glance. */
+function StatusChip({ label, muted }: { label: string; muted: boolean }) {
+  return (
+    <span
+      className={
+        muted
+          ? 'border-line bg-panel-2 text-faint text-meta mono rounded-full border px-3 py-1.5'
+          : 'border-line bg-panel-2 text-mute text-meta mono rounded-full border px-3 py-1.5'
+      }
+    >
+      {label}
+    </span>
   );
 }
 
@@ -242,11 +285,11 @@ function RelativeTime({ iso }: { iso: string }) {
   );
 }
 
-/** What the folded settings panel says about itself while folded. */
-function settingsSummary(t: Translate, settings: DnsSettingsView | null): string {
-  if (settings === null) return t('dns.form.summaryUnconfigured');
+/** What is configured, in one line, for the header chip and the dialog alike. */
+export function settingsSummary(t: Translate, settings: DnsSettingsView | null): string {
+  if (settings === null) return t('dns.settings.summaryUnconfigured');
   const provider = providerLabel(t, settings.provider);
   return settings.scheduleEnabled
-    ? t('dns.form.summaryConfigured', { provider, minutes: settings.intervalMinutes })
-    : t('dns.form.summaryOff', { provider });
+    ? t('dns.settings.summaryConfigured', { provider, minutes: settings.intervalMinutes })
+    : t('dns.settings.summaryOff', { provider });
 }

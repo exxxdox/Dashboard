@@ -589,6 +589,31 @@ export type DnsIpv6Probe = {
   detectedAt: string;
 };
 
+/**
+ * Whether the record and this host agree, as of the last time both were seen.
+ *
+ * `unknown` is a real answer rather than a gap to paper over. The two addresses
+ * are held in memory and lost on restart, and a comparison nobody has performed
+ * is not a comparison this console will invent -- a "consistent" that was never
+ * checked is worse than an honest "not compared yet", because the whole point of
+ * the console is being able to trust that word. A configured deployment
+ * repopulates both on its next scheduled check.
+ */
+export type DnsConsistency = {
+  /**
+   * `moved` means the record points somewhere other than where this host is --
+   * the state a check exists to correct, not a past tense.
+   */
+  state: 'consistent' | 'moved' | 'unknown';
+  /** The address this host last detected; null when nothing has probed. */
+  ipv6: string | null;
+  /** What the provider last answered; null when nothing has queried. */
+  recordValue: string | null;
+  recordName: string | null;
+  /** When the more recent of the two observations was made. */
+  at: string | null;
+};
+
 export type DnsRecordProbe = {
   /** Null means the provider has no AAAA record yet, which is not an error. */
   record: DnsRecord | null;

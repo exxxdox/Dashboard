@@ -40,7 +40,9 @@ export function DnsHistoryTable({ search }: { search: URLSearchParams }) {
   const summary = state.data?.history.summary;
 
   return (
-    <div className="grid gap-5 p-5">
+    // No outer padding: the dialog this renders in owns the gutter, and two of
+    // them would read as a table that cannot reach the edge of its own panel.
+    <div className="grid gap-5">
       {summary ? (
         <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-5">
           <Stat label={t('dns.history.checks')}>{summary.total}</Stat>

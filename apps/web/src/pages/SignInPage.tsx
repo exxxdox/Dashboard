@@ -3,6 +3,7 @@ import { LogIn } from 'lucide-react';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, TextInput } from '../components/Form';
+import { Wordmark } from '../components/Wordmark';
 import { useLogin } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
@@ -29,16 +30,12 @@ export function SignInPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={submit} className="card w-full max-w-sm p-6">
-        <div className="flex items-center gap-3">
-          <span className="bg-accent shadow-glow h-8 w-1 shrink-0 rounded-full" aria-hidden />
-          <span className="mono text-brand font-semibold tracking-tight">
-            <span className="text-mute">script</span>
-            <span className="text-ink">dashboard</span>
-          </span>
-        </div>
+      <form onSubmit={submit} className="card w-full max-w-md p-7">
+        {/* The one screen with room for the mark at full size, and the only one
+            where it is the first thing a person sees. */}
+        <Wordmark size="hero" />
 
-        <p className="text-mute text-meta mt-3">{t('auth.tagline')}</p>
+        <p className="text-mute text-body mt-4">{t('auth.tagline')}</p>
 
         <div className="mt-5 grid gap-3">
           <Field label={t('auth.username')}>

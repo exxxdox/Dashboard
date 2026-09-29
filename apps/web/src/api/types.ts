@@ -1,4 +1,4 @@
-import type { ExecutionSummary } from '@dashboard/shared';
+import type { DnsConsistency, ExecutionSummary } from '@dashboard/shared';
 
 /** Endpoints whose response shapes are not exported from `@dashboard/shared`. */
 
@@ -17,6 +17,8 @@ export type OverviewResponse = {
     failed24h: number;
   };
   recent: ExecutionSummary[];
+  /** Whether the AAAA record and this host agree, as far as anyone has looked. */
+  dns: DnsConsistency;
 };
 
 export type ExecutionListResponse = {

@@ -102,6 +102,8 @@ The probe asks `https://api6.ipify.org` and accepts only a public address: priva
 
 A Gotify notification is sent only when the record actually changed; a notification that fails does not change the run's outcome and is reported separately. The address and token are an **application setting** rather than part of this console -- see [Settings](#settings) -- so the console no longer holds a notification credential, and the next feature that wants to notify you does not have to borrow one.
 
+The page shows what a check found and what it decided. The settings and the whole history are behind buttons rather than laid out on it: **Settings** opens the provider form, and the history panel shows the newest five with **View all** opening the paginated table. The overview page carries the same verdict as a one-line tile -- whether the record still points at this host, or that nobody has compared the two yet.
+
 ## Settings
 
 `/#/settings` holds what belongs to the dashboard rather than to a feature:

@@ -1,5 +1,13 @@
-import { Activity, ArrowRight, CircleAlert, FileCode, Server, FolderTree } from 'lucide-react';
-import type { ExecutionSummary } from '@dashboard/shared';
+import {
+  Activity,
+  ArrowRight,
+  CircleAlert,
+  FileCode,
+  FolderTree,
+  Globe,
+  Server,
+} from 'lucide-react';
+import type { DnsConsistency, ExecutionSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -119,6 +127,8 @@ export function OverviewPage() {
             })}
       </div>
 
+      <DnsTile dns={overview.data?.dns} pending={overview.isPending} />
+
       <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
           title={t('overview.recentRuns')}
@@ -210,6 +220,91 @@ export function OverviewPage() {
         </Panel>
       </div>
     </PageBody>
+  );
+}
+
+/**
+ * Whether the AAAA record still points at this host.
+ *
+ * The third state is the honest one. The two addresses this compares live in
+ * the server's memory and are lost on restart, so until a check has run there
+ * is nothing to compare -- and a green light nobody has earned is worse than
+ * saying so, because the entire point of the DNS console is being able to
+ * trust that word.
+ */
+function DnsTile({ dns, pending }: { dns: DnsConsistency | undefined; pending: boolean }) {
+  const { t } = useI18n();
+
+  if (pending || !dns) {
+    return <div className="card mt-5 h-[84px] animate-pulse" />;
+  }
+
+  const state = dns.state;
+  const label =
+    state === 'consistent'
+      ? t('overview.dns.consistent')
+      : state === 'moved'
+        ? t('overview.dns.moved')
+        : t('overview.dns.unknown');
+
+  const hint =
+    state === 'consistent'
+      ? t('overview.dns.hint.consistent')
+      : state === 'moved'
+        ? t('overview.dns.hint.moved', {
+            record: dns.recordValue ?? t('common.dash'),
+            ipv6: dns.ipv6 ?? t('common.dash'),
+          })
+        : dns.recordName === null
+          ? t('overview.dns.hint.unconfigured')
+          : t('overview.dns.hint.unknown');
+
+  return (
+    <a
+      href={href('/dns')}
+      className="card focus-ring group hover:border-line-strong mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 transition-colors duration-150 ease-out"
+    >
+      <span
+        aria-hidden
+        className={
+          state === 'consistent'
+            ? 'bg-ok/12 text-ok grid size-11 shrink-0 place-items-center rounded-xl'
+            : state === 'moved'
+              ? 'bg-danger/12 text-danger grid size-11 shrink-0 place-items-center rounded-xl'
+              : 'bg-panel-3 text-faint grid size-11 shrink-0 place-items-center rounded-xl'
+        }
+      >
+        <Globe className="size-5" />
+      </span>
+
+      <span className="grid gap-0.5">
+        <span className="label">{t('overview.dns.title')}</span>
+        <span
+          className={
+            state === 'consistent'
+              ? 'text-ok text-lead font-semibold'
+              : state === 'moved'
+                ? 'text-danger text-lead font-semibold'
+                : 'text-mute text-lead font-semibold'
+          }
+        >
+          {label}
+        </span>
+      </span>
+
+      <span className="text-mute text-body min-w-0 flex-1">{hint}</span>
+
+      {dns.at === null ? null : (
+        <span className="text-faint text-meta shrink-0">
+          {t('overview.dns.at', { when: formatRelative(dns.at, t) })}
+        </span>
+      )}
+
+      <span className="text-faint group-hover:text-accent flex shrink-0 items-center gap-1.5 text-meta transition-colors duration-150">
+        {t('overview.dns.open')}
+        <ArrowRight className="size-4" aria-hidden />
+      </span>
+    </a>
   );
 }
 

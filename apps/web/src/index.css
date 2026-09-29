@@ -99,6 +99,10 @@
   --text-title--line-height: 1.25;
   --text-display: 2.5rem;
   --text-display--line-height: 1.2;
+  /* The overview's count values: machine data meant to be read from across the
+     room, so they get their own step above body text. */
+  --text-stat: 1.75rem;
+  --text-stat--line-height: 1.1;
 
   --radius-card: var(--radius);
 
@@ -307,6 +311,32 @@
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
   }
+
+  /*
+   * A `<dialog>` arrives with a UA border, padding, background and centred
+   * margin, all of which `.card` replaces -- except the backdrop, which is the
+   * one part of a modal no utility class can reach.
+   */
+  .modal-panel {
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .modal-panel::backdrop {
+    background: rgb(4 6 10 / 72%);
+    backdrop-filter: blur(3px);
+  }
+
+  .modal-panel[open] {
+    animation: modal-in 180ms var(--ease);
+  }
+
+  /* The wordmark's mark sits on a near-black rail, where a flat fill reads as a
+     sticker. A faint accent bloom behind it is what makes it look lit. */
+  .mark-glow {
+    filter: drop-shadow(0 0 12px rgb(245 173 48 / 28%));
+  }
 }
 
 @keyframes dot-pulse {
@@ -334,6 +364,19 @@
   from {
     opacity: 0;
     transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Dialogs rise rather than fade: the movement says where they came from, so
+   closing them is not a jump. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
   }
   to {
     opacity: 1;

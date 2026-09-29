@@ -199,6 +199,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: AppContext): voi
         failed24h,
       },
       recent: recentRows.map((row) => getExecution(ctx.db, row.id)),
+      // Whether the AAAA record still points here is a dashboard-level fact, so
+      // it rides along with the counts rather than costing the overview page a
+      // second request that would answer from the same process anyway.
+      dns: ctx.dns.consistency(),
     };
   });
 }

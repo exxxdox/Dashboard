@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Nav, ServerStamp } from './Nav';
+import { Wordmark } from './Wordmark';
 import { href, type Route } from '../lib/router';
 import { useT } from '../lib/i18n';
 
@@ -18,16 +19,12 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
       <aside className="border-line bg-base/80 sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col border-r backdrop-blur-xl lg:flex">
         <a
           href={href('/')}
-          className="focus-ring flex h-24 items-center gap-3.5 px-5"
+          className="focus-ring flex h-24 items-center px-5"
           aria-label={t('nav.home')}
         >
           {/* The wordmark is the one piece of furniture in the rail: it is sized
               to read as the product's name, not as another nav label. */}
-          <span className="bg-accent shadow-glow h-9 w-1.5 shrink-0 rounded-full" aria-hidden />
-          <span className="mono text-brand font-semibold tracking-tight">
-            <span className="text-mute">script</span>
-            <span className="text-ink">dashboard</span>
-          </span>
+          <Wordmark />
         </a>
 
         <Nav active={route.name} />
@@ -40,7 +37,10 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
         {/* Below lg the rail becomes a horizontal strip; the tool is still usable. */}
         <div className="border-line bg-base/85 sticky top-0 z-20 border-b backdrop-blur-xl lg:hidden">
           <div className="flex h-16 items-center gap-1 overflow-x-auto px-4">
-            <span className="mono text-ink text-brand mr-3 shrink-0 font-semibold">dashboard</span>
+            {/* The mark alone: the strip is for navigation, and the word would
+                cost a nav item's worth of width to say what the mark already
+                says. */}
+            <Wordmark className="mr-3 [&>span:last-child]:hidden" />
             <Nav active={route.name} />
           </div>
         </div>

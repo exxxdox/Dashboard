@@ -61,11 +61,12 @@ const en = {
   'dns.form.saved': 'Settings saved.',
   'dns.form.cleared': '{name} cleared.',
   'dns.form.blockedClear': 'The selected provider still needs this credential.',
-  'dns.form.showSettings': 'Show settings',
-  'dns.form.hideSettings': 'Hide settings',
-  'dns.form.summaryConfigured': '{provider} · every {minutes} min',
-  'dns.form.summaryOff': '{provider} · schedule off',
-  'dns.form.summaryUnconfigured': 'Not configured yet',
+
+  // -- the settings dialog -------------------------------------------------
+  'dns.action.settings': 'Settings',
+  'dns.settings.summaryConfigured': '{provider} · every {minutes} min',
+  'dns.settings.summaryOff': '{provider} · schedule off',
+  'dns.settings.summaryUnconfigured': 'Not configured yet',
 
   // -- history -------------------------------------------------------------
   'dns.history.checks': 'Checks',
@@ -84,6 +85,9 @@ const en = {
   'dns.history.column.why': 'Why',
   'dns.history.newer': 'Newer',
   'dns.history.older': 'Older',
+  'dns.history.viewAll': 'View all',
+  'dns.history.allTitle': 'All checks',
+  'dns.history.allDescription': 'Every manual and scheduled check, newest first.',
   'dns.history.range': '{from}–{to} of {total}',
   'dns.history.label': 'DNS checks',
 
@@ -172,11 +176,11 @@ const zh: Record<keyof typeof en, string> = {
   'dns.form.saved': '设置已保存。',
   'dns.form.cleared': '已清除{name}。',
   'dns.form.blockedClear': '当前选中的服务商仍需要该凭据。',
-  'dns.form.showSettings': '展开设置',
-  'dns.form.hideSettings': '收起设置',
-  'dns.form.summaryConfigured': '{provider} · 每 {minutes} 分钟',
-  'dns.form.summaryOff': '{provider} · 定时任务已关闭',
-  'dns.form.summaryUnconfigured': '尚未配置',
+
+  'dns.action.settings': '设置',
+  'dns.settings.summaryConfigured': '{provider} · 每 {minutes} 分钟',
+  'dns.settings.summaryOff': '{provider} · 定时任务已关闭',
+  'dns.settings.summaryUnconfigured': '尚未配置',
 
   'dns.history.checks': '检查次数',
   'dns.history.succeeded': '成功',
@@ -193,6 +197,9 @@ const zh: Record<keyof typeof en, string> = {
   'dns.history.column.why': '原因',
   'dns.history.newer': '更新',
   'dns.history.older': '更早',
+  'dns.history.viewAll': '查看全部',
+  'dns.history.allTitle': '全部检查记录',
+  'dns.history.allDescription': '所有手动与自动检查，最新的在最前。',
   'dns.history.range': '第 {from}–{to} 条，共 {total} 条',
   'dns.history.label': 'DNS 检查记录',
 

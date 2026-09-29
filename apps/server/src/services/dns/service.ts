@@ -23,6 +23,7 @@ import type {
   DnsAction,
   DnsCheckList,
   DnsCheckSource,
+  DnsConsistency,
   DnsFailureReason,
   DnsIpv6Probe,
   DnsProviderName,
@@ -103,6 +104,14 @@ export type DnsService = {
   update: (source: DnsCheckSource, signal?: AbortSignal) => Promise<DnsUpdateResult>;
   detect: (signal?: AbortSignal) => Promise<DnsIpv6Probe>;
   queryRecord: (signal?: AbortSignal) => Promise<DnsRecordProbe>;
+  /**
+   * Whether the record and this host agree, for the overview page.
+   *
+   * Read from what this process has already seen rather than by asking anyone:
+   * the overview is a glance at the dashboard, and a tile that made two network
+   * calls to render would be a worse tile.
+   */
+  consistency: () => DnsConsistency;
   state: () => DnsState;
   listChecks: (filter: DnsCheckFilter) => DnsCheckList;
   clearChecks: () => number;
@@ -295,6 +304,28 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
       return { record, queriedAt: lastRecordAt };
     },
 
+    consistency() {
+      // Comparing one known address against an unknown one would answer
+      // "moved" for a record nobody has looked at, so a missing half is
+      // reported as unknown and the tile sends the reader to the console.
+      const state: DnsConsistency['state'] =
+        lastIpv6 === null || lastRecord === null
+          ? 'unknown'
+          : lastIpv6 === lastRecord.value
+            ? 'consistent'
+            : 'moved';
+
+      return {
+        state,
+        ipv6: lastIpv6,
+        recordValue: lastRecord?.value ?? null,
+        recordName: lastRecord?.recordName ?? null,
+        // The more recent of the two observations: a verdict is only as fresh
+        // as its older half.
+        at: latest(lastIpv6At, lastRecordAt),
+      };
+    },
+
     state() {
       const summary = summarizeChecks(db);
       return {
@@ -376,4 +407,16 @@ function failFrom(
 ): DnsUpdateResult {
   if (!(error instanceof DnsFailureError)) throw error;
   return failure(error.reason, provider, ipv6, previousValue, recordName);
+}
+
+/**
+ * The later of two ISO stamps, either of which may be absent.
+ *
+ * Plain string comparison, which is what the format is for: every stamp here
+ * comes from `nowIso()`, so they are the same shape and UTC.
+ */
+function latest(left: string | null, right: string | null): string | null {
+  if (left === null) return right;
+  if (right === null) return left;
+  return left > right ? left : right;
 }
