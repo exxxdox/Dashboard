@@ -44,9 +44,16 @@ export function ScriptSource({ content, format }: { content: string; format: Scr
                 >
                   {line.number}
                 </span>
+                {/* Soft-wrapped rather than horizontally scrollable: a shell
+                    line is often wider than the pane, and reading it by
+                    scrolling sideways loses the line worth reading. Wrapping
+                    keeps the whole line in view, and `break-words` is what
+                    stops one long path or URL from overflowing anyway.
+                    `min-w-0` lets this flex item shrink below its content,
+                    which is what allows the wrap to happen at all. */}
                 <span
                   className={cn(
-                    'pr-4 whitespace-pre',
+                    'min-w-0 pr-4 whitespace-pre-wrap break-words',
                     line.kind === 'code' ? 'text-ink' : 'text-mute',
                     line.kind === 'header' && 'text-accent',
                   )}
