@@ -23,8 +23,7 @@ This project pulls that back into one place:
 ## Quick start
 
 ```bash
-cp .env.example .env                  # change SCRIPT_ROOT_HOST and PUID/PGID at least
-cp compose.yaml.example compose.yaml  # adjust image name and mounts; it is not committed
+cp .env.example .env      # change SCRIPT_ROOT_HOST and PUID/PGID at least
 docker compose up -d --build
 ```
 
@@ -32,7 +31,7 @@ Open `http://<host address>:50014` (or whatever `DASHBOARD_PORT` says in `.env`)
 
 ## docker compose
 
-The repository's `compose.yaml.example` is the template -- copy it to `compose.yaml` and adjust it, since that file is in `.gitignore`. The parts that matter are these:
+The repository's `compose.yaml` is the file a machine runs, with defaults for a single-host install. The parts that matter are these:
 
 ```yaml
 services:
@@ -47,6 +46,8 @@ services:
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # script directory (read for clone/scan)
     user: "0:0"
 ```
+
+What is local to a machine -- the image name, the container name, a port the host already uses -- goes in `compose.override.yaml` beside it: compose merges that file over `compose.yaml` automatically. It is in `.gitignore`, so the committed file stays identical to the repository's and an update never conflicts.
 
 - **Host networking, not published ports.** The DNS check has to leave through the host's own IPv6 egress; a bridge network would report a different address. The cost is that the container takes a port on the machine itself, so `DASHBOARD_PORT` has to be free there, and `ports:` cannot be used at all — it is mutually exclusive with `network_mode`.
 - **The host itself must have working public IPv6 egress.** The probe asks `api6.ipify.org` over IPv6; if it cannot be reached the run fails with an error and writes nothing to DNS.

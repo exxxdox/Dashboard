@@ -1,7 +1,11 @@
-# Template for the compose file a machine actually runs. Copy it to
-# `compose.yaml` and adjust what is local to that host: the image name, the
-# container name, the published port, and the script directory. `compose.yaml`
-# is in .gitignore for exactly that reason.
+# The compose file this project ships, and the one a machine runs. Its defaults
+# are what a single-host install needs: put a `.env` beside it and
+# `docker compose up -d --build` is the whole procedure.
+#
+# What is local to one machine -- the image name, the container name, a port
+# that host already uses -- goes in `compose.override.yaml`. Compose merges that
+# file over this one automatically, and it is in .gitignore. Editing this file
+# instead turns every local difference into a merge conflict on the next update.
 #
 # The whole application: one process serving the API, the web client and the
 # scheduled IPv6 DNS check. Both former projects are merged into it, so there is

@@ -23,8 +23,7 @@ English: [README.en.md](README.en.md)
 ## 快速开始
 
 ```bash
-cp .env.example .env                  # 至少改 SCRIPT_ROOT_HOST 与 PUID/PGID
-cp compose.yaml.example compose.yaml  # 镜像名与挂载按本机改；该文件不入库
+cp .env.example .env      # 至少改 SCRIPT_ROOT_HOST 与 PUID/PGID
 docker compose up -d --build
 ```
 
@@ -32,7 +31,7 @@ docker compose up -d --build
 
 ## docker compose
 
-仓库的 `compose.yaml.example` 是模板（复制成 `compose.yaml` 后按本机改，该文件已加入 `.gitignore`），要点就这几行：
+仓库里的 `compose.yaml` 就是机器上实际运行的那一份，默认值面向单机安装。要点就这几行：
 
 ```yaml
 services:
@@ -47,6 +46,8 @@ services:
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # 脚本目录（容器读它来克隆/扫描）
     user: "0:0"
 ```
+
+本机特有的东西 —— 镜像名、容器名、宿主上已被占用的端口 —— 写进同目录的 `compose.override.yaml`：compose 会自动把它叠加在 `compose.yaml` 之上。该文件在 `.gitignore` 里，所以仓库里那份始终与上游一致，升级时不会冲突。
 
 - **用 host 网络，不用端口映射**：DNS 那条链路必须走宿主自己的 IPv6 出口，网桥网络拿到的是另一个地址。代价是容器直接占用宿主端口，`DASHBOARD_PORT` 必须在本机空闲，且 `ports:` 与 `network_mode` 互斥、在这里根本不能写。
 - **要求宿主本身具备公网 IPv6 出站能力**：探测走 `api6.ipify.org` 的 IPv6 端点，探测不到就只报错、绝不写 DNS。
