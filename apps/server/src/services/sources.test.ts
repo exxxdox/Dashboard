@@ -1,14 +1,35 @@
-import { describe, expect, test } from 'vitest';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, test } from 'vitest';
 
 import { loadConfig, type AppConfig } from '../config.js';
 import { openDatabase, type Db } from '../db/client.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
-import { createSource, gitProxyArgs, updateSource } from './sources.js';
+import { createLogger } from '../lib/logger.js';
+import { createSource, gitProxyArgs, syncSource, updateSource } from './sources.js';
 
-function setup(): { db: Db; config: AppConfig } {
+/** Roots created by `setup`, removed after each test. */
+const roots: string[] = [];
+
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+const logger = createLogger({ level: 'silent', pretty: false });
+
+/**
+ * A real shared root under the temp directory: a local source creates its own
+ * directory now, and that is only provable against a filesystem.
+ */
+function setup(): { db: Db; config: AppConfig; root: string } {
+  const root = mkdtempSync(join(tmpdir(), 'dashboard-sources-'));
+  roots.push(root);
   return {
     db: openDatabase(':memory:'),
-    config: loadConfig({ SCRIPT_ROOT_CONTAINER: '/workspace' }),
+    config: loadConfig({ SCRIPT_ROOT_CONTAINER: root }),
+    root,
   };
 }
 
@@ -171,5 +192,59 @@ describe('updateSource', () => {
     const source = synced(db, config, { name: 'ops', kind: 'local', subPath: 'local' });
 
     expect(updateSource(db, config, source.id, { name: 'renamed' }).syncStatus).toBe('ok');
+  });
+});
+
+/**
+ * A local source owns its directory. The bind mount exists so the files survive
+ * a container rebuild, not as a precondition the host has to satisfy first.
+ */
+describe('local directories', () => {
+  test('creates the directory when a local source is added', () => {
+    const { db, config, root } = setup();
+
+    createSource(db, config, { name: 'ops', kind: 'local', subPath: 'ops-scripts' });
+
+    expect(existsSync(join(root, 'ops-scripts'))).toBe(true);
+  });
+
+  test('creates the intermediate directories a nested path names', () => {
+    const { db, config, root } = setup();
+
+    createSource(db, config, { name: 'ops', kind: 'local', subPath: 'team/ops' });
+
+    expect(existsSync(join(root, 'team/ops'))).toBe(true);
+  });
+
+  test('creates the directory when a local source is moved to a new one', () => {
+    const { db, config, root } = setup();
+    const source = createSource(db, config, { name: 'ops', kind: 'local', subPath: 'before' });
+
+    updateSource(db, config, source.id, { subPath: 'after' });
+
+    expect(existsSync(join(root, 'after'))).toBe(true);
+    // A metadata edit still never deletes files, so the old directory stays.
+    expect(existsSync(join(root, 'before'))).toBe(true);
+  });
+
+  test('recreates a vanished directory instead of refusing to sync', async () => {
+    const { db, config, root } = setup();
+    const source = createSource(db, config, { name: 'ops', kind: 'local', subPath: 'ops-scripts' });
+    rmSync(join(root, 'ops-scripts'), { recursive: true, force: true });
+
+    const result = await syncSource(db, config, source.id, logger);
+
+    expect(result.total).toBe(0);
+    expect(existsSync(join(root, 'ops-scripts'))).toBe(true);
+  });
+
+  test('reports an unwritable directory as a validation error, not a crash', () => {
+    const { db, config, root } = setup();
+    // A file where a directory would have to go: mkdir cannot succeed here.
+    writeFileSync(join(root, 'blocked'), 'not a directory');
+
+    expect(() =>
+      createSource(db, config, { name: 'ops', kind: 'local', subPath: 'blocked/child' }),
+    ).toThrow(ValidationError);
   });
 });

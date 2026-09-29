@@ -63,7 +63,7 @@ const en = {
   'sources.form.subPathPlaceholderGithub': 'scripts',
   'sources.form.subPathPlaceholderLocal': 'ops-scripts',
   'sources.form.localNote':
-    'The directory must already exist inside the shared mount. Git-backed directories are browsable from the source list once created.',
+    'The directory is created for you if it is missing, and files you put there persist across container rebuilds.',
   // Split around the emphasised "Never synced" the sentence ends on.
   'sources.form.editNote.before':
     'Changing the repository, branch or directory leaves what was already scanned behind, so the source goes back to',
@@ -124,7 +124,7 @@ const zh: Record<keyof typeof en, string> = {
   'sources.form.subPathPlaceholderGithub': 'scripts',
   'sources.form.subPathPlaceholderLocal': 'ops-scripts',
   'sources.form.localNote':
-    '该目录必须已存在于共享挂载点中。创建后，Git 仓库目录可从脚本源列表浏览。',
+    '目录不存在时会自动创建；放入其中的文件随挂载点持久保存，容器重建也不会丢失。',
   'sources.form.editNote.before':
     '更改仓库、分支或目录会遗留已扫描的内容，因此在再次同步之前，该脚本源会回到',
   'sources.form.editNote.after': '状态。',

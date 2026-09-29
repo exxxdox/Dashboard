@@ -11,6 +11,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import { mkdir, readdir, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -220,6 +221,34 @@ function shapeFor(
   );
 }
 
+/**
+ * Make sure a local source's directory exists, creating it if it does not.
+ *
+ * The bind mount is there so the files outlive the container, not as something
+ * the host has to prepare: the dashboard owns the directories it manages, so a
+ * missing one is created rather than reported. This is the same thing a GitHub
+ * source already does before its first clone, and it is why a local source no
+ * longer has to be seeded by hand before it can be synced.
+ */
+function ensureLocalDirectory(config: AppConfig, mountPath: string): void {
+  const absolute = joinRoot(config.scriptRootContainer, mountPath);
+
+  if (!isInside(config.scriptRootContainer, absolute)) {
+    throw new ValidationError('The local path must stay inside the shared script root');
+  }
+
+  try {
+    mkdirSync(absolute, { recursive: true });
+  } catch (error) {
+    // Read-only mount, or a file where a directory has to go. Either way the
+    // caller's path is what is wrong, so this is not a 500.
+    throw new ValidationError(
+      `Cannot create "${mountPath}" inside the shared root ` +
+        `(${config.scriptRootContainer}): ${errorMessage(error)}`,
+    );
+  }
+}
+
 /** Two sources may not share a name, and may not share a directory. */
 function assertUnique(db: Db, id: string | null, name: string, mountPath: string): void {
   // `IS NOT` rather than `!=` so a null id (create) compares as "no row is
@@ -256,6 +285,10 @@ export function createSource(db: Db, config: AppConfig, input: CreateSourceInput
   });
 
   assertUnique(db, null, input.name, shape.mountPath);
+
+  // Before the row, so a directory that cannot be created fails the request
+  // instead of leaving a source whose files have nowhere to go.
+  if (input.kind === 'local') ensureLocalDirectory(config, shape.mountPath);
 
   const id = newSourceId();
   const timestamp = nowIso();
@@ -307,6 +340,12 @@ export function updateSource(
   });
 
   assertUnique(db, id, input.name ?? current.name, shape.mountPath);
+
+  // A move names a directory that may not exist yet; an edit that leaves the
+  // path alone does not, and repairing a vanished one is sync's job.
+  if (current.kind === 'local' && shape.mountPath !== current.mount_path) {
+    ensureLocalDirectory(config, shape.mountPath);
+  }
 
   // Only a moved checkout or a different ref invalidates what was synced. A
   // rename must not clear the row's state, or every edit would look like a
@@ -461,16 +500,9 @@ export async function syncSource(
     if (row.kind === 'github') {
       await ensureGitRepository(config, row, absolute);
     } else {
-      const exists = await stat(absolute).then(
-        (info) => info.isDirectory(),
-        () => false,
-      );
-      if (!exists) {
-        throw new ValidationError(
-          `The directory "${row.mount_path}" does not exist inside the shared root ` +
-            `(${config.scriptRootContainer}). Create it on the host, or point this source at one that exists.`,
-        );
-      }
+      // Repair as well as seed: a directory deleted on the host is recreated
+      // here, so a sync can only fail for a reason worth reporting.
+      ensureLocalDirectory(config, row.mount_path);
     }
 
     // A subdirectory of a repo can be chosen as the script root; scanning starts
