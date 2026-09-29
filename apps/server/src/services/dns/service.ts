@@ -30,9 +30,11 @@ import type {
   DnsRecord,
   DnsRecordProbe,
   DnsSchedulerView,
+  DnsSettingsView,
   DnsState,
   DnsUpdateResult,
   TestDnsNotificationInput,
+  UpdateDnsSettingsInput,
 } from '@dashboard/shared';
 import { DNS_CHECK_PREVIEW, MAX_DNS_CHECKS } from '@dashboard/shared';
 
@@ -54,7 +56,15 @@ import {
 import { createCloudflareProvider } from './cloudflare.js';
 import { redactToken, sendGotify, type GotifyMessage } from './gotify.js';
 import { detectPublicIpv6 } from './ipv6.js';
-import { getSettingsView, resolveSettings, resolveSettingsOrEmpty, validate } from './settings.js';
+import {
+  getSettingsView,
+  resolveSettings,
+  resolveSettingsOrEmpty,
+  validate,
+  // Renamed at the import: the service exposes its own `saveSettings`, and two
+  // bindings with one name in this file is a reading hazard.
+  saveSettings as writeSettings,
+} from './settings.js';
 import { DnsFailureError, type DnsProvider, type ResolvedDnsSettings } from './types.js';
 
 export type DnsServiceDeps = {
@@ -70,6 +80,12 @@ export type DnsServiceDeps = {
   notify?: (message: GotifyMessage) => Promise<boolean>;
   /** Wired by the composition root once the scheduler exists; null before that. */
   getSchedule?: () => DnsSchedulerView | null;
+  /**
+   * Also wired by the composition root. Saving settings is where the schedule
+   * changes, so the service applies it: that way there is no path that stores an
+   * interval and forgets to arm the timer for it.
+   */
+  configureSchedule?: (settings: { scheduleEnabled: boolean; intervalMinutes: number }) => void;
 };
 
 export type DnsService = {
@@ -84,6 +100,8 @@ export type DnsService = {
   state: () => DnsState;
   listChecks: (filter: DnsCheckFilter) => DnsCheckList;
   clearChecks: () => number;
+  /** Store a settings update, and re-arm the schedule to match. */
+  saveSettings: (input: UpdateDnsSettingsInput) => DnsSettingsView;
 };
 
 /**
@@ -326,6 +344,15 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
 
     clearChecks() {
       return clearChecks(db);
+    },
+
+    saveSettings(input) {
+      const view = writeSettings(db, box, input);
+      deps.configureSchedule?.({
+        scheduleEnabled: view.scheduleEnabled,
+        intervalMinutes: view.intervalMinutes,
+      });
+      return view;
     },
   };
 }

@@ -13,6 +13,8 @@ import type { SecretBox } from './lib/crypto.js';
 import type { Logger } from './lib/logger.js';
 import type { Queue } from './runner/queue.js';
 import type { ExecutionRunner } from './runner/runner.js';
+import type { DnsScheduler } from './services/dns/scheduler.js';
+import type { DnsService } from './services/dns/service.js';
 import type { ExecutionService } from './services/executions.js';
 import type { ExecutionHub } from './ws/hub.js';
 
@@ -32,6 +34,9 @@ export type AppContext = {
   queue: Queue;
   runner: ExecutionRunner;
   executions: ExecutionService;
+  /** The IPv6 DNS console: one settings row, one history table, one timer. */
+  dns: DnsService;
+  dnsScheduler: DnsScheduler;
   /** Set while the process is shutting down, so routes can refuse new work. */
   isShuttingDown: () => boolean;
 };

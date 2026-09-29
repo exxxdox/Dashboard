@@ -16,6 +16,9 @@ import { createSecretBox, resolveSecretKey } from './lib/crypto.js';
 import { createLogger } from './lib/logger.js';
 import { createQueue } from './runner/queue.js';
 import { createExecutionRunner } from './runner/runner.js';
+import { createDnsScheduler } from './services/dns/scheduler.js';
+import { createDnsService, type DnsService } from './services/dns/service.js';
+import { resolveSettings } from './services/dns/settings.js';
 import { createExecutionService, type ExecutionService } from './services/executions.js';
 import { createExecutionHub } from './ws/hub.js';
 
@@ -87,6 +90,24 @@ async function main(): Promise<void> {
 
   executions = createExecutionService({ db, box, config, hub, logger, runner, queue });
 
+  // The same cycle as the runner and the execution service, broken the same way:
+  // the scheduler needs something to run, and the service reads the scheduler's
+  // snapshot for its state payload.
+  let dns!: DnsService;
+  const dnsScheduler = createDnsScheduler({
+    service: { update: (source, signal) => dns.update(source, signal) },
+    logger,
+  });
+  dns = createDnsService({
+    db,
+    box,
+    logger,
+    getSchedule: () => dnsScheduler.snapshot(),
+    configureSchedule: (settings) => {
+      dnsScheduler.configure(settings);
+    },
+  });
+
   const ctx: AppContext = {
     config,
     db,
@@ -96,6 +117,8 @@ async function main(): Promise<void> {
     queue,
     runner,
     executions,
+    dns,
+    dnsScheduler,
     auth,
     loginThrottle: createLoginThrottle(),
     isShuttingDown: () => shuttingDown,
@@ -105,6 +128,22 @@ async function main(): Promise<void> {
   // reporting otherwise would strand the UI on a run that will never finish.
   executions.markInterrupted();
   executions.prune();
+
+  // Restore the schedule a previous process left enabled. A failure here must not
+  // stop the server starting: whatever cannot be read is the same thing the DNS
+  // page will report when someone opens it, and a process that refuses to boot
+  // is a worse answer than one that explains itself in the UI.
+  try {
+    const stored = resolveSettings(db, box);
+    if (stored) {
+      dnsScheduler.configure({
+        scheduleEnabled: stored.scheduleEnabled,
+        intervalMinutes: stored.intervalMinutes,
+      });
+    }
+  } catch (error) {
+    logger.warn({ err: error }, 'the stored DNS settings could not be read at boot');
+  }
 
   const pruneTimer = setInterval(() => {
     try {
@@ -124,6 +163,9 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'shutting down');
 
     clearInterval(pruneTimer);
+    // Stopped before the database closes: a tick that fired now would run
+    // against a closed handle.
+    dnsScheduler.stop();
 
     // Stop accepting work first, then give the queue a bounded window to finish.
     // Runs that do not finish are reported as interrupted on the next boot.
@@ -156,7 +198,7 @@ async function main(): Promise<void> {
       keySource: keyResolution.source,
       maxConcurrentExecutions: config.maxConcurrentExecutions,
     },
-    'script dashboard ready',
+    'dashboard ready',
   );
 }
 
