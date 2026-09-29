@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { CircleAlert, Loader, TriangleAlert } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { useT } from '../lib/i18n';
 
 /** Errors always show the server's own message; nothing is paraphrased. */
 export function ErrorBanner({
@@ -12,6 +13,8 @@ export function ErrorBanner({
   onRetry?: () => void;
   className?: string;
 }) {
+  const t = useT();
+
   return (
     <div
       role="alert"
@@ -28,7 +31,7 @@ export function ErrorBanner({
           onClick={onRetry}
           className="focus-ring text-danger hover:bg-danger/15 text-meta rounded-lg px-2 py-1 font-semibold transition-colors duration-150"
         >
-          Retry
+          {t('common.retry')}
         </button>
       ) : null}
     </div>
@@ -75,26 +78,30 @@ export function EmptyState({
 }
 
 export function LoadingRows({ rows = 5, className }: { rows?: number; className?: string }) {
+  const t = useT();
+
   return (
     <div className={cn('divide-line divide-y', className)} aria-busy="true" aria-live="polite">
       {Array.from({ length: rows }, (_, index) => (
-        <div key={index} className="flex items-center gap-3 px-4 py-3.5">
+        <div key={index} className="flex items-center gap-3 px-4 py-4">
           <div className="bg-panel-3 size-2 animate-pulse rounded-full" />
           <div className="bg-panel-3 h-3 w-24 animate-pulse rounded" />
           <div className="bg-panel-3 h-3 w-40 animate-pulse rounded" />
           <div className="bg-panel-3 ml-auto h-3 w-12 animate-pulse rounded" />
         </div>
       ))}
-      <span className="sr-only">Loading</span>
+      <span className="sr-only">{t('common.loading')}</span>
     </div>
   );
 }
 
-export function LoadingBlock({ label = 'Loading' }: { label?: string }) {
+export function LoadingBlock({ label }: { label?: string }) {
+  const t = useT();
+
   return (
     <div className="text-mute text-body flex items-center gap-2.5 px-4 py-8" aria-busy="true">
       <Loader className="size-4 animate-spin" aria-hidden />
-      {label}
+      {label ?? t('common.loading')}
     </div>
   );
 }

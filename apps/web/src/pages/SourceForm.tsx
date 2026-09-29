@@ -11,6 +11,7 @@ import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextInput } from '../components/Form';
 import { useCreateSource, useUpdateSource } from '../api/queries';
 import { errorMessage } from '../api/client';
+import { useI18n, type Translate } from '../lib/i18n';
 
 type FormState = {
   name: string;
@@ -34,8 +35,10 @@ function toFormState(source: SourceSummary | null): FormState {
   };
 }
 
-function kindLabel(kind: SourceKind): string {
-  return kind === 'github' ? 'GitHub repository' : 'Local directory';
+function kindLabel(kind: SourceKind, t: Translate): string {
+  return kind === 'github'
+    ? t('sources.form.githubRepository')
+    : t('sources.form.localDirectory');
 }
 
 export function SourceForm({
@@ -46,6 +49,7 @@ export function SourceForm({
   source: SourceSummary | null;
   onDone: () => void;
 }) {
+  const i18n = useI18n();
   const create = useCreateSource();
   const update = useUpdateSource();
   const [state, setState] = useState<FormState>(() => toFormState(source));
@@ -110,39 +114,42 @@ export function SourceForm({
   return (
     <form onSubmit={submit} className="grid gap-3">
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-        <Field label="Name" error={showErrors && missing.name ? 'Required' : null}>
+        <Field
+          label={i18n.t('sources.form.name')}
+          error={showErrors && missing.name ? i18n.t('sources.form.required') : null}
+        >
           {({ id }) => (
             <TextInput
               id={id}
               value={state.name}
-              placeholder="ops-scripts"
+              placeholder={i18n.t('sources.form.namePlaceholder')}
               onChange={(event) => patch({ name: event.target.value })}
             />
           )}
         </Field>
         <Field
-          label="Kind"
+          label={i18n.t('sources.form.kind')}
           hint={
             isEdit
-              ? 'Fixed: it decides where the files live.'
+              ? i18n.t('sources.form.kindHintEdit')
               : state.kind === 'github'
-                ? 'Cloned and refreshed on sync.'
-                : 'Already on this machine.'
+                ? i18n.t('sources.form.kindHintGithub')
+                : i18n.t('sources.form.kindHintLocal')
           }
         >
           {({ id }) =>
             isEdit ? (
               // Changing the kind would move the checkout, orphan the files and
               // strand every script path recorded against this source.
-              <TextInput id={id} value={kindLabel(state.kind)} disabled />
+              <TextInput id={id} value={kindLabel(state.kind, i18n.t)} disabled />
             ) : (
               <Select
                 id={id}
                 value={state.kind}
                 onChange={(event) => patch({ kind: event.target.value as SourceKind })}
               >
-                <option value="local">Local directory</option>
-                <option value="github">GitHub repository</option>
+                <option value="local">{i18n.t('sources.form.localDirectory')}</option>
+                <option value="github">{i18n.t('sources.form.githubRepository')}</option>
               </Select>
             )
           }
@@ -151,24 +158,27 @@ export function SourceForm({
 
       {state.kind === 'github' ? (
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
-          <Field label="Repository URL" error={showErrors && missing.repoUrl ? 'Required' : null}>
+          <Field
+            label={i18n.t('sources.form.repoUrl')}
+            error={showErrors && missing.repoUrl ? i18n.t('sources.form.required') : null}
+          >
             {({ id }) => (
               <TextInput
                 id={id}
                 className="mono"
                 value={state.repoUrl}
-                placeholder="https://github.com/acme/ops"
+                placeholder={i18n.t('sources.form.repoUrlPlaceholder')}
                 onChange={(event) => patch({ repoUrl: event.target.value })}
               />
             )}
           </Field>
-          <Field label="Branch" hint="Blank uses the default branch.">
+          <Field label={i18n.t('sources.form.branch')} hint={i18n.t('sources.form.branchHint')}>
             {({ id }) => (
               <TextInput
                 id={id}
                 className="mono"
                 value={state.branch}
-                placeholder="main"
+                placeholder={i18n.t('sources.form.branchPlaceholder')}
                 onChange={(event) => patch({ branch: event.target.value })}
               />
             )}
@@ -177,20 +187,28 @@ export function SourceForm({
       ) : null}
 
       <Field
-        label={state.kind === 'github' ? 'Subdirectory' : 'Directory'}
+        label={
+          state.kind === 'github'
+            ? i18n.t('sources.form.subdirectory')
+            : i18n.t('sources.form.directory')
+        }
         hint={
           state.kind === 'github'
-            ? 'Path inside the repository to treat as the script root. Blank uses the repository root.'
-            : 'Directory inside the shared mount that holds the scripts, relative to the mount root.'
+            ? i18n.t('sources.form.subPathHintGithub')
+            : i18n.t('sources.form.subPathHintLocal')
         }
-        error={showErrors && missing.subPath ? 'Required' : null}
+        error={showErrors && missing.subPath ? i18n.t('sources.form.required') : null}
       >
         {({ id }) => (
           <TextInput
             id={id}
             className="mono"
             value={state.subPath}
-            placeholder={state.kind === 'github' ? 'scripts' : 'ops-scripts'}
+            placeholder={
+              state.kind === 'github'
+                ? i18n.t('sources.form.subPathPlaceholderGithub')
+                : i18n.t('sources.form.subPathPlaceholderLocal')
+            }
             onChange={(event) => patch({ subPath: event.target.value })}
           />
         )}
@@ -199,19 +217,19 @@ export function SourceForm({
       {state.kind === 'local' ? (
         <p className="text-faint text-meta flex items-start gap-2">
           <FolderTree className="mt-0.5 size-4 shrink-0" aria-hidden />
-          The directory must already exist inside the shared mount. Git-backed directories are
-          browsable from the source list once created.
+          {i18n.t('sources.form.localNote')}
         </p>
       ) : null}
 
       {isEdit ? (
         <p className="text-mute text-meta">
-          Changing the repository, branch or directory leaves what was already scanned behind, so the
-          source goes back to <span className="text-ink">Never synced</span> until you sync it again.
+          {i18n.t('sources.form.editNote.before')}{' '}
+          <span className="text-ink">{i18n.t('sources.neverSynced')}</span>{' '}
+          {i18n.t('sources.form.editNote.after')}
         </p>
       ) : null}
 
-      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error)} /> : null}
+      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error, i18n)} /> : null}
 
       <div className="flex items-center gap-2">
         <Button
@@ -222,10 +240,10 @@ export function SourceForm({
           }
           loading={mutation.isPending}
         >
-          {isEdit ? 'Save source' : 'Add source'}
+          {isEdit ? i18n.t('sources.form.save') : i18n.t('sources.add')}
         </Button>
         <Button variant="ghost" icon={<X className="size-4" aria-hidden />} onClick={onDone}>
-          Cancel
+          {i18n.t('sources.form.cancel')}
         </Button>
       </div>
     </form>

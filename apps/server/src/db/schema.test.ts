@@ -86,7 +86,8 @@ describe('v5 migration', () => {
       expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       expect(columnsOf(db, 'dns_settings')).toContain('cloudflare_token_encrypted');
       expect(columnsOf(db, 'dns_settings')).toContain('alibaba_access_key_secret_encrypted');
-      expect(columnsOf(db, 'dns_settings')).toContain('gotify_token_encrypted');
+      // The third secret this migration created has since moved to
+      // `app_settings`; the v6 block below is where that is asserted.
       expect(columnsOf(db, 'dns_checks')).toContain('failure_reason');
       // The tables the rest of the app is written against are still intact.
       expect(columnsOf(db, 'executions')).toContain('argv_json');
@@ -105,7 +106,6 @@ describe('v5 migration', () => {
       // would be a second, ambiguous spelling of the same thing.
       expect(notNullOf(db, 'dns_settings', 'cloudflare_token_encrypted')).toBe(0);
       expect(notNullOf(db, 'dns_settings', 'alibaba_access_key_secret_encrypted')).toBe(0);
-      expect(notNullOf(db, 'dns_settings', 'gotify_token_encrypted')).toBe(0);
       expect(notNullOf(db, 'dns_checks', 'previous_value')).toBe(0);
       // Everything the form has to display is NOT NULL, so the row type carries
       // no nullability the UI would have to invent text for.
@@ -138,6 +138,86 @@ describe('v5 migration', () => {
       expect(() => checks.run('dnsc_3', NOW, 'manual', 'failed', 'dns_is_broken')).toThrow(/CHECK/);
       expect(() => checks.run('dnsc_4', NOW, 'scheduled', 'unchanged', null)).not.toThrow();
       expect(() => checks.run('dnsc_5', NOW, 'manual', 'failed', 'dns_query_failed')).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+});
+
+/**
+ * A database at schema v5 holding a notification credential on the DNS
+ * settings row, which is what the settings move has to upgrade from.
+ */
+function versionFiveDatabase(): SqliteDatabase {
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+  for (const migration of MIGRATIONS.slice(0, 5)) migration(db);
+  db.pragma('user_version = 5');
+
+  db.prepare(
+    `INSERT INTO dns_settings
+       (id, provider, interval_minutes, cloudflare_zone_id, cloudflare_record_name,
+        gotify_address, gotify_token_encrypted, created_at, updated_at)
+     VALUES ('dns','cloudflare',10,'zone-1','home.example.com','notify.test','ciphertext',?,?)`,
+  ).run(NOW, NOW);
+
+  return db;
+}
+
+describe('v6 migration', () => {
+  test('carries the notification credential over and drops it from the DNS row', () => {
+    const db = versionFiveDatabase();
+    try {
+      migrate(db);
+
+      const app = db
+        .prepare<[], { gotify_address: string; gotify_token_encrypted: string | null }>(
+          `SELECT gotify_address, gotify_token_encrypted FROM app_settings WHERE id = 'app'`,
+        )
+        .get();
+      // Ciphertext in, ciphertext out: the move does not decrypt and re-encrypt,
+      // so it cannot fail on a credential it has no reason to understand.
+      expect(app).toEqual({
+        gotify_address: 'notify.test',
+        gotify_token_encrypted: 'ciphertext',
+      });
+
+      // One source of truth: the old columns are gone rather than shadowed.
+      expect(columnsOf(db, 'dns_settings')).not.toContain('gotify_address');
+      expect(columnsOf(db, 'dns_settings')).not.toContain('gotify_token_encrypted');
+      expect(columnsOf(db, 'dns_settings')).toContain('cloudflare_token_encrypted');
+      expect(columnsOf(db, 'dns_settings')).toContain('cloudflare_zone_id');
+    } finally {
+      db.close();
+    }
+  });
+
+  test('writes no row when there were no DNS settings to move', () => {
+    const db = new Database(':memory:');
+    try {
+      for (const migration of MIGRATIONS.slice(0, 5)) migration(db);
+      // Without this the version is still 0 and `migrate` replays v1 into the
+      // tables it just made. The DNS row is what is deliberately absent here.
+      db.pragma('user_version = 5');
+      migrate(db);
+
+      // A fresh install has no notification address, not an empty one that
+      // looks like an address someone deleted.
+      expect(db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM app_settings').get()).toEqual({
+        n: 0,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  test('keeps the moved credential nullable, so "not stored" stays expressible', () => {
+    const db = versionFiveDatabase();
+    try {
+      migrate(db);
+
+      expect(notNullOf(db, 'app_settings', 'gotify_token_encrypted')).toBe(0);
+      expect(notNullOf(db, 'app_settings', 'gotify_address')).toBe(1);
     } finally {
       db.close();
     }

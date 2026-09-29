@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 5;
+const TARGET_VERSION = 6;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -220,6 +220,43 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX idx_dns_checks_at ON dns_checks(at DESC);
     `);
+  },
+
+  // v6 -- a notification address is a property of the dashboard, not of the
+  // IPv6 console. It was only ever stored on `dns_settings` because that console
+  // was the first and only thing that sent one.
+  //
+  // The two columns move rather than being copied and left behind: a second
+  // source of truth for one credential is a bug waiting for the day the two
+  // disagree. The copy and the drop are in the same migration, and `migrate()`
+  // wraps every migration in a transaction, so a failure leaves the old columns
+  // exactly as they were.
+  //
+  // `created_at`/`updated_at` come across unchanged, because they are the truth
+  // about when this credential was written -- not about when it was moved.
+  (db) => {
+    db.exec(`
+      CREATE TABLE app_settings (
+        id                     TEXT PRIMARY KEY,
+        gotify_address         TEXT NOT NULL DEFAULT '',
+        gotify_token_encrypted TEXT,
+        created_at             TEXT NOT NULL,
+        updated_at             TEXT NOT NULL
+      );
+    `);
+
+    // `INSERT ... SELECT` writes nothing when the DNS settings were never saved,
+    // which is the correct outcome: a fresh install has no notification address,
+    // not an empty one to migrate.
+    db.exec(`
+      INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, created_at, updated_at)
+      SELECT 'app', gotify_address, gotify_token_encrypted, created_at, updated_at
+      FROM dns_settings
+      WHERE id = 'dns'
+    `);
+
+    db.exec('ALTER TABLE dns_settings DROP COLUMN gotify_address');
+    db.exec('ALTER TABLE dns_settings DROP COLUMN gotify_token_encrypted');
   },
 ];
 

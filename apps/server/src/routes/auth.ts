@@ -82,9 +82,13 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
         // this point, so a malformed request from a locked address answers 422
         // instead -- the price of the rule above, and the cheaper of the two.
         void reply.header('retry-after', '900');
-        throw new RateLimitedError();
+        throw new RateLimitedError('Too many attempts. Try again later.', {
+          key: 'error.auth.rateLimited',
+        });
       }
-      throw new UnauthorizedError('That username and password do not match');
+      throw new UnauthorizedError('That username and password do not match', {
+        key: 'error.auth.badCredentials',
+      });
     }
 
     loginThrottle.reset(address);

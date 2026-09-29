@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { ScriptFormat } from '@dashboard/shared';
 import { cn } from '../lib/cn';
+import { useT } from '../lib/i18n';
 
 const MAX_LINES = 400;
 
@@ -18,6 +19,7 @@ function classify(text: string, index: number): Line['kind'] {
 }
 
 export function ScriptSource({ content, format }: { content: string; format: ScriptFormat }) {
+  const t = useT();
   const lines = useMemo<Line[]>(
     () =>
       content
@@ -59,7 +61,9 @@ export function ScriptSource({ content, format }: { content: string; format: Scr
       <p className="text-faint text-micro">
         <span className="mono">{format}</span>
         {' · '}
-        {total > MAX_LINES ? `first ${MAX_LINES} of ${total} lines` : `${total} lines`}
+        {total > MAX_LINES
+          ? t('scripts.source.overflow', { shown: MAX_LINES, total })
+          : t('scripts.source.lines', { count: total })}
       </p>
     </div>
   );

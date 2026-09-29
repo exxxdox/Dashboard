@@ -66,7 +66,10 @@ function loadScriptRow(db: Db, scriptId: string): ScriptDraftRow {
       'SELECT params_json, run_draft_json FROM scripts WHERE id = ?',
     )
     .get(scriptId);
-  if (!row) throw new NotFoundError(`No script with id ${JSON.stringify(scriptId)}`);
+  // The entity, not a sentence: `NotFoundError` derives its translation key
+  // from this word, and "No script with id "abc" not found" was neither good
+  // English nor a translatable string. The id is already in the request path.
+  if (!row) throw new NotFoundError('Script');
   return row;
 }
 

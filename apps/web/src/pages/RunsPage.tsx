@@ -11,8 +11,10 @@ import { KeyHints } from '../components/KeyHints';
 import { Select } from '../components/Form';
 import { ScriptSearch } from '../components/ScriptSearch';
 import { useExecutions, useScript, useTargets } from '../api/queries';
-import { EXECUTION_STATUS_META } from '../lib/status';
+import { errorMessage } from '../api/client';
+import { EXECUTION_STATUS_META, executionStatusLabel } from '../lib/status';
 import { formatDuration, formatRelative, formatExit, runTag } from '../lib/format';
+import { useI18n } from '../lib/i18n';
 import { goBack, href, navigate, type Route } from '../lib/router';
 import { useListKeyboard } from '../lib/keyboard';
 
@@ -52,6 +54,8 @@ function readFilters(search: URLSearchParams): RunsFilters {
 }
 
 export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> }) {
+  const i18n = useI18n();
+  const t = i18n.t;
   const filters = useMemo(() => readFilters(route.search), [route.search]);
   const containerRef = useRef<HTMLDivElement>(null);
   // `/` focuses the script picker — the filter worth reaching for mid-scan.
@@ -108,16 +112,16 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Executions"
-        title="Runs"
-        description="Every execution, newest first."
+        eyebrow={t('runs.eyebrow')}
+        title={t('nav.runs')}
+        description={t('runs.description')}
         hints={
           <KeyHints
             hints={[
-              { keys: ['j', 'k'], label: 'move' },
-              { keys: ['/'], label: 'search' },
-              { keys: ['↵'], label: 'open' },
-              { keys: ['esc'], label: 'back' },
+              { keys: ['j', 'k'], label: t('runs.hint.move') },
+              { keys: ['/'], label: t('runs.hint.search') },
+              { keys: ['↵'], label: t('runs.hint.open') },
+              { keys: ['esc'], label: t('runs.hint.back') },
             ]}
           />
         }
@@ -127,22 +131,22 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
             onClick={() => void executions.refetch()}
             loading={executions.isFetching}
           >
-            Refresh
+            {t('runs.refresh')}
           </Button>
         }
       />
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
         <Select
-          aria-label="Filter by status"
+          aria-label={t('runs.filter.status')}
           value={filters.status}
           onChange={(event) => applyFilters({ status: event.target.value })}
           className="w-[184px] shrink-0"
         >
-          <option value="">All statuses</option>
+          <option value="">{t('runs.filter.allStatuses')}</option>
           {STATUS_OPTIONS.map((status) => (
             <option key={status} value={status}>
-              {EXECUTION_STATUS_META[status].label}
+              {executionStatusLabel(t, status)}
             </option>
           ))}
         </Select>
@@ -154,12 +158,12 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
         />
 
         <Select
-          aria-label="Filter by target"
+          aria-label={t('runs.filter.target')}
           value={filters.targetId}
           onChange={(event) => applyFilters({ targetId: event.target.value })}
           className="w-[208px] shrink-0"
         >
-          <option value="">All targets</option>
+          <option value="">{t('runs.filter.allTargets')}</option>
           {(targets.data ?? []).map((target) => (
             <option key={target.id} value={target.id}>
               {target.name}
@@ -169,19 +173,21 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
 
         {hasFilters ? (
           <Button size="sm" variant="ghost" onClick={() => navigate('/runs')}>
-            Clear
+            {t('common.clear')}
           </Button>
         ) : null}
 
         <span className="text-faint mono text-meta ml-auto shrink-0">
-          {total} {total === 1 ? 'run' : 'runs'}
+          {total === 1
+            ? t('runs.count.one', { count: total })
+            : t('runs.count.many', { count: total })}
         </span>
       </div>
 
       {executions.isError ? (
         <ErrorBanner
           className="mt-4"
-          message={executions.error.message}
+          message={errorMessage(executions.error, i18n)}
           onRetry={() => void executions.refetch()}
         />
       ) : null}
@@ -193,38 +199,38 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
           <div className="p-4">
             <EmptyState
               icon={<Terminal className="size-5" aria-hidden />}
-              title={hasFilters ? 'No runs match these filters' : 'No runs yet'}
+              title={hasFilters ? t('runs.empty.filtered.title') : t('runs.empty.none.title')}
               description={
                 hasFilters
-                  ? 'Loosen the filters, or clear them to see every execution.'
-                  : 'Executions appear here the moment a script is sent to a target.'
+                  ? t('runs.empty.filtered.description')
+                  : t('runs.empty.none.description')
               }
               action={
                 hasFilters ? (
                   <Button size="sm" onClick={() => navigate('/runs')}>
-                    Clear filters
+                    {t('runs.empty.filtered.action')}
                   </Button>
                 ) : (
                   <Button size="sm" variant="primary" onClick={() => navigate('/scripts')}>
-                    Run a script
+                    {t('runs.empty.none.action')}
                   </Button>
                 )
               }
             />
           </div>
         ) : (
-          <div ref={containerRef} role="grid" aria-label="Executions">
+          <div ref={containerRef} role="grid" aria-label={t('runs.eyebrow')}>
             <div
               role="row"
               className={`border-line text-faint grid ${GRID_COLUMNS} items-center gap-4 border-b px-4 py-2.5`}
             >
-              <span className="label">Run</span>
-              <span className="label">Status</span>
-              <span className="label">Script</span>
-              <span className="label hidden xl:block">Target</span>
-              <span className="label hidden text-right md:block">Exit</span>
-              <span className="label text-right">Time</span>
-              <span className="label hidden text-right 2xl:block">Queued</span>
+              <span className="label">{t('runs.col.run')}</span>
+              <span className="label">{t('runs.col.status')}</span>
+              <span className="label">{t('runs.col.script')}</span>
+              <span className="label hidden xl:block">{t('runs.col.target')}</span>
+              <span className="label hidden text-right md:block">{t('runs.col.exit')}</span>
+              <span className="label text-right">{t('runs.col.time')}</span>
+              <span className="label hidden text-right 2xl:block">{t('runs.col.queued')}</span>
             </div>
 
             {items.map((execution, index) => (
@@ -248,14 +254,14 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
                 <span className="text-mute text-meta hidden truncate xl:block">{execution.targetName}</span>
                 <span className="mono text-mute text-meta hidden text-right md:block">
                   {execution.status === 'running' || execution.status === 'queued'
-                    ? '—'
+                    ? t('common.dash')
                     : formatExit(execution.exitCode, execution.signal)}
                 </span>
                 <span className="mono text-mute text-meta text-right">
                   {formatDuration(execution.durationMs)}
                 </span>
                 <span className="text-faint text-meta hidden text-right 2xl:block">
-                  {formatRelative(execution.queuedAt)}
+                  {formatRelative(execution.queuedAt, t)}
                 </span>
               </button>
             ))}
@@ -266,7 +272,11 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
       {total > PAGE_SIZE ? (
         <div className="mt-4 flex items-center justify-between">
           <span className="text-faint mono text-meta">
-            {offset + 1}–{Math.min(offset + items.length, total)} of {total}
+            {t('runs.range', {
+              from: offset + 1,
+              to: Math.min(offset + items.length, total),
+              total,
+            })}
           </span>
           <div className="flex items-center gap-2.5">
             <Button
@@ -275,7 +285,7 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
               icon={<ChevronLeft className="size-4" aria-hidden />}
               onClick={() => applyFilters({ page: filters.page - 1 })}
             >
-              Previous
+              {t('runs.previous')}
             </Button>
             <span className="text-mute mono text-meta">
               {filters.page} / {lastPage}
@@ -285,7 +295,7 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
               disabled={filters.page >= lastPage}
               onClick={() => applyFilters({ page: filters.page + 1 })}
             >
-              Next
+              {t('runs.next')}
               <ChevronRight className="size-4" aria-hidden />
             </Button>
           </div>

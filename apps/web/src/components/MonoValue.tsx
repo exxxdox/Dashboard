@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { useT } from '../lib/i18n';
 
 /**
  * A machine value with a copy affordance.
@@ -19,6 +20,7 @@ export function MonoValue({
   wrap?: boolean;
   label?: string;
 }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -44,7 +46,9 @@ export function MonoValue({
       <button
         type="button"
         onClick={() => void copy()}
-        aria-label={copied ? 'Copied' : `Copy ${label ?? 'value'}`}
+        aria-label={
+          copied ? t('common.copied') : t('common.copyNamed', { name: label ?? t('common.value') })
+        }
         className={cn(
           'focus-ring shrink-0 rounded-md p-1 transition-all duration-150 ease-out',
           'opacity-0 group-hover/mono:opacity-100 focus-visible:opacity-100',

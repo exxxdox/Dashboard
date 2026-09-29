@@ -274,23 +274,39 @@ export const updateDnsSettingsSchema = z.object({
   alibabaAccessKeyId: z.string().max(200).optional(),
   alibabaRecordId: z.string().max(200).optional(),
   alibabaAccessKeySecret: z.string().max(500).optional(),
-  gotifyAddress: z.string().max(500).optional(),
-  gotifyToken: z.string().max(500).optional(),
   clearCloudflareToken: z.boolean().optional(),
   clearAlibabaAccessKeySecret: z.boolean().optional(),
-  clearGotifyToken: z.boolean().optional(),
 });
 export type UpdateDnsSettingsInput = z.infer<typeof updateDnsSettingsSchema>;
+
+// ---------------------------------------------------------------------------
+// Application settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Settings that belong to the whole application rather than to one feature.
+ *
+ * Notifications live here rather than on the DNS settings row because what is
+ * being configured is "how this dashboard reaches me", and the first feature to
+ * send one will not be the last. The credential rule is the one used everywhere
+ * else: omitted or blank keeps the stored value, and deleting is its own flag.
+ */
+export const updateAppSettingsSchema = z.object({
+  gotifyAddress: z.string().max(500).optional(),
+  gotifyToken: z.string().max(500).optional(),
+  clearGotifyToken: z.boolean().optional(),
+});
+export type UpdateAppSettingsInput = z.infer<typeof updateAppSettingsSchema>;
 
 /**
  * The test message is sent with the form's current values, so a credential can
  * be verified before it is saved. Only the two fields it uses are accepted.
  */
-export const testDnsNotificationSchema = updateDnsSettingsSchema.pick({
+export const testNotificationSchema = updateAppSettingsSchema.pick({
   gotifyAddress: true,
   gotifyToken: true,
 });
-export type TestDnsNotificationInput = z.infer<typeof testDnsNotificationSchema>;
+export type TestNotificationInput = z.infer<typeof testNotificationSchema>;
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -453,9 +469,22 @@ export type DnsSettingsView = {
   /** Fixed: updating an IPv6 record is updating an AAAA record. */
   alibabaRecordType: 'AAAA';
   hasAlibabaAccessKeySecret: boolean;
+  updatedAt: string;
+};
+
+/**
+ * The application settings as the API returns them.
+ *
+ * Same rule as `DnsSettingsView`: no field here can carry a secret, so a route
+ * cannot leak one by forgetting to strip it. `notificationsReady` is derived
+ * rather than stored -- it is simply "both halves are present" -- so it cannot
+ * disagree with the two fields beside it.
+ */
+export type AppSettingsView = {
   gotifyAddress: string;
   hasGotifyToken: boolean;
-  updatedAt: string;
+  notificationsReady: boolean;
+  updatedAt: string | null;
 };
 
 export type DnsRecord = {
@@ -566,8 +595,36 @@ export type DnsRecordProbe = {
   queriedAt: string;
 };
 
-export type DnsNotificationTest = {
+/** The answer to a test message: it was handed to the notifier, and accepted. */
+export type NotificationTest = {
   sent: true;
+};
+
+// ---------------------------------------------------------------------------
+// Error contract
+// ---------------------------------------------------------------------------
+
+/**
+ * A locale-neutral identity for a message the server produced.
+ *
+ * The server never renders prose for a client in a language it cannot know: it
+ * names the message and supplies the values, and the client's own dictionary
+ * chooses the words. `params` holds plain values, except where the value is
+ * itself a name that has to be translated -- a credential field, an entity --
+ * in which case it is an identifier the client looks up.
+ */
+export type ErrorI18n = {
+  key: string;
+  params?: Record<string, string | number | readonly string[]>;
+};
+
+/** The body of every failed API response. */
+export type ApiErrorBody = {
+  code: string;
+  message: string;
+  /** Present when `message` has a locale-neutral identity. */
+  i18n?: ErrorI18n;
+  details?: unknown;
 };
 
 // ---------------------------------------------------------------------------

@@ -118,8 +118,9 @@ describe('describePrefill', () => {
   });
 
   it('names the source when there is', () => {
-    expect(describePrefill({ source: 'draft', draft: EMPTY })).toContain('last typed');
-    expect(describePrefill({ source: 'last-run', draft: EMPTY })).toContain('last run');
+    // The notice is a dictionary key; the wording belongs to the area file.
+    expect(describePrefill({ source: 'draft', draft: EMPTY })).toBe('runs.prefill.draft');
+    expect(describePrefill({ source: 'last-run', draft: EMPTY })).toBe('runs.prefill.lastRun');
   });
 
   it('accepts the server response type', () => {

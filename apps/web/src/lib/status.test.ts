@@ -29,8 +29,11 @@ describe('status metadata', () => {
 
   it('labels every status with readable text', () => {
     for (const meta of [...Object.values(EXECUTION_STATUS_META), ...Object.values(SYNC_STATUS_META)]) {
-      expect(meta.label.length).toBeGreaterThan(0);
-      expect(meta.label).not.toMatch(/_/);
+      // The label is a dictionary key now, so what is checked here is that it
+      // names something: a key misspelt or left as the raw enum has an
+      // underscore in it, and no key does.
+      expect(meta.labelKey.length).toBeGreaterThan(0);
+      expect(meta.labelKey).not.toMatch(/_/);
     }
   });
 

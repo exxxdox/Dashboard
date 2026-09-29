@@ -88,7 +88,7 @@ async function harness(overrides: { provider?: Partial<DnsProvider> } = {}): Pro
     logger,
     createProvider: () => provider as DnsProvider,
     detectIpv6: async (): Promise<string> => '2606:4700::1',
-    notify: async (): Promise<boolean> => false,
+    sendNotification: async (): Promise<boolean> => false,
     getSchedule: () => dnsScheduler.snapshot(),
   });
 

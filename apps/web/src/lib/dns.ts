@@ -1,10 +1,14 @@
 /**
  * Copy for the DNS console.
  *
- * Every map here is keyed by a union from the shared contract, so adding a
+ * Every function here is keyed by a union from the shared contract, so adding a
  * failure reason or an action on the server makes this file fail to compile
  * until it has words for it. That is the point: the server reports codes, and
  * nothing in the UI ever renders one.
+ *
+ * The words themselves live in the i18n dictionary -- `areas/dns.ts`. This
+ * module is only the mapping from a code onto one, which is why each lookup
+ * builds its key from the union rather than spelling the key out.
  */
 
 import type {
@@ -15,12 +19,11 @@ import type {
   DnsUpdateResult,
 } from '@dashboard/shared';
 
-export const ACTION_LABEL: Record<DnsAction, string> = {
-  created: 'Created',
-  updated: 'Updated',
-  unchanged: 'No change',
-  failed: 'Failed',
-};
+import type { Translate } from './i18n';
+
+export function resultLabel(t: Translate, action: DnsAction): string {
+  return t(`dns.resultLabel.${action}`);
+}
 
 /**
  * What went wrong, addressed to whoever has to fix it.
@@ -29,26 +32,17 @@ export const ACTION_LABEL: Record<DnsAction, string> = {
  * unreachable probe and a probe that answered with a private address are the
  * same sentence to a machine and different jobs for a person.
  */
-export const FAILURE_TEXT: Record<DnsFailureReason, string> = {
-  not_configured: 'Nothing has been configured yet.',
-  invalid_settings: 'The saved settings are incomplete, so no check was attempted.',
-  ipv6_detect_failed: 'The public IPv6 probe could not be reached.',
-  ipv6_not_global: 'The detected address is not a public one, so nothing was written.',
-  dns_query_failed: 'The provider could not be asked for the current record.',
-  dns_write_failed: 'The provider rejected the write.',
-  record_missing: 'The provider has no record with that id, and this console never creates one.',
-  record_identity_missing: 'The queried record has no host name, so there was nothing to update.',
-};
+export function failureText(t: Translate, reason: DnsFailureReason): string {
+  return t(`dns.failure.${reason}`);
+}
 
-export const SOURCE_LABEL: Record<DnsCheckSource, string> = {
-  manual: 'Manual',
-  scheduled: 'Scheduled',
-};
+export function sourceLabel(t: Translate, source: DnsCheckSource): string {
+  return t(`dns.source.${source}`);
+}
 
-export const PROVIDER_LABEL: Record<DnsProviderName, string> = {
-  cloudflare: 'Cloudflare',
-  alibaba: 'Alibaba Cloud',
-};
+export function providerLabel(t: Translate, provider: DnsProviderName): string {
+  return t(`dns.provider.${provider}`);
+}
 
 /**
  * A run in one sentence, composed from the numbers rather than from prose.
@@ -57,19 +51,23 @@ export const PROVIDER_LABEL: Record<DnsProviderName, string> = {
  * for the same fact, because the same outcome appears in the live result, the
  * summary line and a history row.
  */
-export function describeUpdate(result: DnsUpdateResult): string {
-  const where = result.recordName === '' ? 'the record' : result.recordName;
+export function describeUpdate(t: Translate, result: DnsUpdateResult): string {
+  const where = result.recordName === '' ? t('dns.update.theRecord') : result.recordName;
 
   switch (result.action) {
     case 'created':
-      return `Created ${where}, pointing at ${result.ipv6}.`;
+      return t('dns.update.created', { where, ipv6: result.ipv6 });
     case 'updated':
-      return `Updated ${where} from ${result.previousValue ?? '(empty)'} to ${result.ipv6}.`;
+      return t('dns.update.updated', {
+        where,
+        previous: result.previousValue ?? t('dns.update.emptyValue'),
+        ipv6: result.ipv6,
+      });
     case 'unchanged':
-      return `${where} already points at ${result.ipv6}; nothing was written.`;
+      return t('dns.update.unchanged', { where, ipv6: result.ipv6 });
     case 'failed':
       return result.failureReason === null
-        ? 'The check failed.'
-        : FAILURE_TEXT[result.failureReason];
+        ? t('dns.update.failed')
+        : failureText(t, result.failureReason);
   }
 }

@@ -20,6 +20,7 @@ import { createDnsScheduler } from './services/dns/scheduler.js';
 import { createDnsService, type DnsService } from './services/dns/service.js';
 import { resolveSettings } from './services/dns/settings.js';
 import { createExecutionService, type ExecutionService } from './services/executions.js';
+import { createNotificationService } from './services/notifications/service.js';
 import { createExecutionHub } from './ws/hub.js';
 
 /** How often retention runs. Daily is plenty for a self-hosted dashboard. */
@@ -90,6 +91,10 @@ async function main(): Promise<void> {
 
   executions = createExecutionService({ db, box, config, hub, logger, runner, queue });
 
+  // Built before the DNS service, which is only its first caller: the
+  // notification credential is a dashboard setting, so it is owned here.
+  const notifications = createNotificationService({ db, box });
+
   // The same cycle as the runner and the execution service, broken the same way:
   // the scheduler needs something to run, and the service reads the scheduler's
   // snapshot for its state payload.
@@ -102,6 +107,7 @@ async function main(): Promise<void> {
     db,
     box,
     logger,
+    sendNotification: (notification, signal) => notifications.send(notification, signal),
     getSchedule: () => dnsScheduler.snapshot(),
     configureSchedule: (settings) => {
       dnsScheduler.configure(settings);
@@ -119,6 +125,7 @@ async function main(): Promise<void> {
     executions,
     dns,
     dnsScheduler,
+    notifications,
     auth,
     loginThrottle: createLoginThrottle(),
     isShuttingDown: () => shuttingDown,

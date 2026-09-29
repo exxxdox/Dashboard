@@ -18,6 +18,11 @@ export const queryKeys = {
     ['executions', filter] as const,
   execution: (id: string) => ['executions', id] as const,
 
+  // The application settings are their own key rather than part of `dns`:
+  // they belong to the dashboard, and the DNS page is only one of their
+  // readers. Saving them therefore cannot invalidate a history table.
+  settings: () => ['settings'] as const,
+
   // One key for the whole DNS page: its state payload already carries the
   // settings, the probe results and a preview of the history, so there is
   // nothing to fetch in parallel with it.

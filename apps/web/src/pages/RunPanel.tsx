@@ -17,6 +17,7 @@ import {
 } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { cn } from '../lib/cn';
+import { useI18n, type Translate } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import {
   describePrefill,
@@ -64,16 +65,20 @@ function seedValues(params: ScriptParam[]): ParamValues {
  * required value is caught before a request is made. The server stays the
  * authority: this only saves a round trip.
  */
-function validate(params: ScriptParam[], values: ParamValues): Record<string, string> {
+function validate(
+  params: ScriptParam[],
+  values: ParamValues,
+  t: Translate,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const param of params) {
     const raw = (values[param.name] ?? '').trim();
     if (raw === '') {
-      if (param.required && param.default === null) errors[param.name] = 'Required';
+      if (param.required && param.default === null) errors[param.name] = t('runs.error.required');
       continue;
     }
     if (param.type === 'number' && !Number.isFinite(Number(raw))) {
-      errors[param.name] = 'Expected a number';
+      errors[param.name] = t('runs.error.number');
     }
   }
   return errors;
@@ -138,6 +143,8 @@ function RunRow({
  * different parameter set, and remounting is clearer than re-seeding state.
  */
 export function RunPanel({ script }: RunPanelProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const targets = useTargets();
   const execute = useExecuteScript();
   const prefill = useScriptRunDraft(script.id);
@@ -174,8 +181,8 @@ export function RunPanel({ script }: RunPanelProps) {
     setTimeoutSec(next);
   }
 
-  const errors = validate(script.params, values);
-  const customErrors = validateRows(customRows, script.params);
+  const errors = validate(script.params, values, t);
+  const customErrors = validateRows(customRows, script.params, t);
   const hasErrors = Object.keys(errors).length > 0 || Object.keys(customErrors).length > 0;
 
   const targetList = targets.data ?? [];
@@ -250,16 +257,18 @@ export function RunPanel({ script }: RunPanelProps) {
       <div className="border-line grid gap-3 border-t pt-4">
         {/* Says why the form is already filled in. Without it, restored values
             are indistinguishable from declared defaults. */}
-        {restoredNotice ? <p className="text-faint text-micro">{restoredNotice}</p> : null}
+        {restoredNotice ? (
+          <p className="text-faint text-micro">{t(restoredNotice)}</p>
+        ) : null}
 
         <RunRow
-          label="Target"
+          label={t('runs.field.target')}
           hint={
             selectedTarget
               ? `${selectedTarget.username}@${selectedTarget.host}:${selectedTarget.port}`
               : undefined
           }
-          error={showErrors && effectiveTargetId === '' ? 'Pick a target' : null}
+          error={showErrors && effectiveTargetId === '' ? t('runs.error.pickTarget') : null}
         >
           {({ id, describedBy }) => (
             <Select
@@ -269,8 +278,8 @@ export function RunPanel({ script }: RunPanelProps) {
               disabled={noTargets || targets.isPending}
               onChange={(event) => setTargetId(event.target.value)}
             >
-              {targets.isPending ? <option value="">Loading targets…</option> : null}
-              {noTargets ? <option value="">No targets configured</option> : null}
+              {targets.isPending ? <option value="">{t('runs.target.loading')}</option> : null}
+              {noTargets ? <option value="">{t('runs.target.none')}</option> : null}
               {targetList.map((target) => (
                 <option key={target.id} value={target.id}>
                   {target.name} — {target.username}@{target.host}
@@ -282,23 +291,25 @@ export function RunPanel({ script }: RunPanelProps) {
 
         {noTargets ? (
           <p className="text-mute text-meta">
-            A run needs somewhere to run.{' '}
+            {t('runs.noTargets.lead')}{' '}
             <a href="#/targets" className="text-accent underline underline-offset-2">
-              Add a target
+              {t('runs.noTargets.link')}
             </a>{' '}
-            first.
+            {t('runs.noTargets.tail')}
           </p>
         ) : null}
 
         {script.params.length > 0 ? (
           <>
-            <p className="label border-line mt-1 border-t pt-4">Parameters</p>
+            <p className="label border-line mt-1 border-t pt-4">{t('runs.field.parameters')}</p>
             {script.params.map((param) => (
               <RunRow
                 key={param.name}
                 label={param.name}
-                meta={`${param.type}${param.required ? ' · required' : ''}${
-                  param.default !== null ? ` · default ${param.default}` : ''
+                meta={`${param.type}${param.required ? ` · ${t('runs.param.required')}` : ''}${
+                  param.default !== null
+                    ? ` · ${t('runs.param.default', { value: param.default })}`
+                    : ''
                 }`}
                 hint={param.description || undefined}
                 error={showErrors ? (errors[param.name] ?? null) : null}
@@ -333,10 +344,7 @@ export function RunPanel({ script }: RunPanelProps) {
             ))}
           </>
         ) : (
-          <p className="text-mute text-meta">
-            This script declares no parameters, so the list below is the whole form: anything added
-            there reaches it as an environment variable or a positional argument.
-          </p>
+          <p className="text-mute text-meta">{t('runs.noParams')}</p>
         )}
 
         <div className="border-line mt-1 grid gap-3 border-t pt-4">
@@ -353,7 +361,7 @@ export function RunPanel({ script }: RunPanelProps) {
               )}
               aria-hidden
             />
-            <span className="label">Custom parameters</span>
+            <span className="label">{t('runs.custom.title')}</span>
             {customCount > 0 ? (
               <span className="mono text-accent text-micro">{customCount}</span>
             ) : null}
@@ -370,10 +378,10 @@ export function RunPanel({ script }: RunPanelProps) {
                     className="mono col-start-1 row-start-1 min-w-0"
                     aria-label={
                       row.mode === 'env'
-                        ? `Custom parameter ${index + 1} name`
-                        : `Custom argument ${index + 1} label`
+                        ? t('runs.custom.nameLabel', { index: index + 1 })
+                        : t('runs.custom.argLabel', { index: index + 1 })
                     }
-                    placeholder={row.mode === 'env' ? 'NAME' : 'label (optional)'}
+                    placeholder={row.mode === 'env' ? 'NAME' : t('runs.custom.labelPlaceholder')}
                     value={row.name}
                     onChange={(event) =>
                       editRows((current) =>
@@ -388,7 +396,7 @@ export function RunPanel({ script }: RunPanelProps) {
                     // Wide enough for the longest option: at 92px the browser
                     // rendered "argv" as "arg".
                     className="col-start-2 row-start-1 w-[104px]"
-                    aria-label={`Custom parameter ${index + 1} mode`}
+                    aria-label={t('runs.custom.modeLabel', { index: index + 1 })}
                     value={row.mode}
                     onChange={(event) =>
                       editRows((current) =>
@@ -402,7 +410,7 @@ export function RunPanel({ script }: RunPanelProps) {
                     <option value="argv">argv</option>
                   </Select>
                   <IconButton
-                    label={`Remove parameter ${index + 1}`}
+                    label={t('runs.custom.remove', { index: index + 1 })}
                     className="col-start-3 row-start-1"
                     onClick={() => editRows((current) => removeRow(current, row.id))}
                   >
@@ -410,8 +418,8 @@ export function RunPanel({ script }: RunPanelProps) {
                   </IconButton>
                   <TextInput
                     className="mono col-span-3 min-w-0"
-                    aria-label={`Custom parameter ${index + 1} value`}
-                    placeholder="value"
+                    aria-label={t('runs.custom.valueLabel', { index: index + 1 })}
+                    placeholder={t('runs.custom.valuePlaceholder')}
                     value={row.value}
                     onChange={(event) =>
                       editRows((current) =>
@@ -436,27 +444,28 @@ export function RunPanel({ script }: RunPanelProps) {
                   disabled={atCap}
                   onClick={appendRow}
                 >
-                  Add parameter
+                  {t('runs.custom.add')}
                 </Button>
               </div>
 
               <p className="text-faint text-meta">
-                <span className="mono">env</span> sets an environment variable, so its name must be
-                a shell identifier, and the runner&apos;s own{' '}
-                <span className="mono">SD_*</span> names are reserved. <span className="mono">argv</span>{' '}
-                is a positional argument: it reaches the script as{' '}
-                <span className="mono">$1</span>, <span className="mono">$2</span> … in the order
-                listed here, and its name is only a label. At most {MAX_PARAM_COUNT} in all.
+                <span className="mono">env</span> {t('runs.custom.envLead')}{' '}
+                <span className="mono">SD_*</span> {t('runs.custom.envTail')}{' '}
+                <span className="mono">argv</span> {t('runs.custom.argvLead')}{' '}
+                <span className="mono">$1</span>, <span className="mono">$2</span> …{' '}
+                {t('runs.custom.argvTail', { max: MAX_PARAM_COUNT })}
               </p>
             </div>
           ) : null}
         </div>
 
         <RunRow
-          label="Timeout"
-          hint={`Seconds. Blank uses the script's own limit${
-            script.timeoutSec === null ? '' : ` (${script.timeoutSec}s)`
-          }.`}
+          label={t('runs.field.timeout')}
+          hint={
+            script.timeoutSec === null
+              ? t('runs.timeout.hint')
+              : t('runs.timeout.hintOwn', { seconds: script.timeoutSec })
+          }
         >
           {({ id, describedBy }) => (
             <TextInput
@@ -474,7 +483,7 @@ export function RunPanel({ script }: RunPanelProps) {
         </RunRow>
       </div>
 
-      {execute.isError ? <ErrorBanner message={errorMessage(execute.error)} /> : null}
+      {execute.isError ? <ErrorBanner message={errorMessage(execute.error, i18n)} /> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -484,9 +493,9 @@ export function RunPanel({ script }: RunPanelProps) {
           disabled={noTargets}
           onClick={submit}
         >
-          Run script
+          {t('runs.submit')}
         </Button>
-        <span className="text-faint text-meta">Values reach the script as environment variables.</span>
+        <span className="text-faint text-meta">{t('runs.submitHint')}</span>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScriptParam } from '@dashboard/shared';
 
+import { translate, type Translate } from './i18n';
 import {
   addRow,
   collectArgv,
@@ -10,6 +11,10 @@ import {
   type CustomParamRow,
   type CustomParamMode,
 } from './run-params';
+
+// The form's messages are dictionary keys; this resolves them the way the page
+// does, so an assertion here also proves the key exists.
+const t: Translate = (key) => translate('en', key);
 
 const DECLARED: ScriptParam[] = [
   { name: 'ENV', type: 'string', required: true, default: null, description: 'Target environment' },
@@ -57,46 +62,46 @@ describe('addRow', () => {
 describe('validateRows', () => {
   it('reports nothing for rows that are still empty, and sends nothing for them', () => {
     const list = rows(['', ''], ['', '']);
-    expect(validateRows(list, DECLARED)).toEqual({});
+    expect(validateRows(list, DECLARED, t)).toEqual({});
     expect(collectParams(list)).toEqual({});
   });
 
   it('asks for a name once a value has been typed', () => {
-    expect(validateRows(rows(['', 'x']), DECLARED)).toEqual({ 'row-0': 'Name required' });
+    expect(validateRows(rows(['', 'x']), DECLARED, t)).toEqual({ 'row-0': 'Name required' });
   });
 
   it('refuses a name that is not a shell variable', () => {
-    expect(validateRows(rows(['A; rm -rf /', 'x']), DECLARED)).toEqual({
+    expect(validateRows(rows(['A; rm -rf /', 'x']), DECLARED, t)).toEqual({
       'row-0': 'Not a valid parameter name',
     });
   });
 
   it('refuses the names the runner owns, after trimming', () => {
-    expect(validateRows(rows(['SD_SCRIPT_PATH', '/tmp/x']), DECLARED)).toEqual({
+    expect(validateRows(rows(['SD_SCRIPT_PATH', '/tmp/x']), DECLARED, t)).toEqual({
       'row-0': 'The runner sets this variable',
     });
-    expect(validateRows(rows(['  SD_TARGET_NAME  ', 'host1']), DECLARED)).toEqual({
+    expect(validateRows(rows(['  SD_TARGET_NAME  ', 'host1']), DECLARED, t)).toEqual({
       'row-0': 'The runner sets this variable',
     });
   });
 
   it('refuses a name that repeats an earlier row', () => {
-    const errors = validateRows(rows(['API_BASE', 'a'], ['API_BASE', 'b']), DECLARED);
+    const errors = validateRows(rows(['API_BASE', 'a'], ['API_BASE', 'b']), DECLARED, t);
     expect(errors).toEqual({ 'row-1': 'Already set above' });
   });
 
   it('refuses a name the script already declares', () => {
-    expect(validateRows(rows(['ENV', 'prod']), DECLARED)).toEqual({
+    expect(validateRows(rows(['ENV', 'prod']), DECLARED, t)).toEqual({
       'row-0': 'Already declared above',
     });
   });
 
   it('accepts a name the script never declared', () => {
-    expect(validateRows(rows(['API_BASE', 'https://example.test']), DECLARED)).toEqual({});
+    expect(validateRows(rows(['API_BASE', 'https://example.test']), DECLARED, t)).toEqual({});
   });
 
   it('ignores a blank row while judging the rows around it', () => {
-    const errors = validateRows(rows(['', ''], ['API_BASE', 'x'], ['API_BASE', 'y']), DECLARED);
+    const errors = validateRows(rows(['', ''], ['API_BASE', 'x'], ['API_BASE', 'y']), DECLARED, t);
     expect(errors).toEqual({ 'row-2': 'Already set above' });
   });
 });
@@ -123,10 +128,10 @@ describe('positional arguments', () => {
   it('takes no name check on an argument row: the name is only a label', () => {
     // A positional argument has no environment variable to name, so the label
     // may be anything the operator finds readable -- including a non-identifier.
-    expect(validateRows(rows(['起始端口:argv', '100']), DECLARED)).toEqual({});
-    expect(validateRows(rows(['SD_SCRIPT_PATH:argv', '100']), DECLARED)).toEqual({});
+    expect(validateRows(rows(['起始端口:argv', '100']), DECLARED, t)).toEqual({});
+    expect(validateRows(rows(['SD_SCRIPT_PATH:argv', '100']), DECLARED, t)).toEqual({});
     // Not even the name-required rule applies: `:argv` is a bare argument.
-    expect(validateRows(rows([':argv', '100']), DECLARED)).toEqual({});
+    expect(validateRows(rows([':argv', '100']), DECLARED, t)).toEqual({});
   });
 
   it('keeps an argument out of the environment and a parameter out of argv', () => {

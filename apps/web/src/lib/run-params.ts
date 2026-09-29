@@ -1,4 +1,6 @@
-import { PARAM_NAME_MESSAGE, paramNameProblem, type ScriptParam } from '@dashboard/shared';
+import { paramNameProblem, type ParamNameProblem, type ScriptParam } from '@dashboard/shared';
+
+import type { MessageKey, Translate } from './i18n';
 
 /**
  * A parameter the operator adds by hand, because the script's header does not
@@ -27,6 +29,17 @@ export type CustomParamRow = {
 
 /** Prefix for generated row ids; only the trailing number is ever read back. */
 const ROW_ID_PREFIX = 'row-';
+
+/**
+ * The server's `ParamNameProblem` as a key this client can translate.
+ *
+ * The server sends the problem, not the sentence -- `PARAM_NAME_MESSAGE` is its
+ * own English rendering and would be the wrong language here.
+ */
+const PARAM_NAME_KEY: Record<ParamNameProblem, MessageKey> = {
+  invalid: 'runs.paramName.invalid',
+  reserved: 'runs.paramName.reserved',
+};
 
 /** Blank means nothing typed at all: a name alone, or a value alone, is not. */
 export function isBlankRow(row: CustomParamRow): boolean {
@@ -71,10 +84,15 @@ export function removeRow(rows: readonly CustomParamRow[], id: string): CustomPa
  * Everything a row can be wrong about is answered here, using the same
  * `paramNameProblem` the server calls, so the form refuses exactly what a run
  * would refuse instead of letting a request discover it.
+ *
+ * The translator comes in as an argument rather than from a hook: this module is
+ * plain state manipulation, and callers want the messages as a map, not as
+ * rendered nodes.
  */
 export function validateRows(
   rows: readonly CustomParamRow[],
   declared: readonly ScriptParam[],
+  t: Translate,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   const declaredNames = new Set(declared.map((param) => param.name));
@@ -88,21 +106,21 @@ export function validateRows(
 
     const name = row.name.trim();
     if (name === '') {
-      errors[row.id] = 'Name required';
+      errors[row.id] = t('runs.paramName.required');
       continue;
     }
 
     const problem = paramNameProblem(name);
     if (problem) {
-      errors[row.id] = PARAM_NAME_MESSAGE[problem];
+      errors[row.id] = t(PARAM_NAME_KEY[problem]);
       continue;
     }
     if (declaredNames.has(name)) {
-      errors[row.id] = 'Already declared above';
+      errors[row.id] = t('runs.paramName.declared');
       continue;
     }
     if (seen.has(name)) {
-      errors[row.id] = 'Already set above';
+      errors[row.id] = t('runs.paramName.duplicate');
       continue;
     }
     seen.add(name);

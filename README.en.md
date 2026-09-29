@@ -100,7 +100,16 @@ A "Check and update" run follows one order: read the settings, detect the public
 
 The probe asks `https://api6.ipify.org` and accepts only a public address: private, link-local, NAT64 and Teredo ranges are refused, and a refusal writes nothing. The probe **never uses a proxy**, so no `HTTP_PROXY` is needed and a proxy's egress address can never end up in a DNS record.
 
-A Gotify notification is sent only when the record actually changed; a notification that fails does not change the run's outcome and is reported separately.
+A Gotify notification is sent only when the record actually changed; a notification that fails does not change the run's outcome and is reported separately. The address and token are an **application setting** rather than part of this console -- see [Settings](#settings) -- so the console no longer holds a notification credential, and the next feature that wants to notify you does not have to borrow one.
+
+## Settings
+
+`/#/settings` holds what belongs to the dashboard rather than to a feature:
+
+- **Language.** English or 简体中文, remembered in the browser so it survives a reload. It changes the interface only; the log lines a script produces are not translated. The first visit follows `navigator.language`.
+- **Notifications.** A Gotify address and application token, plus a button that sends a test message using whatever is in the boxes -- saved or not. Nothing is required: an address with no token is a notifier that is not set up yet, and the card says which of its three states applies.
+
+Credentials are write-only: the API never returns one, so an empty box means "keep what is stored" and deleting is its own button. The same rule covers a target's ssh secret and the DNS provider tokens.
 
 ## Limitations
 

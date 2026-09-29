@@ -42,9 +42,13 @@ export type DnsProvider = {
 /**
  * Settings with the secrets decrypted.
  *
- * Built only by `settings.ts`, handed only to a provider or the notifier, and
- * never returned from a route: the API's own shape (`DnsSettingsView`) has no
- * field these could travel in.
+ * Built only by `settings.ts`, handed only to a provider, and never returned
+ * from a route: the API's own shape (`DnsSettingsView`) has no field these
+ * could travel in.
+ *
+ * No notification address here. Where a message goes is the dashboard's
+ * business rather than this console's, so the notifier is injected into the
+ * service instead of being read out of these settings.
  */
 export type ResolvedDnsSettings = {
   provider: DnsProviderName;
@@ -57,6 +61,4 @@ export type ResolvedDnsSettings = {
   alibabaAccessKeySecret: string;
   alibabaRecordId: string;
   alibabaRecordType: string;
-  gotifyAddress: string;
-  gotifyToken: string;
 };

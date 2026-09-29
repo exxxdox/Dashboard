@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FileCode, Folder, FolderOpen } from 'lucide-react';
 import type { ScriptTreeNode } from '@dashboard/shared';
 import { cn } from '../lib/cn';
+import { useT } from '../lib/i18n';
 
 type FlatRow = {
   node: ScriptTreeNode;
@@ -33,6 +34,7 @@ export function ScriptTree({
   selectedId: string | null;
   onSelect: (node: ScriptTreeNode) => void;
 }) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const rows = useMemo(() => {
@@ -84,7 +86,7 @@ export function ScriptTree({
                   onClick={() => toggle(node.path)}
                   aria-expanded={!isCollapsed}
                   className="focus-ring text-faint hover:text-ink hover:bg-panel-3 flex size-5 shrink-0 items-center justify-center rounded-md transition-colors duration-150"
-                  aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${node.name}`}
+                  aria-label={`${isCollapsed ? t('common.expand') : t('common.collapse')} ${node.name}`}
                 >
                   {isCollapsed ? (
                     <ChevronRight className="size-4" aria-hidden />
@@ -141,14 +143,14 @@ export function ScriptTree({
             onClick={expandAll}
             className="focus-ring text-faint hover:text-ink text-meta rounded-md transition-colors duration-150"
           >
-            Expand all
+            {t('scripts.tree.expandAll')}
           </button>
           <button
             type="button"
             onClick={collapseAll}
             className="focus-ring text-faint hover:text-ink text-meta rounded-md transition-colors duration-150"
           >
-            Collapse all
+            {t('scripts.tree.collapseAll')}
           </button>
         </div>
       ) : null}

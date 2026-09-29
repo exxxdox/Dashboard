@@ -10,10 +10,13 @@ import { Select } from '../components/Form';
 import { ScriptTree } from '../components/ScriptTree';
 import { SyncStatusLabel } from '../components/StatusDot';
 import { useSourceTree, useSources, useSyncSource } from '../api/queries';
+import { errorMessage } from '../api/client';
+import { useI18n, useT } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import { ScriptDetail } from './ScriptDetail';
 
 export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
+  const i18n = useI18n();
   const sources = useSources();
   const [selectedSourceId, setSelectedSourceId] = useState<string>('');
 
@@ -31,32 +34,32 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   return (
     <PageBody wide>
       <PageHeader
-        eyebrow="Library"
-        title="Scripts"
-        description="Every script the dashboard has discovered, grouped by the source it came from."
+        eyebrow={i18n.t('scripts.eyebrow')}
+        title={i18n.t('nav.scripts')}
+        description={i18n.t('scripts.description')}
       />
 
       {sources.isError ? (
         <ErrorBanner
           className="mt-5"
-          message={sources.error.message}
+          message={errorMessage(sources.error, i18n)}
           onRetry={() => void sources.refetch()}
         />
       ) : null}
 
       {sources.isPending ? (
         <Panel className="mt-5">
-          <LoadingBlock label="Loading sources…" />
+          <LoadingBlock label={i18n.t('scripts.loadingSources')} />
         </Panel>
       ) : (sources.data ?? []).length === 0 ? (
         <div className="mt-5">
           <EmptyState
             icon={<FolderTree className="size-5" aria-hidden />}
-            title="No sources configured"
-            description="A source is a directory of scripts — either a folder already shared with the container, or a GitHub repository to sync. Scripts appear here as soon as one exists."
+            title={i18n.t('scripts.noSources.title')}
+            description={i18n.t('scripts.noSources.description')}
             action={
               <Button variant="primary" onClick={() => navigate('/sources')}>
-                Add a source
+                {i18n.t('scripts.addSource')}
               </Button>
             }
           />
@@ -68,7 +71,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
         <div className="mt-5 grid gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
           <div className="grid min-w-0 content-start gap-3">
             <Select
-              aria-label="Source"
+              aria-label={i18n.t('scripts.source')}
               value={selectedSourceId}
               onChange={(event) => setSelectedSourceId(event.target.value)}
             >
@@ -100,8 +103,8 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
             {scriptId === null ? (
               <EmptyState
                 icon={<FileCode className="size-5" aria-hidden />}
-                title="No script selected"
-                description="Pick a script from the tree to see its parameters, its source, and the form that runs it."
+                title={i18n.t('scripts.noSelection.title')}
+                description={i18n.t('scripts.noSelection.description')}
               />
             ) : (
               <ScriptDetail scriptId={scriptId} />
@@ -114,6 +117,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
 }
 
 function SourceSyncButton({ sourceId }: { sourceId: string }) {
+  const t = useT();
   const sync = useSyncSource();
   return (
     <Button
@@ -123,7 +127,7 @@ function SourceSyncButton({ sourceId }: { sourceId: string }) {
       loading={sync.isPending}
       onClick={() => sync.mutate(sourceId)}
     >
-      Sync
+      {t('scripts.sync')}
     </Button>
   );
 }
@@ -137,12 +141,13 @@ function SourceTreePane({
   scriptId: string | null;
   onSelect: (node: ScriptTreeNode) => void;
 }) {
+  const i18n = useI18n();
   const tree = useSourceTree(sourceId, sourceId !== '');
 
   if (sourceId === '') {
     return (
       <Panel>
-        <p className="text-mute text-body">Choose a source to see its scripts.</p>
+        <p className="text-mute text-body">{i18n.t('scripts.chooseSource')}</p>
       </Panel>
     );
   }
@@ -153,15 +158,20 @@ function SourceTreePane({
       bodyClassName="p-1.5"
       aside={
         tree.data ? (
-          <span className="mono text-faint text-micro">{countFiles(tree.data)} files</span>
+          <span className="mono text-faint text-micro">
+            {i18n.t('scripts.fileCount', { count: countFiles(tree.data) })}
+          </span>
         ) : null
       }
     >
       {tree.isPending ? (
-        <LoadingBlock label="Loading tree…" />
+        <LoadingBlock label={i18n.t('scripts.loadingTree')} />
       ) : tree.isError ? (
         <div className="p-1.5">
-          <ErrorBanner message={tree.error.message} onRetry={() => void tree.refetch()} />
+          <ErrorBanner
+            message={errorMessage(tree.error, i18n)}
+            onRetry={() => void tree.refetch()}
+          />
         </div>
       ) : tree.data ? (
         <div className="max-h-[calc(100vh-320px)] overflow-auto">

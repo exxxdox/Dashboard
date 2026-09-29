@@ -8,6 +8,18 @@ import {
   formatRelative,
   runTag,
 } from './format';
+import { translate, type Locale } from './i18n';
+
+/**
+ * The two formatters that produce words take a translator, so these tests hand
+ * them real ones. Asserting through the dictionary rather than a stub is what
+ * makes "the same instant reads differently in Chinese" testable at all.
+ */
+const translator = (locale: Locale) =>
+  ((key, params) => translate(locale, key, params)) as Parameters<typeof formatRelative>[1];
+
+const en = translator('en');
+const zh = translator('zh');
 
 describe('formatDuration', () => {
   it('renders an open run without inventing a number', () => {
@@ -73,11 +85,11 @@ describe('formatExit', () => {
 
 describe('formatParams', () => {
   it('says so when a script takes no parameters', () => {
-    expect(formatParams({})).toBe('(none)');
+    expect(formatParams({}, en)).toBe('(none)');
   });
 
   it('renders an environment assignment per value', () => {
-    expect(formatParams({ A: '1', B: 'two words' })).toBe('A=1  B=two words');
+    expect(formatParams({ A: '1', B: 'two words' }, en)).toBe('A=1  B=two words');
   });
 });
 
@@ -92,18 +104,24 @@ describe('formatRelative', () => {
   });
 
   it('measures against the current time', () => {
-    expect(formatRelative('2026-09-27T11:59:00.000Z')).toBe('1m ago');
-    expect(formatRelative('2026-09-27T09:00:00.000Z')).toBe('3h ago');
-    expect(formatRelative('2026-09-25T12:00:00.000Z')).toBe('2d ago');
+    expect(formatRelative('2026-09-27T11:59:00.000Z', en)).toBe('1m ago');
+    expect(formatRelative('2026-09-27T09:00:00.000Z', en)).toBe('3h ago');
+    expect(formatRelative('2026-09-25T12:00:00.000Z', en)).toBe('2d ago');
   });
 
   it('never reports a negative age from a clock that is ahead', () => {
-    expect(formatRelative('2026-09-27T12:00:30.000Z')).toBe('just now');
+    expect(formatRelative('2026-09-27T12:00:30.000Z', en)).toBe('just now');
   });
 
   it('renders a missing timestamp as a dash', () => {
-    expect(formatRelative(null)).toBe('—');
-    expect(formatRelative('not a date')).toBe('—');
+    expect(formatRelative(null, en)).toBe('—');
+    expect(formatRelative('not a date', en)).toBe('—');
+  });
+
+  it('speaks the language it was handed', () => {
+    // The unit is the translator's business rather than this module's, so the
+    // same instant reads differently through a different one.
+    expect(formatRelative('2026-09-27T09:00:00.000Z', zh)).toBe('3 小时前');
   });
 });
 

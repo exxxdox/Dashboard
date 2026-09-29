@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { MIN_DNS_INTERVAL_MINUTES } from '@dashboard/shared';
 import { describe, expect, test } from 'vitest';
 
 import { openDatabase, type Db } from '../../db/client.js';
@@ -61,13 +62,11 @@ describe('saving settings', () => {
         cloudflareRecordName: 'home.example.com',
         hasCloudflareToken: true,
         hasAlibabaAccessKeySecret: false,
-        hasGotifyToken: false,
       });
       // The discipline is structural rather than remembered: there is no key a
       // credential could be hiding under.
       expect(Object.keys(view)).not.toContain('cloudflareToken');
       expect(Object.keys(view)).not.toContain('alibabaAccessKeySecret');
-      expect(Object.keys(view)).not.toContain('gotifyToken');
     } finally {
       db.close();
     }
@@ -193,18 +192,47 @@ describe('validate', () => {
     ).toBeNull();
   });
 
-  test('lists everything missing at once', () => {
-    expect(
-      validate({
+  test('lists everything missing at once, in both the forms it has to take', () => {
+    const problem = validate({
+      provider: 'cloudflare',
+      intervalMinutes: 10,
+      cloudflareToken: '',
+      cloudflareZoneId: '',
+      cloudflareRecordName: '',
+      alibabaAccessKeyId: '',
+      alibabaAccessKeySecret: null,
+      alibabaRecordId: '',
+    });
+
+    expect(problem?.message).toMatch(
+      /Cloudflare API token, Cloudflare zone id, Cloudflare record name/,
+    );
+    // The client is sent identifiers, not the English labels: it names the
+    // fields itself, and a label would be untranslatable once it arrived.
+    expect(problem?.i18n).toEqual({
+      key: 'error.dns.missingCredentials',
+      params: {
         provider: 'cloudflare',
-        intervalMinutes: 10,
-        cloudflareToken: '',
-        cloudflareZoneId: '',
-        cloudflareRecordName: '',
-        alibabaAccessKeyId: '',
-        alibabaAccessKeySecret: null,
-        alibabaRecordId: '',
-      }),
-    ).toMatch(/Cloudflare API token, Cloudflare zone id, Cloudflare record name/);
+        fields: ['cloudflareToken', 'cloudflareZoneId', 'cloudflareRecordName'],
+      },
+    });
+  });
+
+  test('names the interval bound as a number the client can read back', () => {
+    const tooSmall = validate({
+      provider: 'cloudflare',
+      intervalMinutes: 0,
+      cloudflareToken: 'cf-token',
+      cloudflareZoneId: 'zone-1',
+      cloudflareRecordName: 'home.example.com',
+      alibabaAccessKeyId: '',
+      alibabaAccessKeySecret: null,
+      alibabaRecordId: '',
+    });
+
+    expect(tooSmall?.i18n).toEqual({
+      key: 'error.dns.intervalTooSmall',
+      params: { min: MIN_DNS_INTERVAL_MINUTES },
+    });
   });
 });

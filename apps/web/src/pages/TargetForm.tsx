@@ -6,6 +6,7 @@ import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextArea, TextInput } from '../components/Form';
 import { useCreateTarget, useUpdateTarget } from '../api/queries';
 import { errorMessage } from '../api/client';
+import { useI18n } from '../lib/i18n';
 
 type AuthMethod = 'key' | 'password';
 
@@ -58,6 +59,7 @@ export function TargetForm({
   target: TargetSummary | null;
   onDone: () => void;
 }) {
+  const i18n = useI18n();
   const create = useCreateTarget();
   const update = useUpdateTarget();
   const [state, setState] = useState<FormState>(() => toFormState(target));
@@ -123,23 +125,29 @@ export function TargetForm({
   return (
     <form onSubmit={submit} className="grid gap-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Name" error={showErrors && missing.name ? 'Required' : null}>
+        <Field
+          label={i18n.t('targets.form.name')}
+          error={showErrors && missing.name ? i18n.t('targets.form.required') : null}
+        >
           {({ id }) => (
             <TextInput
               id={id}
               value={state.name}
-              placeholder="prod-01"
+              placeholder={i18n.t('targets.form.namePlaceholder')}
               onChange={(event) => patch({ name: event.target.value })}
             />
           )}
         </Field>
-        <Field label="Username" error={showErrors && missing.username ? 'Required' : null}>
+        <Field
+          label={i18n.t('targets.form.username')}
+          error={showErrors && missing.username ? i18n.t('targets.form.required') : null}
+        >
           {({ id }) => (
             <TextInput
               id={id}
               className="mono"
               value={state.username}
-              placeholder="deploy"
+              placeholder={i18n.t('targets.form.usernamePlaceholder')}
               autoComplete="off"
               onChange={(event) => patch({ username: event.target.value })}
             />
@@ -148,18 +156,21 @@ export function TargetForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_110px]">
-        <Field label="Host" error={showErrors && missing.host ? 'Required' : null}>
+        <Field
+          label={i18n.t('targets.form.host')}
+          error={showErrors && missing.host ? i18n.t('targets.form.required') : null}
+        >
           {({ id }) => (
             <TextInput
               id={id}
               className="mono"
               value={state.host}
-              placeholder="10.0.0.12 or host.example.com"
+              placeholder={i18n.t('targets.form.hostPlaceholder')}
               onChange={(event) => patch({ host: event.target.value })}
             />
           )}
         </Field>
-        <Field label="Port">
+        <Field label={i18n.t('targets.form.port')}>
           {({ id }) => (
             <TextInput
               id={id}
@@ -175,30 +186,30 @@ export function TargetForm({
       </div>
 
       <Field
-        label="Working directory on host"
-        hint="Absolute path the script runs in. It does not need to match anything in this container: the script is uploaded to a temporary directory and simply run from here, so this only has to exist. Files it reads by relative path must already live there."
-        error={showErrors && missing.workDir ? 'Required' : null}
+        label={i18n.t('targets.form.workDir')}
+        hint={i18n.t('targets.form.workDirHint')}
+        error={showErrors && missing.workDir ? i18n.t('targets.form.required') : null}
       >
         {({ id }) => (
           <TextInput
             id={id}
             className="mono"
             value={state.workDir}
-            placeholder="/srv/scripts"
+            placeholder={i18n.t('targets.form.workDirPlaceholder')}
             onChange={(event) => patch({ workDir: event.target.value })}
           />
         )}
       </Field>
 
-      <Field label="Authentication">
+      <Field label={i18n.t('targets.form.auth')}>
         {({ id }) => (
           <Select
             id={id}
             value={state.authMethod}
             onChange={(event) => patch({ authMethod: event.target.value as AuthMethod })}
           >
-            <option value="key">Private key</option>
-            <option value="password">Password</option>
+            <option value="key">{i18n.t('targets.form.privateKey')}</option>
+            <option value="password">{i18n.t('targets.form.password')}</option>
           </Select>
         )}
       </Field>
@@ -206,9 +217,13 @@ export function TargetForm({
       {state.authMethod === 'key' ? (
         <>
           <Field
-            label="Private key"
-            hint={isEdit ? 'Leave blank to keep the stored key.' : 'PEM text, including the BEGIN/END lines.'}
-            error={showErrors && missing.secret ? 'Required' : null}
+            label={i18n.t('targets.form.privateKey')}
+            hint={
+              isEdit
+                ? i18n.t('targets.form.privateKeyHintEdit')
+                : i18n.t('targets.form.privateKeyHintNew')
+            }
+            error={showErrors && missing.secret ? i18n.t('targets.form.required') : null}
           >
             {({ id }) => (
               <TextArea
@@ -217,19 +232,23 @@ export function TargetForm({
                 value={state.privateKey}
                 spellCheck={false}
                 autoComplete="off"
-                placeholder={isEdit ? 'unchanged' : '-----BEGIN OPENSSH PRIVATE KEY-----'}
+                placeholder={
+                  isEdit
+                    ? i18n.t('targets.form.unchanged')
+                    : i18n.t('targets.form.keyPlaceholder')
+                }
                 onChange={(event) => patch({ privateKey: event.target.value })}
               />
             )}
           </Field>
-          <Field label="Passphrase" hint="Only if the key is encrypted.">
+          <Field label={i18n.t('targets.form.passphrase')} hint={i18n.t('targets.form.passphraseHint')}>
             {({ id }) => (
               <TextInput
                 id={id}
                 type="password"
                 value={state.passphrase}
                 autoComplete="new-password"
-                placeholder={isEdit ? 'unchanged' : ''}
+                placeholder={isEdit ? i18n.t('targets.form.unchanged') : ''}
                 onChange={(event) => patch({ passphrase: event.target.value })}
               />
             )}
@@ -237,9 +256,9 @@ export function TargetForm({
         </>
       ) : (
         <Field
-          label="Password"
-          hint={isEdit ? 'Leave blank to keep the stored password.' : undefined}
-          error={showErrors && missing.secret ? 'Required' : null}
+          label={i18n.t('targets.form.password')}
+          hint={isEdit ? i18n.t('targets.form.passwordHintEdit') : undefined}
+          error={showErrors && missing.secret ? i18n.t('targets.form.required') : null}
         >
           {({ id }) => (
             <TextInput
@@ -247,14 +266,17 @@ export function TargetForm({
               type="password"
               value={state.password}
               autoComplete="new-password"
-              placeholder={isEdit ? 'unchanged' : ''}
+              placeholder={isEdit ? i18n.t('targets.form.unchanged') : ''}
               onChange={(event) => patch({ password: event.target.value })}
             />
           )}
         </Field>
       )}
 
-      <Field label="Connect timeout" hint="Seconds to wait for the SSH handshake.">
+      <Field
+        label={i18n.t('targets.form.connectTimeout')}
+        hint={i18n.t('targets.form.connectTimeoutHint')}
+      >
         {({ id }) => (
           <TextInput
             id={id}
@@ -268,7 +290,7 @@ export function TargetForm({
         )}
       </Field>
 
-      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error)} /> : null}
+      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error, i18n)} /> : null}
 
       <div className="flex items-center gap-2">
         <Button
@@ -277,10 +299,10 @@ export function TargetForm({
           icon={isEdit ? <Save className="size-4" aria-hidden /> : <Plug className="size-4" aria-hidden />}
           loading={mutation.isPending}
         >
-          {isEdit ? 'Save target' : 'Add target'}
+          {isEdit ? i18n.t('targets.form.save') : i18n.t('targets.add')}
         </Button>
         <Button variant="ghost" icon={<X className="size-4" aria-hidden />} onClick={onDone}>
-          Cancel
+          {i18n.t('targets.form.cancel')}
         </Button>
       </div>
     </form>

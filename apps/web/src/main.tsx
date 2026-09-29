@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import { App } from './App';
 import { ApiError } from './api/client';
+import { LocaleProvider } from './lib/i18n';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +27,11 @@ if (!container) throw new Error('Root element #root is missing from index.html')
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      {/* Outside the app rather than inside a page: the language is read by the
+          sign-in screen too, which renders before any route exists. */}
+      <LocaleProvider>
+        <App />
+      </LocaleProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

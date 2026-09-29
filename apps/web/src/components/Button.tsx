@@ -8,17 +8,22 @@ export type ButtonSize = 'sm' | 'md';
 // Hover is a lift in surface plus a lift in elevation, not just a colour swap:
 // the button has to read as pressable before the pointer is on it.
 const VARIANT_CLASS: Record<ButtonVariant, string> = {
+  // The primary action carries a gradient rather than a flat fill: on a dark
+  // page it is what separates "press this" from every other bordered control.
   primary:
-    'bg-accent text-accent-ink border-transparent shadow-card hover:brightness-110 hover:shadow-glow',
+    'bg-linear-to-b from-[color-mix(in_oklab,var(--accent)_92%,white)] to-accent text-accent-ink border-transparent shadow-card hover:shadow-glow hover:brightness-105',
   default:
     'bg-panel-2 text-ink border-line hover:border-line-strong hover:bg-panel-3 hover:shadow-card',
   ghost: 'bg-transparent text-mute border-transparent hover:bg-panel-2 hover:text-ink',
   danger: 'bg-transparent text-danger border-line hover:border-danger hover:bg-danger/12',
 };
 
+// Both steps moved up with the type scale: a 36px control under 17px text
+// reads as a link, and the taller step is what makes a primary action look
+// like the thing to press.
 const SIZE_CLASS: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3.5 gap-2 text-meta',
-  md: 'h-10 px-4 gap-2 text-body',
+  sm: 'h-10 px-4 gap-2 text-meta',
+  md: 'h-11 px-5 gap-2.5 text-body',
 };
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -45,7 +50,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'focus-ring inline-flex items-center justify-center rounded-lg border font-medium whitespace-nowrap',
+        'focus-ring inline-flex items-center justify-center rounded-[10px] border font-medium whitespace-nowrap',
         'transition-all duration-150 ease-out active:translate-y-px',
         'disabled:pointer-events-none disabled:opacity-45',
         SIZE_CLASS[size],

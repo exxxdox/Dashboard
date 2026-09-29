@@ -5,6 +5,7 @@ import { ErrorBanner } from '../components/Feedback';
 import { Field, TextInput } from '../components/Form';
 import { useLogin } from '../api/queries';
 import { errorMessage } from '../api/client';
+import { useI18n } from '../lib/i18n';
 
 /**
  * The sign-in screen: the only page reachable without a session.
@@ -14,6 +15,8 @@ import { errorMessage } from '../api/client';
  * server returns is what persists.
  */
 export function SignInPage() {
+  const i18n = useI18n();
+  const { t } = i18n;
   const login = useLogin();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -35,12 +38,10 @@ export function SignInPage() {
           </span>
         </div>
 
-        <p className="text-mute text-meta mt-3">
-          Sign in to continue. These are the credentials configured on the server.
-        </p>
+        <p className="text-mute text-meta mt-3">{t('auth.tagline')}</p>
 
         <div className="mt-5 grid gap-3">
-          <Field label="Username">
+          <Field label={t('auth.username')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -53,7 +54,7 @@ export function SignInPage() {
             )}
           </Field>
 
-          <Field label="Password">
+          <Field label={t('auth.password')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -69,7 +70,7 @@ export function SignInPage() {
 
         {login.isError ? (
           <div className="mt-3">
-            <ErrorBanner message={errorMessage(login.error)} />
+            <ErrorBanner message={errorMessage(login.error, i18n)} />
           </div>
         ) : null}
 
@@ -81,7 +82,7 @@ export function SignInPage() {
           loading={login.isPending}
           disabled={username === '' || password === ''}
         >
-          Sign in
+          {t('auth.submit')}
         </Button>
       </form>
     </main>

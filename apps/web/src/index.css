@@ -12,39 +12,42 @@
 
   /* Surfaces step by lift, not by border weight: the hairline separates, the
      lighter surface is what says "this is above that". */
-  --bg: #0b0e13;
-  --surface: #12171f;
-  --surface-2: #1a212b;
-  --surface-3: #232c38;
-  --border: #222b36;
-  --border-strong: #38465a;
+  --bg: #090c11;
+  --surface: #111721;
+  --surface-2: #19212d;
+  --surface-3: #232d3b;
+  --surface-4: #2d3949;
+  --border: #222c39;
+  --border-strong: #3a4a60;
 
-  --text: #e6edf4;
-  --muted: #9dabb9;
-  --faint: #7b8a97;
+  --text: #eef3f9;
+  --muted: #a3b1c1;
+  --faint: #7d8b99;
 
-  --accent: #f0a92c;
+  --accent: #f5ad30;
   --accent-ink: #1a1204;
-  --accent-soft: rgb(240 169 44 / 14%);
-  --accent-line: rgb(240 169 44 / 42%);
+  --accent-soft: rgb(245 173 48 / 15%);
+  --accent-line: rgb(245 173 48 / 45%);
+  --accent-glow: rgb(245 173 48 / 45%);
 
-  --ok: #4fbf8b;
-  --warn: #e8c256;
-  --danger: #f0736c;
-  --info: #86a6cf;
+  --ok: #4fca92;
+  --warn: #ecc75c;
+  --danger: #f4786f;
+  --info: #8db0dd;
 
   /* Elevation is subtle on purpose: on a dark surface a shadow reads as a
      smudge, so the top hairline carries most of the "lifted" signal. */
-  --sheen: inset 0 1px 0 rgb(255 255 255 / 4%);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
-  --shadow-md: 0 12px 32px -12px rgb(0 0 0 / 70%);
-  --shadow-accent: 0 8px 24px -10px rgb(240 169 44 / 55%);
+  --sheen: inset 0 1px 0 rgb(255 255 255 / 5%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-md: 0 18px 44px -16px rgb(0 0 0 / 75%);
+  --shadow-accent: 0 10px 30px -10px rgb(245 173 48 / 55%);
 
+  --radius: 0.875rem;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
 
   /* No web fonts: the container is expected to be offline. */
   --stack-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+    'Helvetica Neue', Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --stack-mono: ui-monospace, 'Cascadia Mono', 'Cascadia Code', 'JetBrains Mono', 'SFMono-Regular',
     Menlo, Consolas, 'Liberation Mono', monospace;
 }
@@ -54,6 +57,7 @@
   --color-panel: var(--surface);
   --color-panel-2: var(--surface-2);
   --color-panel-3: var(--surface-3);
+  --color-panel-4: var(--surface-4);
   --color-line: var(--border);
   --color-line-strong: var(--border-strong);
 
@@ -74,27 +78,29 @@
 
   /* One type scale, named by role. Every size in the app comes from here, so
      the next "make it bigger" is one edit rather than a sweep of arbitrary
-     values scattered across the pages. */
-  --text-micro: 0.8125rem;
-  --text-micro--line-height: 1.4;
-  --text-meta: 0.875rem;
-  --text-meta--line-height: 1.5;
-  --text-body: 0.9375rem;
-  --text-body--line-height: 1.55;
-  --text-lead: 1rem;
+     values scattered across the pages.
+     This pass moved the whole scale up a step: the smallest label is now what
+     the body text used to be, and nothing reads below 14px. */
+  --text-micro: 0.875rem;
+  --text-micro--line-height: 1.45;
+  --text-meta: 0.9375rem;
+  --text-meta--line-height: 1.55;
+  --text-body: 1.0625rem;
+  --text-body--line-height: 1.6;
+  --text-lead: 1.125rem;
   --text-lead--line-height: 1.5;
-  --text-brand: 1.25rem;
-  --text-brand--line-height: 1.1;
+  --text-brand: 1.375rem;
+  --text-brand--line-height: 1.15;
   /* 1.25 rather than something tighter: both sizes are used on headings that
      truncate, and `overflow: hidden` clips to the line box. Anything under the
      glyph's own height cuts the descenders -- the "g" in Targets, the "p" in a
      script path. */
-  --text-title: 1.625rem;
+  --text-title: 1.875rem;
   --text-title--line-height: 1.25;
-  --text-display: 2rem;
-  --text-display--line-height: 1.25;
-  --text-stat: 2.25rem;
-  --text-stat--line-height: 1;
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.2;
+
+  --radius-card: var(--radius);
 
   --shadow-sheen: var(--sheen);
   --shadow-card: var(--shadow-sm);
@@ -109,16 +115,19 @@
 
   body {
     margin: 0;
-    /* Two faint off-screen lights keep the flat near-black from reading as a
-       dead panel. Fixed, so the atmosphere does not travel with long logs. */
+    /* Three faint off-screen lights keep the flat near-black from reading as a
+       dead panel, and give the accent somewhere to come from. Fixed, so the
+       atmosphere does not travel with a long log. */
     background:
-      radial-gradient(1100px 560px at 12% -12%, rgb(240 169 44 / 6%), transparent 62%),
-      radial-gradient(900px 520px at 100% 0%, rgb(120 160 220 / 6%), transparent 58%), var(--bg);
+      radial-gradient(1200px 620px at 8% -14%, rgb(245 173 48 / 9%), transparent 60%),
+      radial-gradient(1000px 560px at 102% -4%, rgb(120 165 230 / 8%), transparent 58%),
+      radial-gradient(900px 700px at 50% 118%, rgb(245 173 48 / 4%), transparent 62%),
+      var(--bg);
     background-attachment: fixed;
     color: var(--text);
     font-family: var(--stack-sans);
-    font-size: 16px;
-    line-height: 1.55;
+    font-size: 17px;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -166,13 +175,15 @@
   .control {
     width: 100%;
     border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border-radius: 0.625rem;
     background: var(--surface-2);
-    padding: 0.5625rem 0.8125rem;
+    padding: 0.625rem 0.875rem;
     color: var(--text);
+    font-size: var(--text-body);
     transition:
       border-color 150ms var(--ease),
-      background-color 150ms var(--ease);
+      background-color 150ms var(--ease),
+      box-shadow 150ms var(--ease);
   }
 
   .control::placeholder {
@@ -192,6 +203,7 @@
   .control:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+    box-shadow: 0 0 0 5px var(--accent-soft);
   }
 
   /* Machine data: paths, commands, ids, codes, parameter values. */
@@ -204,9 +216,9 @@
   /* Field and section labels borrow the shell's voice: terse, uppercase. */
   .label {
     font-family: var(--stack-mono);
-    font-size: 0.75rem;
-    line-height: 1.2;
-    letter-spacing: 0.14em;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted);
   }
@@ -219,10 +231,36 @@
   /* Raised surface. Every panel-shaped container uses this, so "a card" has
      one definition instead of an ad-hoc border per component. */
   .card {
+    position: relative;
     border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    background: var(--surface);
+    border-radius: var(--radius);
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 2.2%), transparent 22%),
+      var(--surface);
     box-shadow: var(--sheen), var(--shadow-sm);
+  }
+
+  /* A card that answers a state rather than holding one: the accent edge is
+     what says "look here" without moving or shouting. */
+  .card-accent {
+    border-color: var(--accent-line);
+  }
+
+  .card-accent::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 2px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--accent) 22%,
+      var(--accent) 78%,
+      transparent
+    );
+    opacity: 0.75;
   }
 
   /* The terminal panel gets a whisper of scanline: enough to read as a
@@ -262,6 +300,13 @@
     background: var(--surface-2);
     box-shadow: inset 2px 0 0 var(--accent);
   }
+
+  /* A hairline that fades at both ends. Used to divide a page into bands
+     without drawing a hard rule across it. */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  }
 }
 
 @keyframes dot-pulse {
@@ -288,7 +333,7 @@
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(2px);
+    transform: translateY(3px);
   }
   to {
     opacity: 1;
@@ -297,7 +342,7 @@
 }
 
 .animate-fade-in {
-  animation: fade-in 160ms ease-out both;
+  animation: fade-in 200ms var(--ease) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

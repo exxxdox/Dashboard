@@ -61,8 +61,6 @@ function settings(overrides: Partial<ResolvedDnsSettings> = {}): ResolvedDnsSett
     alibabaAccessKeySecret: 'key-secret',
     alibabaRecordId: 'record-1',
     alibabaRecordType: 'AAAA',
-    gotifyAddress: '',
-    gotifyToken: '',
     ...overrides,
   };
 }

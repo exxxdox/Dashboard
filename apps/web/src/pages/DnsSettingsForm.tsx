@@ -3,19 +3,26 @@
  *
  * Credentials follow the same rule as a target's: the API never returns one, so
  * a blank box means "keep the stored value" and deleting one is its own button.
- * The Saved / Not set marker beside each is what makes that legible -- without
- * it, blank is indistinguishable from never having been set.
+ * `components/SecretField.tsx` owns that rule now that a second form needs it.
+ *
+ * The Gotify section used to live here. It moved to the settings page, because
+ * where a notification goes is a property of the dashboard rather than of this
+ * console -- and this form is the better for it: what is left is only what an
+ * AAAA record needs.
  */
 
 import { useState, type FormEvent } from 'react';
 import type { DnsProviderName, DnsSettingsView, UpdateDnsSettingsInput } from '@dashboard/shared';
-import { Save, Send, Trash2 } from 'lucide-react';
+import { Save } from 'lucide-react';
 
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, Switch, TextInput } from '../components/Form';
+import { SecretField } from '../components/SecretField';
 import { errorMessage } from '../api/client';
-import { useSaveDnsSettings, useTestDnsNotification } from '../api/queries';
+import { useSaveDnsSettings } from '../api/queries';
+import { providerLabel } from '../lib/dns';
+import { useI18n } from '../lib/i18n';
 
 type FormState = {
   provider: DnsProviderName;
@@ -27,8 +34,6 @@ type FormState = {
   alibabaAccessKeyId: string;
   alibabaRecordId: string;
   alibabaAccessKeySecret: string;
-  gotifyAddress: string;
-  gotifyToken: string;
 };
 
 const EMPTY: FormState = {
@@ -41,8 +46,6 @@ const EMPTY: FormState = {
   alibabaAccessKeyId: '',
   alibabaRecordId: '',
   alibabaAccessKeySecret: '',
-  gotifyAddress: '',
-  gotifyToken: '',
 };
 
 /** Secrets are never sent back, so they start blank on every load. */
@@ -57,13 +60,13 @@ function toFormState(settings: DnsSettingsView | null): FormState {
     cloudflareRecordName: settings.cloudflareRecordName,
     alibabaAccessKeyId: settings.alibabaAccessKeyId,
     alibabaRecordId: settings.alibabaRecordId,
-    gotifyAddress: settings.gotifyAddress,
   };
 }
 
 export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const save = useSaveDnsSettings();
-  const test = useTestDnsNotification();
   const [state, setState] = useState<FormState>(() => toFormState(settings));
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -84,14 +87,12 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
       cloudflareRecordName: state.cloudflareRecordName,
       alibabaAccessKeyId: state.alibabaAccessKeyId,
       alibabaRecordId: state.alibabaRecordId,
-      gotifyAddress: state.gotifyAddress,
       ...extra,
     };
     if (state.cloudflareToken !== '') input.cloudflareToken = state.cloudflareToken;
     if (state.alibabaAccessKeySecret !== '') {
       input.alibabaAccessKeySecret = state.alibabaAccessKeySecret;
     }
-    if (state.gotifyToken !== '') input.gotifyToken = state.gotifyToken;
     return input;
   }
 
@@ -100,36 +101,35 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
     setNotice(null);
     save.mutate(buildUpdate(), {
       onSuccess: () => {
-        setNotice('Settings saved.');
+        setNotice(t('dns.form.saved'));
         // Empty the credential boxes: the server now holds those values, and
         // leaving them filled would make the next save look like a change.
         setState((current) => ({
           ...current,
           cloudflareToken: '',
           alibabaAccessKeySecret: '',
-          gotifyToken: '',
         }));
       },
     });
   }
 
-  function clear(flag: keyof UpdateDnsSettingsInput, label: string): void {
+  function clear(flag: 'clearCloudflareToken' | 'clearAlibabaAccessKeySecret', name: string): void {
     save.mutate(buildUpdate({ [flag]: true }), {
-      onSuccess: () => setNotice(`${label} cleared.`),
+      onSuccess: () => setNotice(t('dns.form.cleared', { name })),
     });
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-4">
-      <Field label="Provider" hint="Only the selected provider's credentials are required.">
+    <form onSubmit={submit} className="grid gap-5">
+      <Field label={t('dns.form.provider')} hint={t('dns.form.providerHint')}>
         {({ id }) => (
           <Select
             id={id}
             value={state.provider}
             onChange={(event) => patch({ provider: event.target.value as DnsProviderName })}
           >
-            <option value="cloudflare">Cloudflare</option>
-            <option value="alibaba">Alibaba Cloud</option>
+            <option value="cloudflare">{providerLabel(t, 'cloudflare')}</option>
+            <option value="alibaba">{providerLabel(t, 'alibaba')}</option>
           </Select>
         )}
       </Field>
@@ -137,16 +137,16 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
       {isCloudflare ? (
         <>
           <SecretField
-            label="Cloudflare API token"
-            hint="Needs permission to edit DNS records in this zone."
+            label={t('dns.form.cloudflareToken')}
+            hint={t('dns.form.cloudflareTokenHint')}
             saved={settings?.hasCloudflareToken ?? false}
             value={state.cloudflareToken}
             onChange={(value) => patch({ cloudflareToken: value })}
-            onClear={() => clear('clearCloudflareToken', 'Cloudflare API token')}
-            required
+            onClear={() => clear('clearCloudflareToken', t('dns.form.cloudflareToken'))}
+            blockedReason={t('dns.form.blockedClear')}
             pending={save.isPending}
           />
-          <Field label="Zone ID">
+          <Field label={t('dns.form.zoneId')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -157,7 +157,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
               />
             )}
           </Field>
-          <Field label="Record name" hint="The full name, e.g. home.example.com.">
+          <Field label={t('dns.form.recordName')} hint={t('dns.form.recordNameHint')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -171,7 +171,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         </>
       ) : (
         <>
-          <Field label="Access key ID">
+          <Field label={t('dns.form.alibabaAccessKeyId')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -183,18 +183,17 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
             )}
           </Field>
           <SecretField
-            label="Access key secret"
+            label={t('dns.form.alibabaAccessKeySecret')}
             saved={settings?.hasAlibabaAccessKeySecret ?? false}
             value={state.alibabaAccessKeySecret}
             onChange={(value) => patch({ alibabaAccessKeySecret: value })}
-            onClear={() => clear('clearAlibabaAccessKeySecret', 'Alibaba Cloud access key secret')}
-            required
+            onClear={() =>
+              clear('clearAlibabaAccessKeySecret', t('dns.form.alibabaAccessKeySecret'))
+            }
+            blockedReason={t('dns.form.blockedClear')}
             pending={save.isPending}
           />
-          <Field
-            label="Record ID"
-            hint="Alibaba Cloud updates by record id and never creates one, so it has to exist already. Its host record and type come from the provider's own answer, not from here."
-          >
+          <Field label={t('dns.form.alibabaRecordId')} hint={t('dns.form.alibabaRecordIdHint')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -207,17 +206,17 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         </>
       )}
 
-      <div className="border-line grid gap-4 border-t pt-4">
+      <div className="border-line grid gap-5 border-t pt-5">
         <Switch
           checked={state.scheduleEnabled}
           onChange={(checked) => patch({ scheduleEnabled: checked })}
-          label="Check on a schedule"
+          label={t('dns.form.scheduleEnable')}
         />
-        <Field label="Interval (minutes)" hint="A check that finds the same address writes nothing.">
+        <Field label={t('dns.form.interval')} hint={t('dns.form.intervalHint')}>
           {({ id }) => (
             <TextInput
               id={id}
-              className="mono w-32"
+              className="mono w-36"
               type="number"
               min={1}
               max={10080}
@@ -229,133 +228,23 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         </Field>
       </div>
 
-      <div className="border-line grid gap-4 border-t pt-4">
-        <Field label="Gotify address" hint="Optional. Sent only when a record actually changes.">
-          {({ id }) => (
-            <TextInput
-              id={id}
-              className="mono"
-              value={state.gotifyAddress}
-              placeholder="notify.example.com"
-              onChange={(event) => patch({ gotifyAddress: event.target.value })}
-            />
-          )}
-        </Field>
-        <SecretField
-          label="Gotify token"
-          saved={settings?.hasGotifyToken ?? false}
-          value={state.gotifyToken}
-          onChange={(value) => patch({ gotifyToken: value })}
-          onClear={() => clear('clearGotifyToken', 'Gotify token')}
-          pending={save.isPending}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            icon={<Send className="size-4" aria-hidden />}
-            loading={test.isPending}
-            disabled={save.isPending}
-            onClick={() =>
-              test.mutate(
-                { gotifyAddress: state.gotifyAddress, gotifyToken: state.gotifyToken },
-                { onSuccess: () => setNotice('Test message sent.') },
-              )
-            }
-          >
-            Send test message
-          </Button>
-          <span className="text-faint text-meta">
-            Uses what is in the boxes above, saved or not.
-          </span>
-        </div>
-        {test.isError ? <ErrorBanner message={errorMessage(test.error)} /> : null}
-      </div>
-
-      {save.isError ? <ErrorBanner message={errorMessage(save.error)} /> : null}
-      {notice === null ? null : <p className="text-ok text-meta">{notice}</p>}
+      {save.isError ? <ErrorBanner message={errorMessage(save.error, i18n)} /> : null}
+      {notice === null ? null : (
+        <p role="status" className="text-ok text-meta">
+          {notice}
+        </p>
+      )}
 
       <div className="flex items-center gap-2">
         <Button
           type="submit"
           variant="primary"
-          icon={<Save className="size-4" aria-hidden />}
+          icon={<Save className="size-[18px]" aria-hidden />}
           loading={save.isPending}
         >
-          Save settings
+          {t('dns.form.save')}
         </Button>
       </div>
     </form>
-  );
-}
-
-/**
- * A credential box, its stored-or-not marker, and its delete button.
- *
- * The delete button is disabled when nothing is stored, because the click is an
- * irreversible delete and a control that cannot do anything should not look like
- * it can. A credential the selected provider still needs stays disabled with a
- * reason -- and the server refuses that case too, so the disabled state is never
- * the only defence.
- */
-function SecretField({
-  label,
-  hint,
-  saved,
-  value,
-  onChange,
-  onClear,
-  required = false,
-  pending,
-}: {
-  label: string;
-  hint?: string;
-  saved: boolean;
-  value: string;
-  onChange: (value: string) => void;
-  onClear: () => void;
-  /** True when the *selected* provider cannot run without this credential. */
-  required?: boolean;
-  pending: boolean;
-}) {
-  const blocked = required && saved;
-
-  return (
-    <Field
-      label={label}
-      hint={hint}
-      aside={
-        <span className="flex items-center gap-2">
-          <span className={saved ? 'text-ok text-meta' : 'text-faint text-meta'}>
-            {saved ? 'Saved' : 'Not set'}
-          </span>
-          <Button
-            size="sm"
-            variant="danger"
-            icon={<Trash2 className="size-3.5" aria-hidden />}
-            disabled={!saved || blocked || pending}
-            title={
-              blocked
-                ? 'The selected provider still needs this credential.'
-                : `Delete the stored ${label.toLowerCase()}`
-            }
-            onClick={onClear}
-          >
-            Clear
-          </Button>
-        </span>
-      }
-    >
-      {({ id, describedBy }) => (
-        <TextInput
-          id={id}
-          aria-describedby={describedBy}
-          type="password"
-          className="mono"
-          autoComplete="new-password"
-          value={value}
-          placeholder={saved ? 'unchanged' : ''}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </Field>
   );
 }

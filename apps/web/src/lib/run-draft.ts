@@ -1,5 +1,6 @@
 import type { RunDraft, ScriptParam, ScriptRunPrefill } from '@dashboard/shared';
 
+import type { MessageKey } from './i18n';
 import { addRow, updateRow, type CustomParamRow } from './run-params';
 
 /**
@@ -81,11 +82,14 @@ export function sameDraft(left: RunDraft, right: RunDraft): boolean {
 /**
  * What to tell the operator about where the values came from.
  *
+ * A key rather than a sentence: this module holds no words of its own, and the
+ * caller is the one that knows the reader's language.
+ *
  * `none` is the ordinary case -- a script nobody has run or filled in -- and
  * announcing it would be noise on every first visit.
  */
-export function describePrefill(prefill: ScriptRunPrefill): string | null {
-  if (prefill.source === 'draft') return 'Restored what you last typed here.';
-  if (prefill.source === 'last-run') return 'Filled in from the last run of this script.';
+export function describePrefill(prefill: ScriptRunPrefill): MessageKey | null {
+  if (prefill.source === 'draft') return 'runs.prefill.draft';
+  if (prefill.source === 'last-run') return 'runs.prefill.lastRun';
   return null;
 }

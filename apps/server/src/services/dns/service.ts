@@ -25,7 +25,6 @@ import type {
   DnsCheckSource,
   DnsFailureReason,
   DnsIpv6Probe,
-  DnsNotificationTest,
   DnsProviderName,
   DnsRecord,
   DnsRecordProbe,
@@ -33,7 +32,6 @@ import type {
   DnsSettingsView,
   DnsState,
   DnsUpdateResult,
-  TestDnsNotificationInput,
   UpdateDnsSettingsInput,
 } from '@dashboard/shared';
 import { DNS_CHECK_PREVIEW, MAX_DNS_CHECKS } from '@dashboard/shared';
@@ -44,6 +42,10 @@ import type { SecretBox } from '../../lib/crypto.js';
 import { AppError, UpstreamError, ValidationError, errorMessage } from '../../lib/errors.js';
 import type { Logger } from '../../lib/logger.js';
 import { createMutex } from '../../lib/mutex.js';
+// Only the redactor: the notifier itself is injected, because where a
+// notification goes is the dashboard's setting rather than this console's.
+import { redactToken } from '../notifications/gotify.js';
+import type { OutgoingNotification } from '../notifications/service.js';
 import { createAlibabaProvider } from './aliyun.js';
 import {
   clearChecks,
@@ -54,12 +56,10 @@ import {
   type DnsCheckFilter,
 } from './checks.js';
 import { createCloudflareProvider } from './cloudflare.js';
-import { redactToken, sendGotify, type GotifyMessage } from './gotify.js';
 import { detectPublicIpv6 } from './ipv6.js';
 import {
   getSettingsView,
   resolveSettings,
-  resolveSettingsOrEmpty,
   validate,
   // Renamed at the import: the service exposes its own `saveSettings`, and two
   // bindings with one name in this file is a reading hazard.
@@ -77,7 +77,17 @@ export type DnsServiceDeps = {
    */
   createProvider?: (settings: ResolvedDnsSettings) => DnsProvider;
   detectIpv6?: (signal?: AbortSignal) => Promise<string>;
-  notify?: (message: GotifyMessage) => Promise<boolean>;
+  /**
+   * How to reach a person. Required rather than defaulted: where a message goes
+   * is a dashboard-wide setting, and a console that quietly sent nothing would
+   * look exactly like one whose notifications work.
+   *
+   * False means nothing is configured, which is a skip rather than a failure.
+   */
+  sendNotification: (
+    notification: OutgoingNotification,
+    signal?: AbortSignal,
+  ) => Promise<boolean>;
   /** Wired by the composition root once the scheduler exists; null before that. */
   getSchedule?: () => DnsSchedulerView | null;
   /**
@@ -93,10 +103,6 @@ export type DnsService = {
   update: (source: DnsCheckSource, signal?: AbortSignal) => Promise<DnsUpdateResult>;
   detect: (signal?: AbortSignal) => Promise<DnsIpv6Probe>;
   queryRecord: (signal?: AbortSignal) => Promise<DnsRecordProbe>;
-  testNotification: (
-    input: TestDnsNotificationInput,
-    signal?: AbortSignal,
-  ) => Promise<DnsNotificationTest>;
   state: () => DnsState;
   listChecks: (filter: DnsCheckFilter) => DnsCheckList;
   clearChecks: () => number;
@@ -122,7 +128,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
   const { db, box, logger } = deps;
   const createProvider = deps.createProvider ?? defaultProvider;
   const detectIpv6 = deps.detectIpv6 ?? detectPublicIpv6;
-  const notify = deps.notify ?? sendGotify;
+  const { sendNotification } = deps;
 
   // The lock the Python version kept at module level, now that two paths -- the
   // button and the timer -- can reach the same record.
@@ -147,7 +153,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     // of sending a request the provider will reject.
     const problem = validate(settings);
     if (problem !== null) {
-      logger.warn({ reason: problem }, 'the DNS settings are not usable');
+      logger.warn({ reason: problem.message }, 'the DNS settings are not usable');
       return remember(source, failure('invalid_settings', settings.provider, ''));
     }
 
@@ -197,17 +203,16 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     let notificationAttempted = false;
     let notificationFailed = false;
     if (action === 'created' || action === 'updated') {
-      notificationAttempted = true;
       try {
-        const sent = await notify({
-          address: settings.gotifyAddress,
-          token: settings.gotifyToken,
-          title: 'DNS IPv6 updated',
-          message: `${provider.name}: ${previousValue ?? '(no record)'} -> ${ipv6}`,
-          ...(signal === undefined ? {} : { signal }),
-        });
-        // False means the notifier is not configured after all, which is a skip.
-        notificationAttempted = sent;
+        // The call itself answers "was one attempted": false means nothing is
+        // configured, which is a skip and not a failure.
+        notificationAttempted = await sendNotification(
+          {
+            title: 'DNS IPv6 updated',
+            message: `${provider.name}: ${previousValue ?? '(no record)'} -> ${ipv6}`,
+          },
+          signal,
+        );
       } catch (error) {
         notificationFailed = true;
         logger.warn(
@@ -288,34 +293,6 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
       lastRecord = record;
       lastRecordAt = nowIso();
       return { record, queriedAt: lastRecordAt };
-    },
-
-    async testNotification(input, signal) {
-      const settings = resolveSettingsOrEmpty(db, box);
-      // The form's value wins so a credential can be tried before it is saved;
-      // blank means "use what is stored", as it does when saving.
-      const address = pick(input.gotifyAddress, settings.gotifyAddress);
-      const token = pick(input.gotifyToken, settings.gotifyToken);
-      if (address === '' || token === '') {
-        throw new ValidationError(
-          'A Gotify address and token are both needed to send a test message',
-        );
-      }
-
-      try {
-        await notify({
-          address,
-          token,
-          title: 'Test notification',
-          message: 'The DNS console reached this Gotify server.',
-          ...(signal === undefined ? {} : { signal }),
-        });
-      } catch (error) {
-        throw new UpstreamError(
-          `The test message could not be sent: ${redactToken(errorMessage(error))}`,
-        );
-      }
-      return { sent: true };
     },
 
     state() {
@@ -399,10 +376,4 @@ function failFrom(
 ): DnsUpdateResult {
   if (!(error instanceof DnsFailureError)) throw error;
   return failure(error.reason, provider, ipv6, previousValue, recordName);
-}
-
-/** A form value when it says something, otherwise the stored one. */
-function pick(provided: string | undefined, stored: string): string {
-  const trimmed = (provided ?? '').trim();
-  return trimmed === '' ? stored.trim() : trimmed;
 }

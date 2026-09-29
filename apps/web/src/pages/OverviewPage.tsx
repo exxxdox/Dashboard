@@ -6,7 +6,9 @@ import { Panel } from '../components/Panel';
 import { Button } from '../components/Button';
 import { EmptyState, ErrorBanner, LoadingRows } from '../components/Feedback';
 import { ExecutionStatusLabel } from '../components/StatusDot';
+import { errorMessage } from '../api/client';
 import { useOverview } from '../api/queries';
+import { useI18n, useT } from '../lib/i18n';
 import { href, navigate } from '../lib/router';
 import { formatDuration, formatRelative, runTag } from '../lib/format';
 
@@ -20,15 +22,17 @@ type CountTile = {
 };
 
 export function OverviewPage() {
+  const i18n = useI18n();
+  const { t } = i18n;
   const overview = useOverview();
 
   if (overview.isError) {
     return (
       <PageBody>
-        <PageHeader eyebrow="Dashboard" title="Overview" />
+        <PageHeader eyebrow={t('overview.eyebrow')} title={t('overview.title')} />
         <ErrorBanner
           className="mt-5"
-          message={overview.error.message}
+          message={errorMessage(overview.error, i18n)}
           onRetry={() => void overview.refetch()}
         />
       </PageBody>
@@ -41,26 +45,26 @@ export function OverviewPage() {
     overview.isSuccess && counts !== undefined && counts.targets === 0 && counts.sources === 0;
 
   const tiles: CountTile[] = [
-    { label: 'Targets', value: counts?.targets ?? 0, icon: Server, href: '/targets' },
-    { label: 'Sources', value: counts?.sources ?? 0, icon: FolderTree, href: '/sources' },
-    { label: 'Scripts', value: counts?.scripts ?? 0, icon: FileCode, href: '/scripts' },
-    { label: 'Running', value: counts?.running ?? 0, icon: Activity, href: '/runs?status=running' },
-    { label: 'Failed 24h', value: counts?.failed24h ?? 0, icon: CircleAlert, href: '/runs?status=failed', alarm: true },
+    { label: t('overview.count.targets'), value: counts?.targets ?? 0, icon: Server, href: '/targets' },
+    { label: t('overview.count.sources'), value: counts?.sources ?? 0, icon: FolderTree, href: '/sources' },
+    { label: t('overview.count.scripts'), value: counts?.scripts ?? 0, icon: FileCode, href: '/scripts' },
+    { label: t('overview.count.running'), value: counts?.running ?? 0, icon: Activity, href: '/runs?status=running' },
+    { label: t('overview.count.failed'), value: counts?.failed24h ?? 0, icon: CircleAlert, href: '/runs?status=failed', alarm: true },
   ];
 
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Dashboard"
-        title="Overview"
-        description="What is configured, what is running, and what just broke."
+        eyebrow={t('overview.eyebrow')}
+        title={t('overview.title')}
+        description={t('overview.description')}
         actions={
           <Button
             variant="primary"
             icon={<ArrowRight className="size-4" aria-hidden />}
             onClick={() => navigate('/scripts')}
           >
-            Run a script
+            {t('overview.runScript')}
           </Button>
         }
       />
@@ -117,14 +121,14 @@ export function OverviewPage() {
 
       <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
-          title="Recent runs"
+          title={t('overview.recentRuns')}
           flush
           aside={
             <a
               href={href('/runs')}
               className="focus-ring text-mute hover:text-ink text-meta rounded-md px-2 py-1 transition-colors duration-150"
             >
-              All runs
+              {t('overview.allRuns')}
             </a>
           }
         >
@@ -134,11 +138,11 @@ export function OverviewPage() {
             <div className="p-4">
               <EmptyState
                 icon={<Activity className="size-5" aria-hidden />}
-                title="No runs yet"
-                description="Pick a script and send it to a target; every execution lands here with its full output."
+                title={t('overview.noRunsTitle')}
+                description={t('overview.noRunsBody')}
                 action={
                   <Button variant="primary" size="sm" onClick={() => navigate('/scripts')}>
-                    Choose a script
+                    {t('overview.chooseScript')}
                   </Button>
                 }
               />
@@ -152,35 +156,55 @@ export function OverviewPage() {
           )}
         </Panel>
 
-        <Panel title={isBlank ? 'Getting started' : 'Jump to'}>
+        <Panel title={isBlank ? t('overview.gettingStarted') : t('overview.jumpTo')}>
           {isBlank ? (
             <ol className="grid gap-4">
               <SetupStep
                 index="01"
-                title="Add a target"
-                body="Where the scripts run: host, credentials and the host path of the shared directory."
+                title={t('overview.stepTargetTitle')}
+                body={t('overview.stepTargetBody')}
                 href="/targets"
               />
               <SetupStep
                 index="02"
-                title="Add a source"
-                body="Where the scripts live: a local directory or a GitHub repository to sync."
+                title={t('overview.stepSourceTitle')}
+                body={t('overview.stepSourceBody')}
                 href="/sources"
               />
               <SetupStep
                 index="03"
-                title="Run something"
-                body="Once both exist, scripts appear in the tree and can be executed."
+                title={t('overview.stepRunTitle')}
+                body={t('overview.stepRunBody')}
                 href="/scripts"
               />
             </ol>
           ) : (
             <div className="grid gap-1">
-              <QuickLink href="/scripts" label="Scripts" hint="Browse and run" />
-              <QuickLink href="/runs?status=running" label="Running now" hint="Live output" />
-              <QuickLink href="/runs?status=failed" label="Failed runs" hint="Last 24h first" />
-              <QuickLink href="/targets" label="Targets" hint="Hosts and credentials" />
-              <QuickLink href="/sources" label="Sources" hint="Sync and re-scan" />
+              <QuickLink
+                href="/scripts"
+                label={t('overview.quickScripts')}
+                hint={t('overview.quickScriptsHint')}
+              />
+              <QuickLink
+                href="/runs?status=running"
+                label={t('overview.quickRunning')}
+                hint={t('overview.quickRunningHint')}
+              />
+              <QuickLink
+                href="/runs?status=failed"
+                label={t('overview.quickFailed')}
+                hint={t('overview.quickFailedHint')}
+              />
+              <QuickLink
+                href="/targets"
+                label={t('overview.quickTargets')}
+                hint={t('overview.quickTargetsHint')}
+              />
+              <QuickLink
+                href="/sources"
+                label={t('overview.quickSources')}
+                hint={t('overview.quickSourcesHint')}
+              />
             </div>
           )}
         </Panel>
@@ -190,6 +214,9 @@ export function OverviewPage() {
 }
 
 function RecentRunRow({ execution }: { execution: ExecutionSummary }) {
+  // Its own translator rather than a prop: the row is where the relative time is
+  // rendered, so it is where the question of language is actually asked.
+  const t = useT();
   return (
     <li>
       <a
@@ -206,7 +233,7 @@ function RecentRunRow({ execution }: { execution: ExecutionSummary }) {
           {formatDuration(execution.durationMs)}
         </span>
         <span className="text-faint text-meta hidden w-[92px] shrink-0 text-right md:inline">
-          {formatRelative(execution.queuedAt)}
+          {formatRelative(execution.queuedAt, t)}
         </span>
       </a>
     </li>

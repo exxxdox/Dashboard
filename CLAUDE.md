@@ -40,12 +40,16 @@ apps/server/src
   transport/        Transport interface; ssh-transport is the only implementation
   runner/           queue (concurrency) and runner (one plan, one transport)
   services/         targets, sources+git, scan, executions — all DB logic
-  services/dns/     the IPv6 console: settings, checks, providers, probe, notifier,
+  services/dns/     the IPv6 console: settings, checks, providers, probe,
                     scheduler, and the service that is the only orchestration point
-  routes/           targets, sources+scripts+overview, executions+websocket, dns
+  services/notifications/  the app-wide notification settings row, the Gotify client,
+                    and the one way to send a message
+  routes/           targets, sources+scripts+overview, executions+websocket, dns,
+                    settings
   ws/hub.ts         in-process pub/sub for live execution events
 apps/web/src
   api/  components/  pages/  lib/
+  lib/i18n/         the English/Chinese dictionary, one file per area
 ```
 
 ## Architecture, and why it is this way
@@ -87,6 +91,12 @@ Two consequences worth knowing before touching this: only the entry script is up
 **A DNS credential is absent, blank, or replaced -- and only the third or an explicit flag changes it.** The API never returns one, so a form has nothing to send back; blank therefore means "keep", and deleting is its own `clear*` flag. Clearing the *active* provider's required credential is refused by validation with the field named, not by a second rule in the merge. The row stores each credential in its own nullable column (`NULL` is the only spelling of "not stored"), so replacing or clearing one cannot disturb the others.
 
 **The DNS schedule is a re-arming timer, and `configure` is idempotent.** One `setTimeout` that is re-armed after each run rather than a fixed cadence, so a run longer than the interval cannot overlap itself; a tick that lands while one is in flight is skipped. `configure` does nothing when the `(enabled, intervalMinutes)` pair is unchanged, which is what stops the page -- which asks for the state on every visit -- from pushing the next run forward each time someone opens it.
+
+**Where a notification goes is the dashboard's setting, not the DNS console's.** The address and token used to live on `dns_settings`, because that console was the first and only thing that sent one. They are now an `app_settings` row (`services/notifications/`), because the thing being configured is "how this dashboard reaches me". The DNS service no longer reads a credential: `sendNotification` is injected into it like `createProvider` and `detectIpv6`, so the console asks for a message to be sent and never learns where it landed. `send` short-circuits when nothing is configured rather than delegating that judgement to the transport -- "not configured" is a property of the settings, and a transport asked to POST to an empty address would be right to call that a bug rather than a skip. The v6 migration moves the two columns and drops them in the same transaction: a second source of truth for one credential is a bug waiting for the day the two disagree, and `created_at`/`updated_at` come across unchanged because they are the truth about when the credential was written, not about when it moved.
+
+**The server names a message; the client chooses the words.** An `AppError` carries an optional `i18n: { key, params }` beside its English `message`, and `app.ts` puts it in the error body. The English is what the log records and what a client with no wording of its own shows; the key is what a client that has one looks up. The coverage is deliberately partial: the errors a person actually hits have keys (`NotFoundError` derives its own from the entity, `validate()` builds one naming the missing credential fields by identifier, the auth and notifier refusals carry theirs), and the rest fall through to the server's sentence. A client-side key for a message nothing sends would be dead code, so adding one is a two-sided change. `params` values that are names rather than values are identifiers -- the DNS problem sends `['cloudflareZoneId', …]`, not English labels -- and the client resolves each through `error.field.<id>`; this is the one convention the interpolation in `lib/i18n/index.tsx` knows about.
+
+**The web client's two languages live in one dictionary per area.** `lib/i18n/areas/*.ts` each export `{ en, zh }` with `en` a literal and `zh` a `Record<keyof typeof en, string>`, which is the whole enforcement: a key added to one language and not the other fails to typecheck. `MessageKey` is the union of every area, so a misspelled key is a compile error rather than a screen with `dns.titel` printed on it. The locale is remembered in `localStorage`, defaults from `navigator.language`, and mirrors to `document.documentElement.lang`. Dates and relative times take it too (`formatDateTime(iso, locale)`, `formatRelative(iso, t)`) because the order of a date's fields belongs to a language -- which is why `lib/format.ts` takes a translator rather than reaching for one. Language *endonyms* are the deliberate exception and stay literal: someone who cannot read Chinese still recognises 简体中文.
 
 ## Conventions
 

@@ -4,7 +4,8 @@ import {
   executeScriptSchema,
   loginSchema,
   runDraftSchema,
-  testDnsNotificationSchema,
+  testNotificationSchema,
+  updateAppSettingsSchema,
   updateDnsSettingsSchema,
   updateSourceSchema,
 } from './schemas.js';
@@ -171,23 +172,43 @@ describe('updateDnsSettingsSchema', () => {
   test('carries the clear flags as their own fields', () => {
     const parsed = updateDnsSettingsSchema.parse({
       clearCloudflareToken: true,
-      clearGotifyToken: false,
+      clearAlibabaAccessKeySecret: false,
     });
     expect(parsed.clearCloudflareToken).toBe(true);
     // False is not the same as absent: absent leaves the decision to the
     // service, false is an explicit "do not clear".
-    expect(parsed.clearGotifyToken).toBe(false);
-    expect(parsed.clearAlibabaAccessKeySecret).toBeUndefined();
+    expect(parsed.clearAlibabaAccessKeySecret).toBe(false);
+  });
+
+  test('has no field for a notification credential', () => {
+    // Where a message goes is the dashboard's setting rather than this
+    // console's, so a DNS settings update must not be able to reach one.
+    const parsed = updateDnsSettingsSchema.parse({ provider: 'cloudflare' });
+    expect(Object.keys(parsed)).toEqual(['provider']);
   });
 });
 
-describe('testDnsNotificationSchema', () => {
+describe('testNotificationSchema', () => {
   test('accepts only the two fields a test message can use', () => {
-    const parsed = testDnsNotificationSchema.parse({
+    const parsed = testNotificationSchema.parse({
       gotifyAddress: 'notify.test',
       gotifyToken: 'token',
-      cloudflareZoneId: 'ignored',
+      clearGotifyToken: 'ignored',
     });
     expect(parsed).toEqual({ gotifyAddress: 'notify.test', gotifyToken: 'token' });
+  });
+});
+
+describe('updateAppSettingsSchema', () => {
+  test('carries the notification credential and its clear flag', () => {
+    const parsed = updateAppSettingsSchema.parse({
+      gotifyAddress: 'notify.test',
+      clearGotifyToken: true,
+    });
+    expect(parsed).toEqual({ gotifyAddress: 'notify.test', clearGotifyToken: true });
+  });
+
+  test('is entirely optional, so a save may send one field', () => {
+    expect(updateAppSettingsSchema.parse({})).toEqual({});
   });
 });

@@ -16,6 +16,8 @@ export type Route =
   // Carries the query string so the history's page number survives a reload and
   // can be linked to, the way the runs list already does it.
   | { name: 'dns'; search: URLSearchParams }
+  // Preferences for the whole dashboard rather than for one feature.
+  | { name: 'settings' }
   | { name: 'notFound'; path: string };
 
 const DEFAULT_HASH = '#/';
@@ -40,6 +42,8 @@ export function parseRoute(hash: string): Route {
       return { name: 'sources' };
     case 'dns':
       return { name: 'dns', search };
+    case 'settings':
+      return { name: 'settings' };
     default:
       return { name: 'notFound', path };
   }

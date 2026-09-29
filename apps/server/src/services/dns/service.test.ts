@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { openDatabase, type Db } from '../../db/client.js';
 import { createSecretBox, type SecretBox } from '../../lib/crypto.js';
-import { UpstreamError, ValidationError } from '../../lib/errors.js';
+import { ValidationError } from '../../lib/errors.js';
 import { createLogger } from '../../lib/logger.js';
 import { listChecks, summarizeChecks } from './checks.js';
 import { createDnsService, type DnsService } from './service.js';
@@ -45,7 +45,7 @@ type Harness = {
   service: DnsService;
   provider: { getRecord: ReturnType<typeof vi.fn>; setIpv6: ReturnType<typeof vi.fn> };
   detect: ReturnType<typeof vi.fn>;
-  notify: ReturnType<typeof vi.fn>;
+  sendNotification: ReturnType<typeof vi.fn>;
   save: () => void;
 };
 
@@ -65,7 +65,7 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     setIpv6: vi.fn(overrides.provider?.setIpv6 ?? (async (): Promise<'unchanged'> => 'unchanged')),
   };
   const detect = vi.fn(async (): Promise<string> => '2606:4700::1');
-  const notify = vi.fn(async (): Promise<boolean> => true);
+  const sendNotification = vi.fn(async (): Promise<boolean> => true);
 
   const service = createDnsService({
     db,
@@ -73,7 +73,9 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     logger,
     createProvider: () => ({ name: 'cloudflare', ...provider }) as unknown as DnsProvider,
     detectIpv6: detect,
-    notify: notify as unknown as (message: unknown) => Promise<boolean>,
+    sendNotification: sendNotification as unknown as (
+      notification: unknown,
+    ) => Promise<boolean>,
   });
 
   return {
@@ -82,7 +84,7 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     service,
     provider,
     detect,
-    notify,
+    sendNotification,
     save: () => {
       saveSettings(db, box, CLOUDFLARE);
     },
@@ -171,7 +173,7 @@ describe('update', () => {
       const result = await h.service.update('manual');
 
       expect(result).toMatchObject({ action: 'unchanged', notificationAttempted: false });
-      expect(h.notify).not.toHaveBeenCalled();
+      expect(h.sendNotification).not.toHaveBeenCalled();
       // The record the query returned is the one the write was handed, so a
       // second read cannot disagree with what the history row says.
       expect(h.provider.setIpv6).toHaveBeenCalledWith('2606:4700::1', EXISTING, undefined);
@@ -195,9 +197,9 @@ describe('update', () => {
           notificationAttempted: true,
           notificationFailed: false,
         });
-        expect(h.notify).toHaveBeenCalledTimes(1);
-        const message = h.notify.mock.calls[0]?.[0] as { message: string };
-        expect(message.message).toContain('2606:4700::1');
+        expect(h.sendNotification).toHaveBeenCalledTimes(1);
+        const sent = h.sendNotification.mock.calls[0]?.[0] as { message: string };
+        expect(sent.message).toContain('2606:4700::1');
       } finally {
         h.db.close();
       }
@@ -208,7 +210,7 @@ describe('update', () => {
     const h = setup({ provider: { setIpv6: async () => 'updated' } });
     try {
       h.save();
-      h.notify.mockRejectedValue(new Error('Gotify answered 500'));
+      h.sendNotification.mockRejectedValue(new Error('Gotify answered 500'));
 
       const result = await h.service.update('manual');
 
@@ -223,7 +225,7 @@ describe('update', () => {
     const h = setup({ provider: { setIpv6: async () => 'updated' } });
     try {
       h.save();
-      h.notify.mockResolvedValue(false);
+      h.sendNotification.mockResolvedValue(false);
 
       expect(await h.service.update('manual')).toMatchObject({
         action: 'updated',
@@ -333,74 +335,6 @@ describe('detect and queryRecord', () => {
   });
 });
 
-describe('testNotification', () => {
-  test('prefers the form value over the stored one without saving it', async () => {
-    const h = setup();
-    try {
-      saveSettings(h.db, h.box, {
-        ...CLOUDFLARE,
-        gotifyAddress: 'stored.test',
-        gotifyToken: 'stored',
-      });
-
-      await h.service.testNotification({ gotifyAddress: 'typed.test', gotifyToken: 'typed' });
-
-      expect(h.notify).toHaveBeenCalledWith(
-        expect.objectContaining({ address: 'typed.test', token: 'typed' }),
-      );
-    } finally {
-      h.db.close();
-    }
-  });
-
-  test('falls back to the stored credential when the form leaves it blank', async () => {
-    const h = setup();
-    try {
-      saveSettings(h.db, h.box, {
-        ...CLOUDFLARE,
-        gotifyAddress: 'stored.test',
-        gotifyToken: 'stored',
-      });
-
-      await h.service.testNotification({ gotifyToken: '' });
-
-      expect(h.notify).toHaveBeenCalledWith(
-        expect.objectContaining({ address: 'stored.test', token: 'stored' }),
-      );
-    } finally {
-      h.db.close();
-    }
-  });
-
-  test('refuses when there is nothing to send with', async () => {
-    const h = setup();
-    try {
-      await expect(h.service.testNotification({})).rejects.toThrow(/Gotify address and token/);
-      expect(h.notify).not.toHaveBeenCalled();
-    } finally {
-      h.db.close();
-    }
-  });
-
-  test('reports a failed send as an upstream problem, with the token redacted', async () => {
-    const h = setup();
-    try {
-      h.notify.mockRejectedValue(new Error('POST /message?token=secret answered 401'));
-
-      const attempt = h.service.testNotification({
-        gotifyAddress: 'notify.test',
-        gotifyToken: 'secret',
-      });
-      await expect(attempt).rejects.toThrow(UpstreamError);
-
-      try {
-        await h.service.testNotification({ gotifyAddress: 'notify.test', gotifyToken: 'secret' });
-      } catch (error) {
-        expect((error as Error).message).toContain('token=***');
-        expect((error as Error).message).not.toContain('token=secret');
-      }
-    } finally {
-      h.db.close();
-    }
-  });
-});
+// The notification tests used to live here. They moved to
+// `services/notifications/service.test.ts` with the code they cover: the
+// credential they exercise is an application setting now, not a DNS one.

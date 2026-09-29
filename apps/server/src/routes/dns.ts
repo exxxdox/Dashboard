@@ -17,7 +17,7 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { testDnsNotificationSchema, updateDnsSettingsSchema } from '@dashboard/shared';
+import { updateDnsSettingsSchema } from '@dashboard/shared';
 import { z } from 'zod';
 
 import type { AppContext } from '../context.js';
@@ -66,14 +66,9 @@ export function registerDnsRoutes(app: FastifyInstance, ctx: AppContext): void {
     return dns.update('manual');
   });
 
-  app.post('/api/dns/notification-test', async (request) => {
-    const input = testDnsNotificationSchema.parse(request.body);
-    try {
-      return await dns.testNotification(input);
-    } catch (error) {
-      throw toUpstreamError(error);
-    }
-  });
+  // The notification test used to live here. It moved to `/api/settings`,
+  // because the credential it tests belongs to the dashboard rather than to
+  // this console.
 
   app.get('/api/dns/checks', (request) => dns.listChecks(listQuery.parse(request.query)));
 

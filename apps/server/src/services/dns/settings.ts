@@ -8,17 +8,32 @@
  *   could travel in -- each one is reduced to a `has*` boolean -- so a route
  *   cannot leak one by forgetting to delete it. This is the `TargetSummary`
  *   rule applied again.
- * - `ResolvedDnsSettings` has them decrypted, and exists only for a provider or
- *   the notifier, inside the service.
+ * - `ResolvedDnsSettings` has them decrypted, and exists only for a provider,
+ *   inside the service.
+ *
+ * The notification address is not here: it belongs to the dashboard rather than
+ * to this console, and lives in `services/notifications/settings.ts`.
  */
 
-import type { DnsProviderName, DnsSettingsView, UpdateDnsSettingsInput } from '@dashboard/shared';
+import type {
+  DnsProviderName,
+  DnsSettingsView,
+  ErrorI18n,
+  UpdateDnsSettingsInput,
+} from '@dashboard/shared';
 import { MAX_DNS_INTERVAL_MINUTES, MIN_DNS_INTERVAL_MINUTES } from '@dashboard/shared';
 
 import type { Db } from '../../db/client.js';
 import { nowIso } from '../../db/client.js';
 import type { SecretBox } from '../../lib/crypto.js';
 import { ConflictError, ValidationError } from '../../lib/errors.js';
+import {
+  decryptOptionalSecret,
+  encryptSecret,
+  isBlank,
+  mergeSecret,
+  textField,
+} from '../../lib/secrets.js';
 import type { ResolvedDnsSettings } from './types.js';
 
 /**
@@ -43,8 +58,6 @@ export type DnsSettingsRow = {
   alibaba_record_id: string;
   alibaba_record_type: string;
   alibaba_access_key_secret_encrypted: string | null;
-  gotify_address: string;
-  gotify_token_encrypted: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -64,8 +77,6 @@ export type MutableSettings = {
   alibabaAccessKeyId: string;
   alibabaRecordId: string;
   alibabaAccessKeySecret: string | null;
-  gotifyAddress: string;
-  gotifyToken: string | null;
 };
 
 /** What a fresh install has, before anything has been saved. */
@@ -80,8 +91,6 @@ function defaults(): MutableSettings {
     alibabaAccessKeyId: '',
     alibabaRecordId: '',
     alibabaAccessKeySecret: null,
-    gotifyAddress: '',
-    gotifyToken: null,
   };
 }
 
@@ -120,8 +129,6 @@ export function toSettingsView(row: DnsSettingsRow): DnsSettingsView {
     alibabaRecordId: row.alibaba_record_id,
     alibabaRecordType: ALIBABA_RECORD_TYPE,
     hasAlibabaAccessKeySecret: row.alibaba_access_key_secret_encrypted !== null,
-    gotifyAddress: row.gotify_address,
-    hasGotifyToken: row.gotify_token_encrypted !== null,
     updatedAt: row.updated_at,
   };
 }
@@ -142,35 +149,6 @@ export function resolveSettings(db: Db, box: SecretBox): ResolvedDnsSettings | n
     alibabaAccessKeySecret: settings.alibabaAccessKeySecret ?? '',
     alibabaRecordId: settings.alibabaRecordId,
     alibabaRecordType: ALIBABA_RECORD_TYPE,
-    gotifyAddress: settings.gotifyAddress,
-    gotifyToken: settings.gotifyToken ?? '',
-  };
-}
-
-/**
- * The same, with empty strings where nothing is saved.
- *
- * Used by the notification test, which has to be able to try a credential that
- * has not been saved yet -- so "no settings row at all" and "a row with an empty
- * Gotify address" have to look alike to it.
- */
-export function resolveSettingsOrEmpty(db: Db, box: SecretBox): ResolvedDnsSettings {
-  const resolved = resolveSettings(db, box);
-  if (resolved) return resolved;
-  const empty = defaults();
-  return {
-    provider: empty.provider,
-    scheduleEnabled: empty.scheduleEnabled,
-    intervalMinutes: empty.intervalMinutes,
-    cloudflareToken: '',
-    cloudflareZoneId: '',
-    cloudflareRecordName: '',
-    alibabaAccessKeyId: '',
-    alibabaAccessKeySecret: '',
-    alibabaRecordId: '',
-    alibabaRecordType: ALIBABA_RECORD_TYPE,
-    gotifyAddress: '',
-    gotifyToken: '',
   };
 }
 
@@ -190,7 +168,7 @@ export function saveSettings(
   const merged = merge(row, input, box);
 
   const problem = validate(merged);
-  if (problem !== null) throw new ValidationError(problem);
+  if (problem !== null) throw new ValidationError(problem.message, undefined, problem.i18n);
 
   const timestamp = nowIso();
   if (row) {
@@ -199,8 +177,7 @@ export function saveSettings(
          provider = ?, schedule_enabled = ?, interval_minutes = ?,
          cloudflare_zone_id = ?, cloudflare_record_name = ?, cloudflare_token_encrypted = ?,
          alibaba_access_key_id = ?, alibaba_record_id = ?, alibaba_record_type = ?,
-         alibaba_access_key_secret_encrypted = ?,
-         gotify_address = ?, gotify_token_encrypted = ?, updated_at = ?
+         alibaba_access_key_secret_encrypted = ?, updated_at = ?
        WHERE id = ?`,
     ).run(
       merged.provider,
@@ -208,13 +185,11 @@ export function saveSettings(
       merged.intervalMinutes,
       merged.cloudflareZoneId,
       merged.cloudflareRecordName,
-      encrypt(merged.cloudflareToken, box),
+      encryptSecret(merged.cloudflareToken, box),
       merged.alibabaAccessKeyId,
       merged.alibabaRecordId,
       ALIBABA_RECORD_TYPE,
-      encrypt(merged.alibabaAccessKeySecret, box),
-      merged.gotifyAddress,
-      encrypt(merged.gotifyToken, box),
+      encryptSecret(merged.alibabaAccessKeySecret, box),
       timestamp,
       SETTINGS_ID,
     );
@@ -224,9 +199,8 @@ export function saveSettings(
          id, provider, schedule_enabled, interval_minutes,
          cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
          alibaba_access_key_id, alibaba_record_id, alibaba_record_type,
-         alibaba_access_key_secret_encrypted,
-         gotify_address, gotify_token_encrypted, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         alibaba_access_key_secret_encrypted, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       SETTINGS_ID,
       merged.provider,
@@ -234,13 +208,11 @@ export function saveSettings(
       merged.intervalMinutes,
       merged.cloudflareZoneId,
       merged.cloudflareRecordName,
-      encrypt(merged.cloudflareToken, box),
+      encryptSecret(merged.cloudflareToken, box),
       merged.alibabaAccessKeyId,
       merged.alibabaRecordId,
       ALIBABA_RECORD_TYPE,
-      encrypt(merged.alibabaAccessKeySecret, box),
-      merged.gotifyAddress,
-      encrypt(merged.gotifyToken, box),
+      encryptSecret(merged.alibabaAccessKeySecret, box),
       timestamp,
       timestamp,
     );
@@ -276,22 +248,20 @@ function merge(
     provider: input.provider ?? base.provider,
     scheduleEnabled: input.scheduleEnabled ?? base.scheduleEnabled,
     intervalMinutes: input.intervalMinutes ?? base.intervalMinutes,
-    cloudflareZoneId: text(input.cloudflareZoneId, base.cloudflareZoneId),
-    cloudflareRecordName: text(input.cloudflareRecordName, base.cloudflareRecordName),
-    cloudflareToken: secret(
+    cloudflareZoneId: textField(input.cloudflareZoneId, base.cloudflareZoneId),
+    cloudflareRecordName: textField(input.cloudflareRecordName, base.cloudflareRecordName),
+    cloudflareToken: mergeSecret(
       input.cloudflareToken,
       input.clearCloudflareToken,
       base.cloudflareToken,
     ),
-    alibabaAccessKeyId: text(input.alibabaAccessKeyId, base.alibabaAccessKeyId),
-    alibabaRecordId: text(input.alibabaRecordId, base.alibabaRecordId),
-    alibabaAccessKeySecret: secret(
+    alibabaAccessKeyId: textField(input.alibabaAccessKeyId, base.alibabaAccessKeyId),
+    alibabaRecordId: textField(input.alibabaRecordId, base.alibabaRecordId),
+    alibabaAccessKeySecret: mergeSecret(
       input.alibabaAccessKeySecret,
       input.clearAlibabaAccessKeySecret,
       base.alibabaAccessKeySecret,
     ),
-    gotifyAddress: text(input.gotifyAddress, base.gotifyAddress),
-    gotifyToken: secret(input.gotifyToken, input.clearGotifyToken, base.gotifyToken),
   };
 }
 
@@ -302,16 +272,14 @@ function fromRow(row: DnsSettingsRow, box: SecretBox): MutableSettings {
     intervalMinutes: row.interval_minutes,
     cloudflareZoneId: row.cloudflare_zone_id,
     cloudflareRecordName: row.cloudflare_record_name,
-    cloudflareToken: optionalDecrypt(row.cloudflare_token_encrypted, box, 'Cloudflare token'),
+    cloudflareToken: decryptOptionalSecret(row.cloudflare_token_encrypted, box, 'Cloudflare token'),
     alibabaAccessKeyId: row.alibaba_access_key_id,
     alibabaRecordId: row.alibaba_record_id,
-    alibabaAccessKeySecret: optionalDecrypt(
+    alibabaAccessKeySecret: decryptOptionalSecret(
       row.alibaba_access_key_secret_encrypted,
       box,
       'Alibaba Cloud access key secret',
     ),
-    gotifyAddress: row.gotify_address,
-    gotifyToken: optionalDecrypt(row.gotify_token_encrypted, box, 'Gotify token'),
   };
 }
 
@@ -333,78 +301,84 @@ export type ValidatableSettings = {
 };
 
 /**
- * The rules a stored configuration has to satisfy.
+ * What is wrong with a configuration, in both the forms it has to take.
  *
- * Returns the message rather than throwing, so a caller can ask "is this runnable"
- * without a failure being the shape of the answer.
- *
- * Only the active provider's credentials are required: an operator switching from
- * Cloudflare to Alibaba Cloud should not have to keep the old token alive, and
- * keeping it is what makes switching back cheap.
+ * `message` is what the log records and what a client with no wording of its
+ * own shows; `i18n` names the same fact for a client that does have one.
+ * Returning both, rather than a code alone, is what keeps the log readable
+ * without making the wire message the only thing a reader can ever see.
  */
-export function validate(settings: ValidatableSettings): string | null {
-  if (settings.intervalMinutes < MIN_DNS_INTERVAL_MINUTES) {
-    return `The check interval must be at least ${MIN_DNS_INTERVAL_MINUTES} minute`;
-  }
-  if (settings.intervalMinutes > MAX_DNS_INTERVAL_MINUTES) {
-    return `The check interval must be at most ${MAX_DNS_INTERVAL_MINUTES} minutes`;
-  }
+export type SettingsProblem = {
+  message: string;
+  i18n: ErrorI18n;
+};
 
-  const missing: string[] = [];
-  if (settings.provider === 'cloudflare') {
-    if (isBlank(settings.cloudflareToken)) missing.push('Cloudflare API token');
-    if (isBlank(settings.cloudflareZoneId)) missing.push('Cloudflare zone id');
-    if (isBlank(settings.cloudflareRecordName)) missing.push('Cloudflare record name');
-  } else {
-    if (isBlank(settings.alibabaAccessKeyId)) missing.push('Alibaba Cloud access key id');
-    if (isBlank(settings.alibabaAccessKeySecret)) missing.push('Alibaba Cloud access key secret');
-    if (isBlank(settings.alibabaRecordId)) missing.push('Alibaba Cloud record id');
-  }
-
-  if (missing.length > 0) return `The selected provider still needs: ${missing.join(', ')}`;
-  return null;
-}
-
-function text(provided: string | undefined, current: string): string {
-  return provided === undefined ? current : provided.trim();
-}
-
-function secret(
-  provided: string | undefined,
-  clear: boolean | undefined,
-  current: string | null,
-): string | null {
-  if (clear === true) return null;
-  if (provided === undefined) return current;
-  const trimmed = provided.trim();
-  // Blank means "keep", not "erase": see the note on `merge`.
-  return trimmed === '' ? current : trimmed;
-}
-
-function isBlank(value: string | null): boolean {
-  return value === null || value.trim() === '';
-}
-
-function encrypt(value: string | null, box: SecretBox): string | null {
-  return value === null ? null : box.encrypt(value);
-}
-
-function optionalDecrypt(value: string | null, box: SecretBox, what: string): string | null {
-  return value === null ? null : decryptOrExplain(value, box, what);
-}
+/** A field that is missing: named for a sentence, identified for a lookup. */
+type MissingField = {
+  /** The identifier the client translates, e.g. `cloudflareZoneId`. */
+  field: string;
+  /** English, for the log and for the server's own sentence. */
+  label: string;
+};
 
 /**
- * A stored credential that will not decrypt means `secret.key` was replaced or
- * lost, and the operator has to re-enter the credential to fix it. A 409 rather
- * than a 500 because the request itself is fine -- what conflicts is the stored
- * state -- and the message is the only part of this that helps.
+ * The rules a stored configuration has to satisfy.
+ *
+ * Returns the problem rather than throwing, so a caller can ask "is this
+ * runnable" without a failure being the shape of the answer.
+ *
+ * Only the active provider's credentials are required: an operator switching
+ * from Cloudflare to Alibaba Cloud should not have to keep the old token alive,
+ * and keeping it is what makes switching back cheap.
  */
-function decryptOrExplain(value: string, box: SecretBox, what: string): string {
-  try {
-    return box.decrypt(value);
-  } catch {
-    throw new ConflictError(
-      `${what} cannot be decrypted: the secret key has changed. Re-enter the saved credentials.`,
-    );
+export function validate(settings: ValidatableSettings): SettingsProblem | null {
+  if (settings.intervalMinutes < MIN_DNS_INTERVAL_MINUTES) {
+    return {
+      message: `The check interval must be at least ${MIN_DNS_INTERVAL_MINUTES} minute`,
+      i18n: { key: 'error.dns.intervalTooSmall', params: { min: MIN_DNS_INTERVAL_MINUTES } },
+    };
   }
+  if (settings.intervalMinutes > MAX_DNS_INTERVAL_MINUTES) {
+    return {
+      message: `The check interval must be at most ${MAX_DNS_INTERVAL_MINUTES} minutes`,
+      i18n: { key: 'error.dns.intervalTooLarge', params: { max: MAX_DNS_INTERVAL_MINUTES } },
+    };
+  }
+
+  const missing: MissingField[] = [];
+  if (settings.provider === 'cloudflare') {
+    if (isBlank(settings.cloudflareToken)) {
+      missing.push({ field: 'cloudflareToken', label: 'Cloudflare API token' });
+    }
+    if (isBlank(settings.cloudflareZoneId)) {
+      missing.push({ field: 'cloudflareZoneId', label: 'Cloudflare zone id' });
+    }
+    if (isBlank(settings.cloudflareRecordName)) {
+      missing.push({ field: 'cloudflareRecordName', label: 'Cloudflare record name' });
+    }
+  } else {
+    if (isBlank(settings.alibabaAccessKeyId)) {
+      missing.push({ field: 'alibabaAccessKeyId', label: 'Alibaba Cloud access key id' });
+    }
+    if (isBlank(settings.alibabaAccessKeySecret)) {
+      missing.push({ field: 'alibabaAccessKeySecret', label: 'Alibaba Cloud access key secret' });
+    }
+    if (isBlank(settings.alibabaRecordId)) {
+      missing.push({ field: 'alibabaRecordId', label: 'Alibaba Cloud record id' });
+    }
+  }
+
+  if (missing.length > 0) {
+    return {
+      message: `The selected provider still needs: ${missing.map((item) => item.label).join(', ')}`,
+      i18n: {
+        key: 'error.dns.missingCredentials',
+        // The identifiers travel, not the English labels: a client that can
+        // name these fields does so, and one that cannot falls back to
+        // `message`, which still reads correctly on its own.
+        params: { provider: settings.provider, fields: missing.map((item) => item.field) },
+      },
+    };
+  }
+  return null;
 }

@@ -15,7 +15,8 @@ import type {
   ScriptRunPrefill,
   ScriptSummary,
   TargetSummary,
-  TestDnsNotificationInput,
+  TestNotificationInput,
+  UpdateAppSettingsInput,
   UpdateDnsSettingsInput,
   UpdateSourceInput,
   UpdateTargetInput,
@@ -404,14 +405,32 @@ export function useRunDnsUpdate() {
   });
 }
 
+/* ---------------------------------------------------------------- settings */
+
+export function useAppSettings() {
+  return useQuery({ queryKey: queryKeys.settings(), queryFn: api.settingsState });
+}
+
+export function useSaveAppSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateAppSettingsInput) => api.saveSettings(input),
+    // The response is the saved row, so the cache is set rather than
+    // invalidated: a refetch would answer with the same object.
+    onSuccess: (settings) => {
+      client.setQueryData(queryKeys.settings(), settings);
+    },
+  });
+}
+
 /**
  * The test message is sent and its answer is kept by the caller, not cached: it
  * says something about the credentials in the form, which the server has not
  * stored yet.
  */
-export function useTestDnsNotification() {
+export function useTestNotification() {
   return useMutation({
-    mutationFn: (input: TestDnsNotificationInput) => api.testDnsNotification(input),
+    mutationFn: (input: TestNotificationInput) => api.testNotification(input),
   });
 }
 

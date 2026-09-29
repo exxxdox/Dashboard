@@ -16,6 +16,7 @@ import type { ExecutionRunner } from './runner/runner.js';
 import type { DnsScheduler } from './services/dns/scheduler.js';
 import type { DnsService } from './services/dns/service.js';
 import type { ExecutionService } from './services/executions.js';
+import type { NotificationService } from './services/notifications/service.js';
 import type { ExecutionHub } from './ws/hub.js';
 
 export type AppContext = {
@@ -37,6 +38,11 @@ export type AppContext = {
   /** The IPv6 DNS console: one settings row, one history table, one timer. */
   dns: DnsService;
   dnsScheduler: DnsScheduler;
+  /**
+   * How the dashboard reaches a person. Owned here rather than by the DNS
+   * console, which is merely its first caller.
+   */
+  notifications: NotificationService;
   /** Set while the process is shutting down, so routes can refuse new work. */
   isShuttingDown: () => boolean;
 };

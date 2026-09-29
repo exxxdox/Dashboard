@@ -3,13 +3,14 @@ import type {
   CreateSourceInput,
   LoginInput,
   CreateTargetInput,
+  AppSettingsView,
   DnsCheckList,
   DnsIpv6Probe,
-  DnsNotificationTest,
   DnsRecordProbe,
   DnsSettingsView,
   DnsState,
   DnsUpdateResult,
+  ErrorI18n,
   ExecuteScriptInput,
   ExecutionLogChunk,
   ExecutionSummary,
@@ -21,11 +22,15 @@ import type {
   SyncResult,
   TargetCheckResult,
   TargetSummary,
-  TestDnsNotificationInput,
+  TestNotificationInput,
+  NotificationTest,
+  UpdateAppSettingsInput,
   UpdateDnsSettingsInput,
   UpdateSourceInput,
   UpdateTargetInput,
+  ApiErrorBody,
 } from '@dashboard/shared';
+import type { ErrorTranslator } from '../lib/i18n';
 import type {
   BrowseResponse,
   ExecutionListResponse,
@@ -37,7 +42,7 @@ import type {
 const API_BASE = '/api';
 
 export type ApiErrorPayload = {
-  error: { code: string; message: string; details?: unknown };
+  error: ApiErrorBody;
 };
 
 /** Carries the server's own code and message so the UI never invents one. */
@@ -45,18 +50,49 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly details: unknown;
+  /**
+   * The server's own name for this message, when it has one.
+   *
+   * The server cannot know what language the reader wants, so it sends the
+   * English and, where it can, an identifier the client can look up instead.
+   */
+  readonly i18n: ErrorI18n | null;
 
-  constructor(status: number, code: string, message: string, details?: unknown) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details?: unknown,
+    i18n?: ErrorI18n,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.details = details;
+    this.i18n = i18n ?? null;
   }
 }
 
-export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
+/**
+ * What to show a person for a failure.
+ *
+ * The server's own words are the fallback rather than the rule: a message it
+ * named is rendered from this client's dictionary, and one it did not is shown
+ * exactly as it arrived. Nothing here paraphrases, because the server knows
+ * things this file does not.
+ */
+export function errorMessage(error: unknown, i18n?: ErrorTranslator): string {
+  if (error instanceof ApiError) {
+    if (error.i18n && i18n) {
+      const named = i18n.lookup(error.i18n.key, error.i18n.params);
+      if (named !== null) return named;
+    }
+    // No translator means a caller outside React -- the log backfill in
+    // `api/stream.ts` is one. Rather than thread one through plumbing that has
+    // no React context to read it from, the server's own English is shown.
+    return error.message;
+  }
   if (error instanceof Error) return error.message;
   return 'Unexpected error';
 }
@@ -103,6 +139,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       'network_error',
       'Could not reach the server. Check that the API is running and reachable.',
       cause,
+      // This one is invented here, so it is the one error whose key this file
+      // owns rather than receives.
+      { key: 'common.networkError' },
     );
   }
 
@@ -121,11 +160,17 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
     const envelope = (parsed ?? null) as Partial<ApiErrorPayload> | null;
     const detail = envelope?.error;
+    // A server that said something keeps its own message and whatever key it
+    // attached. Only a response with no body at all gets the generic one, so a
+    // real message is never replaced by "request failed".
+    const i18n: ErrorI18n | undefined =
+      detail?.i18n ?? (detail?.message === undefined ? { key: 'common.httpError', params: { status: response.status } } : undefined);
     throw new ApiError(
       response.status,
       detail?.code ?? 'http_error',
       detail?.message ?? `Request failed with status ${response.status}`,
       detail?.details,
+      i18n,
     );
   }
 
@@ -218,9 +263,16 @@ export const api = {
   detectDnsIpv6: () => apiRequest<DnsIpv6Probe>('/dns/ipv6', { method: 'POST' }),
   queryDnsRecord: () => apiRequest<DnsRecordProbe>('/dns/record', { method: 'POST' }),
   runDnsUpdate: () => apiRequest<DnsUpdateResult>('/dns/update', { method: 'POST' }),
-  testDnsNotification: (body: TestDnsNotificationInput) =>
-    apiRequest<DnsNotificationTest>('/dns/notification-test', { method: 'POST', body }),
   listDnsChecks: (filter: { limit?: number; offset?: number } = {}) =>
     apiRequest<DnsCheckList>('/dns/checks', { query: filter }),
   clearDnsChecks: () => apiRequest<void>('/dns/checks', { method: 'DELETE' }),
+
+  // The application settings. Notifications live here rather than under /dns:
+  // the credential belongs to the dashboard, and the IPv6 console is only its
+  // first caller.
+  settingsState: () => apiRequest<AppSettingsView>('/settings'),
+  saveSettings: (body: UpdateAppSettingsInput) =>
+    apiRequest<AppSettingsView>('/settings', { method: 'PATCH', body }),
+  testNotification: (body: TestNotificationInput) =>
+    apiRequest<NotificationTest>('/settings/notification-test', { method: 'POST', body }),
 };

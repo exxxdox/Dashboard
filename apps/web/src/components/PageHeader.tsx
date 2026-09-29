@@ -18,16 +18,19 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn('border-line flex flex-wrap items-end gap-4 border-b pb-5', className)}>
+    <header className={cn('flex flex-wrap items-end gap-x-6 gap-y-4 pb-6', className)}>
       <div className="min-w-0 flex-1">
-        <p className="label mb-2.5">{eyebrow}</p>
+        <p className="label mb-3">{eyebrow}</p>
         <h1 className="text-ink text-display truncate font-semibold tracking-tight">{title}</h1>
-        {description ? <p className="text-mute text-body mt-2.5 max-w-2xl">{description}</p> : null}
+        {description ? <p className="text-mute text-body mt-3 max-w-2xl">{description}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         {hints}
         {actions}
       </div>
+      {/* A fading rule rather than a plain border: it separates the header from
+          the page without drawing a hard line the full width of the screen. */}
+      <div className="rule-fade w-full" />
     </header>
   );
 }

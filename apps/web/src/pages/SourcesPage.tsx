@@ -9,11 +9,14 @@ import { EmptyState, ErrorBanner, LoadingRows } from '../components/Feedback';
 import { MonoValue } from '../components/MonoValue';
 import { SyncStatusLabel } from '../components/StatusDot';
 import { useDeleteSource, useSources, useSyncSource } from '../api/queries';
+import { errorMessage } from '../api/client';
+import { useI18n } from '../lib/i18n';
 import { formatDateTime, formatRelative } from '../lib/format';
 import { navigate } from '../lib/router';
 import { SourceForm } from './SourceForm';
 
 export function SourcesPage() {
+  const i18n = useI18n();
   const sources = useSources();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<SourceSummary | null>(null);
@@ -28,9 +31,9 @@ export function SourcesPage() {
   return (
     <PageBody>
       <PageHeader
-        eyebrow="Library"
-        title="Sources"
-        description="Where scripts come from: a directory already shared with this container, or a GitHub repository kept in sync."
+        eyebrow={i18n.t('sources.eyebrow')}
+        title={i18n.t('sources.title')}
+        description={i18n.t('sources.description')}
         actions={
           showForm ? null : (
             <Button
@@ -41,14 +44,19 @@ export function SourcesPage() {
                 setCreating(true);
               }}
             >
-              Add source
+              {i18n.t('sources.add')}
             </Button>
           )
         }
       />
 
       {showForm ? (
-        <Panel className="mt-5" title={editing ? `Edit ${editing.name}` : 'New source'}>
+        <Panel
+          className="mt-5"
+          title={
+            editing ? i18n.t('sources.editTitle', { name: editing.name }) : i18n.t('sources.newTitle')
+          }
+        >
           {/* Keyed so switching rows reseeds the fields instead of editing the
               previous source's values. */}
           <SourceForm key={editing?.id ?? 'new'} source={editing} onDone={closeForm} />
@@ -58,7 +66,7 @@ export function SourcesPage() {
       {sources.isError ? (
         <ErrorBanner
           className="mt-5"
-          message={sources.error.message}
+          message={errorMessage(sources.error, i18n)}
           onRetry={() => void sources.refetch()}
         />
       ) : null}
@@ -70,11 +78,11 @@ export function SourcesPage() {
           <div className="p-3">
             <EmptyState
               icon={<FolderTree className="size-5" aria-hidden />}
-              title="No sources yet"
-              description="Point the dashboard at a directory of scripts. Local directories are scanned in place; repositories are cloned and refreshed on demand."
+              title={i18n.t('sources.empty.title')}
+              description={i18n.t('sources.empty.description')}
               action={
                 <Button variant="primary" size="sm" onClick={() => setCreating(true)}>
-                  Add source
+                  {i18n.t('sources.add')}
                 </Button>
               }
             />
@@ -100,6 +108,7 @@ export function SourcesPage() {
 }
 
 function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => void }) {
+  const i18n = useI18n();
   const sync = useSyncSource();
   const remove = useDeleteSource();
   // Kept per row so the last sync's counts stay visible after the toast-less
@@ -117,20 +126,23 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             <span className="text-ink text-lead font-medium">{source.name}</span>
             <SyncStatusLabel status={source.syncStatus} />
             <span className="text-faint text-meta">
-              {source.scriptCount} {source.scriptCount === 1 ? 'script' : 'scripts'}
+              {i18n.t(
+                source.scriptCount === 1 ? 'sources.scriptCount.one' : 'sources.scriptCount.many',
+                { count: source.scriptCount },
+              )}
             </span>
           </div>
 
           <div className="mt-1.5 grid gap-1">
             {source.repoUrl ? (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="label">Repo</span>
+                <span className="label">{i18n.t('sources.repo')}</span>
                 <MonoValue value={source.repoUrl} />
                 {source.branch ? <span className="mono text-mute text-meta">@{source.branch}</span> : null}
               </div>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="label">Mount</span>
+              <span className="label">{i18n.t('sources.mount')}</span>
               <MonoValue value={source.mountPath} />
               {source.subPath ? (
                 <span className="mono text-mute text-meta">/{source.subPath}</span>
@@ -138,8 +150,11 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             </div>
             <p className="text-faint text-meta">
               {source.lastSyncAt === null
-                ? 'Never synced'
-                : `Last synced ${formatRelative(source.lastSyncAt)} · ${formatDateTime(source.lastSyncAt)}`}
+                ? i18n.t('sources.neverSynced')
+                : i18n.t('sources.lastSynced', {
+                    when: formatRelative(source.lastSyncAt, i18n.t),
+                    at: formatDateTime(source.lastSyncAt, i18n.locale),
+                  })}
             </p>
           </div>
         </div>
@@ -153,13 +168,13 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
               sync.mutate(source.id, { onSuccess: (result) => setLastSync(result) })
             }
           >
-            Sync now
+            {i18n.t('sources.syncNow')}
           </Button>
-          <IconButton label={`Edit ${source.name}`} onClick={onEdit}>
+          <IconButton label={i18n.t('sources.editTitle', { name: source.name })} onClick={onEdit}>
             <Pencil className="size-4" aria-hidden />
           </IconButton>
           <IconButton
-            label={`Delete ${source.name}`}
+            label={i18n.t('sources.deleteNamed', { name: source.name })}
             className="hover:text-danger"
             disabled={remove.isPending}
             onClick={() => remove.mutate(source.id)}
@@ -170,18 +185,25 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
       </div>
 
       {source.syncError !== null ? <ErrorBanner message={source.syncError} /> : null}
-      {sync.isError ? <ErrorBanner message={sync.error.message} /> : null}
-      {remove.isError ? <ErrorBanner message={remove.error.message} /> : null}
+      {sync.isError ? <ErrorBanner message={errorMessage(sync.error, i18n)} /> : null}
+      {remove.isError ? <ErrorBanner message={errorMessage(remove.error, i18n)} /> : null}
 
       {lastSync ? (
         <div className="border-line bg-panel-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
-          <SyncCount label="added" value={lastSync.added} />
-          <SyncCount label="updated" value={lastSync.updated} />
-          <SyncCount label="removed" value={lastSync.removed} />
-          <span className="mono text-mute text-meta">{lastSync.total} total</span>
+          <SyncCount label={i18n.t('sources.sync.added')} value={lastSync.added} />
+          <SyncCount label={i18n.t('sources.sync.updated')} value={lastSync.updated} />
+          <SyncCount label={i18n.t('sources.sync.removed')} value={lastSync.removed} />
+          <span className="mono text-mute text-meta">
+            {i18n.t('sources.sync.total', { count: lastSync.total })}
+          </span>
           {lastSync.warnings.length > 0 ? (
             <span className="text-warn text-meta">
-              {lastSync.warnings.length} {lastSync.warnings.length === 1 ? 'warning' : 'warnings'}
+              {i18n.t(
+                lastSync.warnings.length === 1
+                  ? 'sources.sync.warning.one'
+                  : 'sources.sync.warning.many',
+                { count: lastSync.warnings.length },
+              )}
             </span>
           ) : null}
           <Button
@@ -190,7 +212,7 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             className="ml-auto"
             onClick={() => navigate('/scripts')}
           >
-            Open scripts
+            {i18n.t('sources.openScripts')}
           </Button>
         </div>
       ) : null}

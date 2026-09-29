@@ -11,9 +11,11 @@ import { RunDetailPage } from './pages/RunDetailPage';
 import { TargetsPage } from './pages/TargetsPage';
 import { SourcesPage } from './pages/SourcesPage';
 import { DnsPage } from './pages/DnsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { SignInPage } from './pages/SignInPage';
 import { useAuthStatus } from './api/queries';
 import { UNAUTHORIZED_EVENT } from './api/client';
+import { useT } from './lib/i18n';
 
 export function App() {
   const route = useRoute();
@@ -45,6 +47,8 @@ export function App() {
 }
 
 function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
+  const t = useT();
+
   switch (route.name) {
     case 'overview':
       return <OverviewPage />;
@@ -62,17 +66,23 @@ function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
       return <SourcesPage />;
     case 'dns':
       return <DnsPage search={route.search} />;
+    case 'settings':
+      return <SettingsPage />;
     case 'notFound':
       return (
         <PageBody>
-          <PageHeader eyebrow="404" title="No such page" description={`Nothing is routed at ${route.path}`} />
+          <PageHeader
+            eyebrow="404"
+            title={t('common.noSuchPage')}
+            description={t('common.noSuchPageDescription', { path: route.path })}
+          />
           <div className="mt-5">
             <EmptyState
-              title="That link does not point anywhere"
-              description="The address may be mistyped, or a run may have been deleted since the link was copied."
+              title={t('common.notFoundTitle')}
+              description={t('common.notFoundDescription')}
               action={
                 <Button variant="primary" onClick={() => navigate('/')}>
-                  Back to overview
+                  {t('common.backToOverview')}
                 </Button>
               }
             />

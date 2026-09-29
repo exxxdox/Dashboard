@@ -3,6 +3,7 @@ import { Search, X } from 'lucide-react';
 import type { ScriptSummary } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import { useScripts } from '../api/queries';
+import { useT } from '../lib/i18n';
 import { useDebounced } from '../lib/useDebounced';
 
 const MAX_SUGGESTIONS = 8;
@@ -23,6 +24,7 @@ export function ScriptSearch({
   onSelect: (script: ScriptSummary | null) => void;
   inputRef?: RefObject<HTMLInputElement | null>;
 }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
@@ -90,14 +92,16 @@ export function ScriptSearch({
     <div ref={containerRef} className="relative min-w-[260px] flex-1">
       {selected ? (
         <div className="border-line bg-panel-2 flex h-9 items-center gap-2.5 rounded-lg border px-3 transition-colors duration-150">
-          <span className="text-faint text-micro shrink-0 tracking-[0.14em] uppercase">script</span>
+          <span className="text-faint text-micro shrink-0 tracking-[0.14em] uppercase">
+            {t('scripts.filter.label')}
+          </span>
           <span className="mono text-ink text-body min-w-0 flex-1 truncate" title={selected.relPath}>
             {selected.relPath}
           </span>
           <button
             type="button"
             onClick={() => choose(null)}
-            aria-label="Clear script filter"
+            aria-label={t('scripts.filter.clear')}
             className="focus-ring text-faint hover:text-ink hover:bg-panel-3 rounded-md p-1 transition-colors duration-150"
           >
             <X className="size-4" aria-hidden />
@@ -118,7 +122,7 @@ export function ScriptSearch({
             aria-controls={listId}
             aria-autocomplete="list"
             value={query}
-            placeholder="Filter by script…"
+            placeholder={t('scripts.filter.placeholder')}
             onChange={(event) => {
               setQuery(event.target.value);
               setOpen(true);
@@ -137,9 +141,11 @@ export function ScriptSearch({
           className="border-line bg-panel-2 shadow-float absolute top-11 left-0 z-30 max-h-72 w-full overflow-auto rounded-xl border py-1.5"
         >
           {search.isPending ? (
-            <li className="text-mute text-body px-3.5 py-2">Searching…</li>
+            <li className="text-mute text-body px-3.5 py-2">{t('scripts.filter.searching')}</li>
           ) : suggestions.length === 0 ? (
-            <li className="text-mute text-body px-3.5 py-2">No scripts match “{debounced}”.</li>
+            <li className="text-mute text-body px-3.5 py-2">
+              {t('scripts.filter.noMatch', { query: debounced })}
+            </li>
           ) : (
             suggestions.map((script, index) => (
               <li key={script.id} role="option" aria-selected={index === highlight}>

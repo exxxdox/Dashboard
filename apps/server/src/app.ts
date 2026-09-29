@@ -19,6 +19,7 @@ import { isSecureRequest, registerAuthRoutes, setSessionCookie } from './routes/
 import { readCookie, SESSION_COOKIE } from './lib/auth.js';
 import { registerDnsRoutes } from './routes/dns.js';
 import { registerExecutionRoutes } from './routes/executions.js';
+import { registerSettingsRoutes } from './routes/settings.js';
 import { registerSourceRoutes } from './routes/sources.js';
 import { registerTargetRoutes } from './routes/targets.js';
 
@@ -55,7 +56,11 @@ function installAuthGuard(app: FastifyInstance, ctx: AppContext): void {
     const site = request.headers['sec-fetch-site'];
     if (STATE_CHANGING_METHODS.has(request.method) && typeof site === 'string' && site !== 'same-origin') {
       void reply.code(403).send({
-        error: { code: 'cross_site', message: 'Cross-site requests are not accepted' },
+        error: {
+          code: 'cross_site',
+          message: 'Cross-site requests are not accepted',
+          i18n: { key: 'error.crossSite' },
+        },
       });
       return;
     }
@@ -66,7 +71,11 @@ function installAuthGuard(app: FastifyInstance, ctx: AppContext): void {
     );
     if (!session) {
       void reply.code(401).send({
-        error: { code: 'unauthorized', message: 'Sign in to continue' },
+        error: {
+          code: 'unauthorized',
+          message: 'Sign in to continue',
+          i18n: { key: 'error.auth.signInRequired' },
+        },
       });
       return;
     }
@@ -164,6 +173,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerSourceRoutes(app, ctx);
   registerExecutionRoutes(app, ctx);
   registerDnsRoutes(app, ctx);
+  registerSettingsRoutes(app, ctx);
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     // Request validation failures are the user's input, not a server fault.
@@ -172,6 +182,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
         error: {
           code: 'validation_failed',
           message: 'The request did not match the expected shape',
+          i18n: { key: 'error.validationFailed' },
+          // The per-field messages stay English: each names a rule from a zod
+          // schema, and there are dozens of them across three packages.
           details: error.issues.map((issue) => ({
             path: issue.path.join('.'),
             message: issue.message,
@@ -182,7 +195,15 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
 
     if (error instanceof AppError) {
       return reply.code(error.statusCode).send({
-        error: { code: error.code, message: error.message, details: error.details },
+        error: {
+          code: error.code,
+          message: error.message,
+          // Omitted rather than null when there is nothing to say: the field
+          // means "a client may translate this", and an explicit null would
+          // have to be checked for by every reader.
+          ...(error.i18n === null ? {} : { i18n: error.i18n }),
+          details: error.details,
+        },
       });
     }
 
@@ -192,7 +213,11 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
     if (status >= 500) {
       request.log.error({ err: error }, 'unhandled request error');
       return reply.code(500).send({
-        error: { code: 'internal_error', message: 'An unexpected error occurred' },
+        error: {
+          code: 'internal_error',
+          message: 'An unexpected error occurred',
+          i18n: { key: 'error.internal' },
+        },
       });
     }
 

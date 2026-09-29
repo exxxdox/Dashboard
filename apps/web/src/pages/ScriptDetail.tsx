@@ -8,19 +8,25 @@ import { Panel, Stat } from '../components/Panel';
 import { PageHeader } from '../components/PageHeader';
 import { useScript, useUpdateScript } from '../api/queries';
 import { errorMessage } from '../api/client';
+import { useI18n } from '../lib/i18n';
 import { formatBytes, formatDateTime } from '../lib/format';
 import { RunPanel } from './RunPanel';
 import { ScriptSource } from './ScriptSource';
 
 export function ScriptDetail({ scriptId }: { scriptId: string }) {
+  const i18n = useI18n();
   const script = useScript(scriptId);
 
   // Rendered inside the Scripts page's right-hand column, so no page frame here.
   if (script.isError) {
     return (
       <div>
-        <PageHeader eyebrow="Script" title="Script" />
-        <ErrorBanner className="mt-4" message={script.error.message} onRetry={() => void script.refetch()} />
+        <PageHeader eyebrow={i18n.t('scripts.script')} title={i18n.t('scripts.script')} />
+        <ErrorBanner
+          className="mt-4"
+          message={errorMessage(script.error, i18n)}
+          onRetry={() => void script.refetch()}
+        />
       </div>
     );
   }
@@ -28,9 +34,9 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
   if (!script.data) {
     return (
       <div>
-        <PageHeader eyebrow="Script" title="Script" />
+        <PageHeader eyebrow={i18n.t('scripts.script')} title={i18n.t('scripts.script')} />
         <Panel className="mt-4">
-          <LoadingBlock label="Loading script…" />
+          <LoadingBlock label={i18n.t('scripts.loadingScript')} />
         </Panel>
       </div>
     );
@@ -41,7 +47,7 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
   return (
     <div>
       <PageHeader
-        eyebrow="Script"
+        eyebrow={i18n.t('scripts.script')}
         title={data.displayName}
         description={data.description ?? undefined}
         actions={
@@ -50,7 +56,7 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
             loading={script.isFetching}
             onClick={() => void script.refetch()}
           >
-            Refresh
+            {i18n.t('scripts.refresh')}
           </Button>
         }
       />
@@ -62,12 +68,12 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
       <div className="@container mt-5">
         <div className="grid gap-4 @min-[760px]:grid-cols-[minmax(0,1fr)_360px]">
           <div className="grid min-w-0 content-start gap-4">
-            <Panel title="Source">
+            <Panel title={i18n.t('scripts.panel.source')}>
               {data.content === null ? (
                 <EmptyState
                   icon={<FileCode className="size-5" aria-hidden />}
-                  title="File is not readable"
-                  description="The script is registered but its content could not be read from the shared directory. Re-sync the source, or check that the directory is mounted."
+                  title={i18n.t('scripts.unreadable.title')}
+                  description={i18n.t('scripts.unreadable.description')}
                 />
               ) : (
                 <ScriptSource content={data.content} format={data.format} />
@@ -78,27 +84,33 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
           </div>
 
           <div className="grid min-w-0 content-start gap-4">
-            <Panel title="Run">
+            <Panel title={i18n.t('scripts.panel.run')}>
               <RunPanel key={data.id} script={data} />
             </Panel>
 
-            <Panel title="Facts">
+            <Panel title={i18n.t('scripts.panel.facts')}>
               <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-                <Stat label="Format">{data.format}</Stat>
-                <Stat label="Size">{formatBytes(data.sizeBytes)}</Stat>
-                <Stat label="Interpreter">
-                  {data.interpreterOverride === null ? 'auto' : data.interpreterOverride.join(' ')}
+                <Stat label={i18n.t('scripts.field.format')}>{data.format}</Stat>
+                <Stat label={i18n.t('scripts.field.size')}>{formatBytes(data.sizeBytes)}</Stat>
+                <Stat label={i18n.t('scripts.field.interpreter')}>
+                  {data.interpreterOverride === null
+                    ? i18n.t('scripts.auto')
+                    : data.interpreterOverride.join(' ')}
                 </Stat>
-                <Stat label="Timeout">
-                  {data.timeoutSec === null ? 'unset' : `${data.timeoutSec}s`}
+                <Stat label={i18n.t('scripts.field.timeout')}>
+                  {data.timeoutSec === null ? i18n.t('common.notSet') : `${data.timeoutSec}s`}
                 </Stat>
-                <Stat label="Source path" className="col-span-2">
+                <Stat label={i18n.t('scripts.field.sourcePath')} className="col-span-2">
                   <MonoValue value={data.relPath} wrap />
                 </Stat>
-                <Stat label="Discovered" className="col-span-2" mono={false}>
-                  {formatDateTime(data.discoveredAt)}
+                <Stat
+                  label={i18n.t('scripts.field.discovered')}
+                  className="col-span-2"
+                  mono={false}
+                >
+                  {formatDateTime(data.discoveredAt, i18n.locale)}
                 </Stat>
-                <Stat label="Content hash" className="col-span-2">
+                <Stat label={i18n.t('scripts.field.contentHash')} className="col-span-2">
                   <MonoValue value={data.contentHash} wrap />
                 </Stat>
               </div>
@@ -117,6 +129,7 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
  * never reaches the server.
  */
 function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
+  const i18n = useI18n();
   const script = useScript(scriptId);
   const update = useUpdateScript();
   const data = script.data;
@@ -159,7 +172,7 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
 
   return (
     <Panel
-      title="Metadata"
+      title={i18n.t('scripts.panel.metadata')}
       aside={
         touched ? (
           <Button
@@ -169,15 +182,15 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
             loading={update.isPending}
             onClick={save}
           >
-            Save
+            {i18n.t('common.save')}
           </Button>
         ) : (
-          <span className="text-faint text-micro">No changes</span>
+          <span className="text-faint text-micro">{i18n.t('scripts.noChanges')}</span>
         )
       }
     >
       <div className="grid gap-3">
-        <Field label="Display name">
+        <Field label={i18n.t('scripts.field.displayName')}>
           {({ id }) => (
             <TextInput
               id={id}
@@ -189,7 +202,7 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
             />
           )}
         </Field>
-        <Field label="Description">
+        <Field label={i18n.t('scripts.field.description')}>
           {({ id }) => (
             <TextArea
               id={id}
@@ -203,7 +216,7 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
           )}
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Timeout (sec)">
+          <Field label={i18n.t('scripts.field.timeoutSec')}>
             {({ id }) => (
               <TextInput
                 id={id}
@@ -212,7 +225,7 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
                 max={86_400}
                 className="mono"
                 value={timeout}
-                placeholder="unset"
+                placeholder={i18n.t('common.notSet')}
                 onChange={(event) => {
                   setTimeoutSec(event.target.value);
                   setTouched(true);
@@ -220,13 +233,16 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
               />
             )}
           </Field>
-          <Field label="Interpreter" hint="e.g. bash -eu">
+          <Field
+            label={i18n.t('scripts.field.interpreter')}
+            hint={i18n.t('scripts.field.interpreterHint')}
+          >
             {({ id }) => (
               <TextInput
                 id={id}
                 className="mono"
                 value={interpreter}
-                placeholder="auto"
+                placeholder={i18n.t('scripts.auto')}
                 onChange={(event) => {
                   setInterpreter(event.target.value);
                   setTouched(true);
@@ -236,7 +252,7 @@ function ScriptMetadataPanel({ scriptId }: { scriptId: string }) {
           </Field>
         </div>
 
-        {update.isError ? <ErrorBanner message={errorMessage(update.error)} /> : null}
+        {update.isError ? <ErrorBanner message={errorMessage(update.error, i18n)} /> : null}
       </div>
     </Panel>
   );
