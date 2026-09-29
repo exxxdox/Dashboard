@@ -62,6 +62,13 @@ const envSchema = z.object({
   AUTH_PASSWORD: z.string().min(1).max(1000).optional(),
 
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+
+  /**
+   * Pretty logs for a terminal. Development only: the production image installs
+   * production dependencies, so `pino-pretty` -- a devDependency -- is not there
+   * to load, and asking for it stops the process before it serves anything.
+   * Production therefore ignores it, and `index.ts` says so out loud.
+   */
   LOG_PRETTY: booleanFromEnv,
 
   /** Global ceiling on simultaneously running scripts. */
@@ -118,6 +125,8 @@ export type AppConfig = {
   secretKey: string | undefined;
   logLevel: string;
   logPretty: boolean;
+  /** True when `LOG_PRETTY` was asked for in production and therefore dropped. */
+  logPrettyIgnored: boolean;
   maxConcurrentExecutions: number;
   maxConcurrentPerTarget: number;
   defaultTimeoutSec: number;
@@ -178,7 +187,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     secretKey: value.SECRET_KEY,
     logLevel: value.LOG_LEVEL,
     // Pretty logs are for reading in a terminal; JSON is what a collector wants.
-    logPretty: value.LOG_PRETTY ?? !isProduction,
+    // Production is not a terminal, and its image cannot load the transport at
+    // all, so the flag is dropped there rather than obeyed -- refusing to start
+    // over a cosmetic setting would be the worse failure. `logPrettyIgnored`
+    // exists so the boot can say it was dropped instead of silently differing
+    // from what .env asked for.
+    logPretty: isProduction ? false : (value.LOG_PRETTY ?? true),
+    logPrettyIgnored: isProduction && value.LOG_PRETTY === true,
     maxConcurrentExecutions: value.MAX_CONCURRENT_EXECUTIONS,
     maxConcurrentPerTarget: value.MAX_CONCURRENT_PER_TARGET,
     defaultTimeoutSec: value.DEFAULT_TIMEOUT_SEC,

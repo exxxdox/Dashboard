@@ -30,6 +30,38 @@ describe('GIT_PROXY', () => {
   });
 });
 
+describe('LOG_PRETTY', () => {
+  test('is on by default in development, where a terminal is reading it', () => {
+    const config = loadConfig({ NODE_ENV: 'development' });
+    expect(config.logPretty).toBe(true);
+    expect(config.logPrettyIgnored).toBe(false);
+  });
+
+  test('is off by default in production, where JSON lines are what a collector wants', () => {
+    const config = loadConfig({ NODE_ENV: 'production' });
+    expect(config.logPretty).toBe(false);
+    expect(config.logPrettyIgnored).toBe(false);
+  });
+
+  test('is honoured in development even when asked for explicitly', () => {
+    const config = loadConfig({ NODE_ENV: 'development', LOG_PRETTY: 'true' });
+    expect(config.logPretty).toBe(true);
+    expect(config.logPrettyIgnored).toBe(false);
+  });
+
+  test('is ignored in production, because the image ships no pino-pretty to load', () => {
+    const config = loadConfig({ NODE_ENV: 'production', LOG_PRETTY: 'true' });
+    expect(config.logPretty).toBe(false);
+    expect(config.logPrettyIgnored).toBe(true);
+  });
+
+  test('is ignored in production whichever spelling of true is used', () => {
+    expect(loadConfig({ NODE_ENV: 'production', LOG_PRETTY: '1' }).logPrettyIgnored).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'production', LOG_PRETTY: 'yes' }).logPrettyIgnored).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'production', LOG_PRETTY: 'false' }).logPrettyIgnored).toBe(false);
+  });
+});
+
 describe('sign-in credentials', () => {
   const base = { SCRIPT_ROOT_CONTAINER: '/workspace' } as NodeJS.ProcessEnv;
 

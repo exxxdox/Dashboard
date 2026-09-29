@@ -12,6 +12,7 @@ import { loadConfig } from './config.js';
 import type { AppContext } from './context.js';
 import { openDatabase } from './db/client.js';
 import { createAuthenticator, createLoginThrottle } from './lib/auth.js';
+import { installCrashHandlers } from './lib/crash-handlers.js';
 import { createSecretBox, resolveSecretKey } from './lib/crypto.js';
 import { createLogger } from './lib/logger.js';
 import { createQueue } from './runner/queue.js';
@@ -31,6 +32,13 @@ const SHUTDOWN_GRACE_MS = 10_000;
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger({ level: config.logLevel, pretty: config.logPretty });
+
+  if (config.logPrettyIgnored) {
+    logger.warn(
+      'LOG_PRETTY is ignored outside development: the image installs production dependencies only, ' +
+        'so pino-pretty is not there to load and obeying the flag would stop the process at startup',
+    );
+  }
 
   if (!config.scriptRootContainer.startsWith('/')) {
     logger.warn(
@@ -164,8 +172,11 @@ async function main(): Promise<void> {
 
   const app = await buildApp(ctx);
 
-  const shutdown = async (signal: string): Promise<void> => {
-    if (shuttingDown) return;
+  const shutdown = async (signal: string, exitCode = 0): Promise<void> => {
+    // A second signal, or a crash during a shutdown already in progress, is a
+    // request for this process to be gone -- waiting through the grace period
+    // again would help nobody.
+    if (shuttingDown) process.exit(exitCode);
     shuttingDown = true;
     logger.info({ signal }, 'shutting down');
 
@@ -189,11 +200,14 @@ async function main(): Promise<void> {
 
     db.close();
     logger.info('shutdown complete');
-    process.exit(0);
+    // The exit code is the caller's: a signal is a clean stop, a crash is not,
+    // and `restart: unless-stopped` plus any supervision reads the difference.
+    process.exit(exitCode);
   };
 
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
   process.on('SIGINT', () => void shutdown('SIGINT'));
+  installCrashHandlers({ logger, shutdown });
 
   await app.listen({ port: config.port, host: config.host });
 
