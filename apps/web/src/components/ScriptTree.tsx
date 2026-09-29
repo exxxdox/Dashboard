@@ -152,7 +152,11 @@ export function ScriptTree({
         })}
       </div>
 
-      {rows.length > 1 ? (
+      {/* Only when there is a directory to fold. A repository of loose scripts
+          -- the common case -- has none, and there the footer was two buttons
+          that did nothing when pressed, which reads as a broken control rather
+          than as an action with no work to do. */}
+      {rows.some((row) => row.node.type === 'dir') ? (
         <div className="border-line mt-3 flex gap-4 border-t px-1.5 pt-2.5">
           <button
             type="button"
