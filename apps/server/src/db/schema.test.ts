@@ -64,6 +64,86 @@ function versionOneDatabase(): SqliteDatabase {
   return db;
 }
 
+/**
+ * A database at schema v4, which is what the DNS migration has to upgrade from.
+ * The first four migrations run in order because each one assumes the state the
+ * previous left behind.
+ */
+function versionFourDatabase(): SqliteDatabase {
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+  for (const migration of MIGRATIONS.slice(0, 4)) migration(db);
+  db.pragma('user_version = 4');
+  return db;
+}
+
+describe('v5 migration', () => {
+  test('adds both dns tables without touching what was there', () => {
+    const db = versionFourDatabase();
+    try {
+      migrate(db);
+
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+      expect(columnsOf(db, 'dns_settings')).toContain('cloudflare_token_encrypted');
+      expect(columnsOf(db, 'dns_settings')).toContain('alibaba_access_key_secret_encrypted');
+      expect(columnsOf(db, 'dns_settings')).toContain('gotify_token_encrypted');
+      expect(columnsOf(db, 'dns_checks')).toContain('failure_reason');
+      // The tables the rest of the app is written against are still intact.
+      expect(columnsOf(db, 'executions')).toContain('argv_json');
+      expect(columnsOf(db, 'scripts')).toContain('run_draft_json');
+    } finally {
+      db.close();
+    }
+  });
+
+  test('keeps the three secrets nullable, so "not stored" is expressible', () => {
+    const db = versionFourDatabase();
+    try {
+      migrate(db);
+
+      // NULL is the only value that can mean "no credential"; an empty string
+      // would be a second, ambiguous spelling of the same thing.
+      expect(notNullOf(db, 'dns_settings', 'cloudflare_token_encrypted')).toBe(0);
+      expect(notNullOf(db, 'dns_settings', 'alibaba_access_key_secret_encrypted')).toBe(0);
+      expect(notNullOf(db, 'dns_settings', 'gotify_token_encrypted')).toBe(0);
+      expect(notNullOf(db, 'dns_checks', 'previous_value')).toBe(0);
+      // Everything the form has to display is NOT NULL, so the row type carries
+      // no nullability the UI would have to invent text for.
+      expect(notNullOf(db, 'dns_settings', 'cloudflare_zone_id')).toBe(1);
+      expect(notNullOf(db, 'dns_settings', 'interval_minutes')).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  test('refuses values outside the enumerations it pins', () => {
+    const db = versionFourDatabase();
+    try {
+      migrate(db);
+
+      const settings = db.prepare(
+        `INSERT INTO dns_settings (id, provider, interval_minutes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      expect(() => settings.run('dns', 'route53', 10, NOW, NOW)).toThrow(/CHECK/);
+      expect(() => settings.run('dns', 'cloudflare', 0, NOW, NOW)).toThrow(/CHECK/);
+      expect(() => settings.run('dns', 'cloudflare', 10, NOW, NOW)).not.toThrow();
+
+      const checks = db.prepare(
+        `INSERT INTO dns_checks (id, at, source, ok, action, failure_reason, provider)
+         VALUES (?, ?, ?, 1, ?, ?, 'cloudflare')`,
+      );
+      expect(() => checks.run('dnsc_1', NOW, 'cli', 'unchanged', null)).toThrow(/CHECK/);
+      expect(() => checks.run('dnsc_2', NOW, 'manual', 'skipped', null)).toThrow(/CHECK/);
+      expect(() => checks.run('dnsc_3', NOW, 'manual', 'failed', 'dns_is_broken')).toThrow(/CHECK/);
+      expect(() => checks.run('dnsc_4', NOW, 'scheduled', 'unchanged', null)).not.toThrow();
+      expect(() => checks.run('dnsc_5', NOW, 'manual', 'failed', 'dns_query_failed')).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+});
+
 describe('v2 migration', () => {
   test('backfills the working directory from the old host path', () => {
     const db = versionOneDatabase();

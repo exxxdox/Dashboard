@@ -14,3 +14,4 @@ export const newTargetId = (): string => newId('tgt');
 export const newSourceId = (): string => newId('src');
 export const newScriptId = (): string => newId('scr');
 export const newExecutionId = (): string => newId('run');
+export const newDnsCheckId = (): string => newId('dnsc');

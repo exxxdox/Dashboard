@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 4;
+const TARGET_VERSION = 5;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -157,6 +157,66 @@ export const MIGRATIONS: Migration[] = [
   // which is also what every existing row is.
   (db) => {
     db.exec("ALTER TABLE scripts ADD COLUMN run_draft_json TEXT NOT NULL DEFAULT '{}'");
+  },
+
+  // v5 -- the IPv6 DNS console, which used to be a separate project writing two
+  // JSON files. Its settings become one row rather than a wider table for many,
+  // because the thing being configured is one domain pointed at one address: a
+  // row that can be replaced by a single statement is also what makes "a blank
+  // secret keeps the stored one" expressible as an omitted column.
+  //
+  // The three secrets are separate columns rather than one JSON blob so that
+  // replacing or clearing one cannot disturb the others, and so a value that
+  // fails to decrypt costs one credential instead of all three. `NULL` means
+  // "not stored" -- an empty string would be a fourth state to reason about.
+  //
+  // `dns_checks` replaces the append-only JSONL file. History is a side channel
+  // (a failed insert must not fail the check), and nothing prunes it but the
+  // service, which keeps the newest MAX_DNS_CHECKS rows.
+  (db) => {
+    db.exec(`
+      CREATE TABLE dns_settings (
+        id                                  TEXT PRIMARY KEY,
+        provider                            TEXT NOT NULL
+                                            CHECK (provider IN ('cloudflare','alibaba')),
+        schedule_enabled                    INTEGER NOT NULL DEFAULT 0,
+        interval_minutes                    INTEGER NOT NULL DEFAULT 10
+                                            CHECK (interval_minutes >= 1),
+        cloudflare_zone_id                  TEXT NOT NULL DEFAULT '',
+        cloudflare_record_name              TEXT NOT NULL DEFAULT '',
+        cloudflare_token_encrypted          TEXT,
+        alibaba_access_key_id               TEXT NOT NULL DEFAULT '',
+        alibaba_record_id                   TEXT NOT NULL DEFAULT '',
+        alibaba_record_type                 TEXT NOT NULL DEFAULT 'AAAA'
+                                            CHECK (alibaba_record_type = 'AAAA'),
+        alibaba_access_key_secret_encrypted TEXT,
+        gotify_address                      TEXT NOT NULL DEFAULT '',
+        gotify_token_encrypted              TEXT,
+        created_at                          TEXT NOT NULL,
+        updated_at                          TEXT NOT NULL
+      );
+
+      CREATE TABLE dns_checks (
+        id             TEXT PRIMARY KEY,
+        at             TEXT NOT NULL,
+        source         TEXT NOT NULL CHECK (source IN ('manual','scheduled')),
+        ok             INTEGER NOT NULL,
+        action         TEXT NOT NULL
+                       CHECK (action IN ('created','updated','unchanged','failed')),
+        -- A code, not a sentence: the client renders it, so the same value can
+        -- read correctly in the result, the summary and a history row without
+        -- three prose variants living in the database.
+        failure_reason TEXT CHECK (failure_reason IN (
+                         'not_configured','invalid_settings','ipv6_detect_failed',
+                         'ipv6_not_global','dns_query_failed','dns_write_failed',
+                         'record_missing','record_identity_missing')),
+        ipv6           TEXT NOT NULL DEFAULT '',
+        previous_value TEXT,
+        provider       TEXT NOT NULL CHECK (provider IN ('cloudflare','alibaba'))
+      );
+
+      CREATE INDEX idx_dns_checks_at ON dns_checks(at DESC);
+    `);
   },
 ];
 
