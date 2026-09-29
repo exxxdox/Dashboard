@@ -1,6 +1,6 @@
 # Dashboard — contributor notes
 
-Self-hosted dashboard that runs shell/PowerShell scripts on remote Linux hosts over SSH, with live and historical execution output.
+Self-hosted dashboard that runs shell/PowerShell scripts on remote Linux hosts over SSH, with live and historical execution output, and keeps an AAAA record pointed at the host's public IPv6.
 
 ## Commands
 
@@ -35,11 +35,14 @@ apps/server/src
   context.ts        AppContext passed to every route module
   config.ts         env parsing, validated at boot
   db/               schema + migrations, connection, pragmas
-  lib/              crypto (credential encryption), paths, ids, errors, logger
+  lib/              crypto (credential encryption), paths, ids, errors, logger,
+                    mutex (FIFO lock), http (fetch deadline + failure flattening)
   transport/        Transport interface; ssh-transport is the only implementation
   runner/           queue (concurrency) and runner (one plan, one transport)
   services/         targets, sources+git, scan, executions — all DB logic
-  routes/           targets, sources+scripts+overview, executions+websocket
+  services/dns/     the IPv6 console: settings, checks, providers, probe, notifier,
+                    scheduler, and the service that is the only orchestration point
+  routes/           targets, sources+scripts+overview, executions+websocket, dns
   ws/hub.ts         in-process pub/sub for live execution events
 apps/web/src
   api/  components/  pages/  lib/
@@ -75,6 +78,16 @@ Two consequences worth knowing before touching this: only the entry script is up
 
 **Script ids are soft-deleted.** A resync that no longer finds a file sets `deleted_at` rather than removing the row, so execution history stays readable and a file that returns is recognisable as the same script. `syncScripts` also only rewrites metadata when the content hash changed, so user edits to a display name survive syncs of unchanged files.
 
+**A failed DNS query must never be read as "there is no record".** `services/dns/service.ts` runs validate, detect, query, write, notify, record, in that order, and a query that fails aborts before anything is written. For Cloudflare, "no record" means "create one", so that misreading duplicates a record -- it is the worst outcome this feature has, and the reason the query step is not simply folded into the write. A second invariant sits beside it: a run whose address has not moved issues no write request at all, so a check that changes nothing leaves no trace in the provider's audit log.
+
+**The public-address rule lives in `packages/shared`.** `parsePublicIpv6` decides whether an address may be written into a record, and the browser renders the same outcome, so a second copy would eventually be a second answer. It is stricter than the CPython `is_global` the Python version used, which accepts deprecated site-local `fec0::/10`, NAT64 `64:ff9b::/96` and Teredo `2001::/32`: it starts from global unicast and subtracts, so an unlisted special range fails closed. Refusing too much costs a run that writes nothing; accepting too much points a public name at an address nothing can reach.
+
+**Nothing reaches the IPv6 probe through a proxy, and that is enforced by doing nothing.** Node's global `fetch` uses undici's default agent, which honours neither `HTTP_PROXY` nor `NO_PROXY` -- the same guarantee the Python version got from `session.trust_env = False`. The risk runs the other way: adding an `EnvHttpProxyAgent` dispatcher, or running node with `--use-env-proxy`, would quietly write the *proxy's* address into the record. `services/dns/ipv6.test.ts` asserts that no dispatcher is passed for exactly that reason.
+
+**A DNS credential is absent, blank, or replaced -- and only the third or an explicit flag changes it.** The API never returns one, so a form has nothing to send back; blank therefore means "keep", and deleting is its own `clear*` flag. Clearing the *active* provider's required credential is refused by validation with the field named, not by a second rule in the merge. The row stores each credential in its own nullable column (`NULL` is the only spelling of "not stored"), so replacing or clearing one cannot disturb the others.
+
+**The DNS schedule is a re-arming timer, and `configure` is idempotent.** One `setTimeout` that is re-armed after each run rather than a fixed cadence, so a run longer than the interval cannot overlap itself; a tick that lands while one is in flight is skipped. `configure` does nothing when the `(enabled, intervalMinutes)` pair is unchanged, which is what stops the page -- which asks for the state on every visit -- from pushing the next run forward each time someone opens it.
+
 ## Conventions
 
 - TypeScript strict, `types` over `interfaces`, no `any`.
@@ -94,6 +107,9 @@ Two consequences worth knowing before touching this: only the entry script is up
 - **Passing a pino `Logger` to `loggerInstance` makes Fastify infer an instance type** parameterised by pino's logger, which then no longer matches the plain `FastifyInstance` the route modules are written against. `app.ts` widens it to `FastifyBaseLogger` first.
 - **`z.coerce.boolean()` turns `"false"` into `true`.** Use the `booleanFromEnv` helper in `config.ts`.
 - **A bind mount shadows the image's `/data`.** The Dockerfile's `chown /data` only reaches the image layer, so the directory the app actually writes to is the host's, owned by whoever created it — root, when Docker creates it on the first `docker compose up`. Compose therefore starts the container as `user: "0:0"` and `docker-entrypoint.sh` chowns the two mounts to `PUID:PGID` before dropping privilege with `setpriv`. The image's `USER` stays unprivileged, so a bare `docker run` is not root.
+- **The Alibaba Cloud DNS SDK is external in the tsup build** and its `postinstall` is refused in `pnpm-workspace.yaml`. It is generated CJS covering a whole product API, so bundling it would inline megabytes for two call sites; and its postinstall only acts on Node 10 and 12, where it runs `npm install` -- allowing it would put a second package manager inside the image build for no effect. Adding either package without those two settings fails the build in a way that does not name the cause.
+- **`dns_checks.provider` is nullable** because a run can fail before a provider has been chosen at all. Writing the schema's default there would make "nothing is configured yet" indistinguishable from "Cloudflare failed", which is the worst possible confusion for the one row an operator reads first.
+- **The DNS history is a side channel.** A failed insert is logged and swallowed: an operator whose disk is full still gets the run's real outcome. The same goes for a failed notification, which is reported beside a successful run rather than replacing it.
 - **SQLite WAL wants a local filesystem.** Do not point `DATA_DIR` at a network share.
 - **`git clean -fdx` runs on every sync** of a GitHub source. That directory is ours to manage; users edit scripts in their own repositories, not in the checkout.
 - **`.npmrc` pins the npm registry to a mirror, and that file does not reach the image.** `pnpm` ignores `npm_config_registry` and `NPM_CONFIG_REGISTRY`, so a file is the only way to set it locally; the Dockerfile's `deps` stage installs before any source is copied, so it writes `/app/.npmrc` from the `NPM_REGISTRY` build arg instead. A cold `pnpm install` dominates build time on a distant network, so that arg is the biggest lever. The mirror has to carry alpine under `/alpine`, which is the same path the official CDN uses, so the Dockerfile substitutes the host and nothing else. `mirrors.cloud.tencent.com` serves both alpine and npm from one host, which is why `dbuild` and `.env.example` name it for both.

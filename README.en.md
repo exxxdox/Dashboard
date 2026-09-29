@@ -88,6 +88,20 @@ Any `.sh` / `.ps1` file in a source is picked up (run with `bash` and `pwsh` res
 
 Declared parameters arrive as **environment variables**. Values the header does not declare can be added in the run form, one row at a time: `env` (an environment variable, whose name must be a shell identifier) or `argv` (positional arguments `$1`, `$2` …, in row order, where the name is only a label). Each script's form remembers what was last typed into it.
 
+## IPv6 DNS console
+
+The "DNS" page keeps one AAAA record pointed at this host's public IPv6. Cloudflare and Alibaba Cloud are supported; the settings live in the database (**there are no environment variables for them**), and so does the history, capped at 500 rows.
+
+A "Check and update" run follows one order: read the settings, detect the public address, query the provider, write, notify, record. Three rules are worth stating on their own:
+
+- **A failed query writes nothing, and is never read as "there is no record".** For Cloudflare that misreading creates a second record for the same name.
+- **An address that has not moved writes nothing at all.** No request, and no trace in the provider's audit log.
+- **Alibaba Cloud never creates a record.** It updates by record id, and the host record and type it sends come from the API's own answer rather than from the form -- a wrong value cannot rename a live record -- and a record that does not exist is refused outright.
+
+The probe asks `https://api6.ipify.org` and accepts only a public address: private, link-local, NAT64 and Teredo ranges are refused, and a refusal writes nothing. The probe **never uses a proxy**, so no `HTTP_PROXY` is needed and a proxy's egress address can never end up in a DNS record.
+
+A Gotify notification is sent only when the record actually changed; a notification that fails does not change the run's outcome and is reported separately.
+
 ## Limitations
 
 - One instance. SQLite in WAL mode and an in-process queue mean the API is not horizontally scalable.
@@ -100,6 +114,9 @@ Declared parameters arrive as **environment variables**. Values the header does 
 - **A restart interrupts** queued and running work (the scripts themselves keep running on the host and are then reported as `interrupted`).
 - **Cancelling depends on `setsid`**; where it is missing, only the script process is killed, not the children it spawned.
 - Stored output is capped by `MAX_LOG_BYTES`; past that the run is marked truncated.
+- **One password opens both halves.** Whoever can sign in can run a script *and* repoint the domain's AAAA record — the API deliberately holds no provider credentials of its own, which is the price of a single sign-in.
+- **The DNS half depends on the host's own IPv6 egress** (see above), which is why the container uses host networking.
+- **The DNS credentials share `data/secret.key` with the SSH ones**: lose that file and both have to be entered again.
 - Database migrations are **forward-only** — back up `data/` before upgrading.
 - `.ps1` scripts need `pwsh` installed on the target.
 - The image is not minimal: it carries the server's production dependency tree, `git` and `ca-certificates`.
