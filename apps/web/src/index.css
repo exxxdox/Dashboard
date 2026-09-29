@@ -35,6 +35,11 @@
   --danger: #f4786f;
   --info: #8db0dd;
 
+  /* Ink for a solid `ok` surface -- the run button is the first one. The green
+     is light enough that only a dark foreground stays readable on it, which is
+     the same relationship `--accent-ink` has to `--accent`. */
+  --ok-ink: #05231a;
+
   /* Elevation is subtle on purpose: on a dark surface a shadow reads as a
      smudge, so the top hairline carries most of the "lifted" signal. */
   --sheen: inset 0 1px 0 rgb(255 255 255 / 5%);
@@ -69,6 +74,7 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
+  --color-ok-ink: var(--ok-ink);
   --color-warn: var(--warn);
   --color-danger: var(--danger);
   --color-info: var(--info);

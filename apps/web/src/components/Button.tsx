@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Loader } from 'lucide-react';
 import { cn } from '../lib/cn';
 
-export type ButtonVariant = 'primary' | 'default' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'default' | 'ghost' | 'danger' | 'success';
 export type ButtonSize = 'sm' | 'md';
 
 // Hover is a lift in surface plus a lift in elevation, not just a colour swap:
@@ -14,6 +14,12 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
     'bg-linear-to-b from-[color-mix(in_oklab,var(--accent)_92%,white)] to-accent text-accent-ink border-transparent shadow-card hover:shadow-glow hover:brightness-105',
   default:
     'bg-panel-2 text-ink border-line hover:border-line-strong hover:bg-panel-3 hover:shadow-card',
+  // Green, and filled rather than outlined: this is the control that starts
+  // something on another machine, so it has to be findable without reading. It
+  // is not `primary` because a page may hold both, and two accent buttons of
+  // equal weight would make "run" and "save" look like the same decision.
+  success:
+    'bg-linear-to-b from-[color-mix(in_oklab,var(--ok)_90%,white)] to-ok text-ok-ink border-transparent shadow-card hover:brightness-110',
   ghost: 'bg-transparent text-mute border-transparent hover:bg-panel-2 hover:text-ink',
   danger: 'bg-transparent text-danger border-line hover:border-danger hover:bg-danger/12',
 };

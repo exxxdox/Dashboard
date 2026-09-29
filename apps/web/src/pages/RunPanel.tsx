@@ -17,7 +17,7 @@ import {
 } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { cn } from '../lib/cn';
-import { useI18n, type Translate } from '../lib/i18n';
+import { useI18n } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import {
   describePrefill,
@@ -27,15 +27,15 @@ import {
 } from '../lib/run-draft';
 import {
   addRow,
-  collectArgv,
-  collectParams,
   isBlankRow,
   removeRow,
   updateRow,
   validateRows,
+  validateValues,
   type CustomParamMode,
   type CustomParamRow,
 } from '../lib/run-params';
+import { toRunInput } from '../lib/run-submit';
 
 type ParamValues = Record<string, string>;
 
@@ -58,30 +58,6 @@ function seedValues(params: ScriptParam[]): ParamValues {
     else if (param.type === 'bool') values[param.name] = '0';
   }
   return values;
-}
-
-/**
- * Client-side mirror of the server's own `validateParams`, so a missing
- * required value is caught before a request is made. The server stays the
- * authority: this only saves a round trip.
- */
-function validate(
-  params: ScriptParam[],
-  values: ParamValues,
-  t: Translate,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
-  for (const param of params) {
-    const raw = (values[param.name] ?? '').trim();
-    if (raw === '') {
-      if (param.required && param.default === null) errors[param.name] = t('runs.error.required');
-      continue;
-    }
-    if (param.type === 'number' && !Number.isFinite(Number(raw))) {
-      errors[param.name] = t('runs.error.number');
-    }
-  }
-  return errors;
 }
 
 /**
@@ -181,7 +157,7 @@ export function RunPanel({ script }: RunPanelProps) {
     setTimeoutSec(next);
   }
 
-  const errors = validate(script.params, values, t);
+  const errors = validateValues(script.params, values, t);
   const customErrors = validateRows(customRows, script.params, t);
   const hasErrors = Object.keys(errors).length > 0 || Object.keys(customErrors).length > 0;
 
@@ -207,14 +183,9 @@ export function RunPanel({ script }: RunPanelProps) {
     execute.mutate(
       {
         scriptId: script.id,
-        input: {
-          targetId: effectiveTargetId,
-          // Custom rows cannot collide with a declared name: validateRows
-          // refuses a row that repeats one.
-          params: { ...values, ...collectParams(customRows) },
-          argv: collectArgv(customRows),
-          ...(timeout.trim() === '' ? {} : { timeoutSec: Number(timeout) }),
-        },
+        // Custom rows cannot collide with a declared name: validateRows refuses
+        // a row that repeats one.
+        input: toRunInput({ values, rows: customRows, timeoutSec: timeout }, effectiveTargetId),
       },
       { onSuccess: (result) => navigate(`/runs/${encodeURIComponent(result.executionId)}`) },
     );

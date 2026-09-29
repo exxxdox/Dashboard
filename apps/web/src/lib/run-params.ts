@@ -41,6 +41,34 @@ const PARAM_NAME_KEY: Record<ParamNameProblem, MessageKey> = {
   reserved: 'runs.paramName.reserved',
 };
 
+/**
+ * Client-side mirror of the server's own `validateParams`, so a missing
+ * required value is caught before a request is made. The server stays the
+ * authority: this only saves a round trip.
+ *
+ * Shared rather than private to the form, because the one-click run button has
+ * to refuse exactly what the form would refuse -- a stored draft is whatever was
+ * left in the form, and it can be stale enough for the header to have moved on.
+ */
+export function validateValues(
+  params: readonly ScriptParam[],
+  values: Record<string, string>,
+  t: Translate,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const param of params) {
+    const raw = (values[param.name] ?? '').trim();
+    if (raw === '') {
+      if (param.required && param.default === null) errors[param.name] = t('runs.error.required');
+      continue;
+    }
+    if (param.type === 'number' && !Number.isFinite(Number(raw))) {
+      errors[param.name] = t('runs.error.number');
+    }
+  }
+  return errors;
+}
+
 /** Blank means nothing typed at all: a name alone, or a value alone, is not. */
 export function isBlankRow(row: CustomParamRow): boolean {
   return row.name.trim() === '' && row.value.trim() === '';

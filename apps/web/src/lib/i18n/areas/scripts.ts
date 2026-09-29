@@ -28,9 +28,20 @@ const en = {
   'scripts.loadingScript': 'Loading script…',
   'scripts.refresh': 'Refresh',
   'scripts.panel.source': 'Source',
-  'scripts.panel.run': 'Run',
+  'scripts.panel.run': 'Run settings',
   'scripts.panel.facts': 'Facts',
   'scripts.panel.metadata': 'Metadata',
+  // The three buttons in the identity bar open these; the titles above are what
+  // the dialogs are called, and these say what is inside them.
+  'scripts.dialog.facts.description':
+    'Everything the last sync recorded for this file: its size, where it came from, and which content hash it was read at.',
+  'scripts.dialog.metadata.description':
+    'How this script is listed and run. Changes apply to the next run, not to past ones.',
+  'scripts.dialog.run.description':
+    'Pick a host and fill in what the script needs, then start it. These values are remembered for the next time.',
+  'scripts.runNow': 'Run now',
+  'scripts.runNowTitle': 'Run now on {target}, with the settings saved for this script',
+  'scripts.unsavedChanges': 'Unsaved changes',
   'scripts.unreadable.title': 'File is not readable',
   'scripts.unreadable.description':
     'The script is registered but its content could not be read from the shared directory. Re-sync the source, or check that the directory is mounted.',
@@ -82,9 +93,17 @@ const zh: Record<keyof typeof en, string> = {
   'scripts.loadingScript': '正在加载脚本…',
   'scripts.refresh': '刷新',
   'scripts.panel.source': '源码',
-  'scripts.panel.run': '运行',
+  'scripts.panel.run': '运行设置',
   'scripts.panel.facts': '基本信息',
   'scripts.panel.metadata': '元数据',
+  'scripts.dialog.facts.description':
+    '上次同步为该文件记录的完整信息：大小、来源路径，以及读取时对应的内容哈希。',
+  'scripts.dialog.metadata.description': '脚本的展示方式与运行方式。改动只影响之后的运行，不影响历史记录。',
+  'scripts.dialog.run.description':
+    '选择目标主机，填写脚本需要的参数，然后启动。填过的值会为下次记住。',
+  'scripts.runNow': '立即运行',
+  'scripts.runNowTitle': '使用该脚本已保存的设置，在 {target} 上立即运行',
+  'scripts.unsavedChanges': '有未保存的改动',
   'scripts.unreadable.title': '文件读不出来',
   'scripts.unreadable.description':
     '脚本已经登记，但无法从共享目录读取其内容。请重新同步脚本源，或确认该目录已挂载。',

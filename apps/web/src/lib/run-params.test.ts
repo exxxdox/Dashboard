@@ -8,6 +8,7 @@ import {
   collectParams,
   isBlankRow,
   validateRows,
+  validateValues,
   type CustomParamRow,
   type CustomParamMode,
 } from './run-params';
@@ -157,5 +158,36 @@ describe('positional arguments', () => {
 
   it('does not trim a value, which may be significant', () => {
     expect(collectArgv(rows(['label:argv', '  two words  ']))).toEqual(['  two words  ']);
+  });
+});
+
+describe('validateValues', () => {
+  it('accepts a declared default standing in for an untouched value', () => {
+    expect(validateValues(DECLARED, { ENV: 'prod' }, t)).toEqual({});
+  });
+
+  it('names the parameter whose required value is missing', () => {
+    // Blank and whitespace-only are the same thing here: neither is a value.
+    expect(validateValues(DECLARED, {}, t)).toEqual({ ENV: t('runs.error.required') });
+    expect(validateValues(DECLARED, { ENV: '   ' }, t)).toEqual({ ENV: t('runs.error.required') });
+  });
+
+  it('does not demand a required parameter that declares its own default', () => {
+    const defaulted: ScriptParam[] = [
+      { name: 'ENV', type: 'string', required: true, default: 'prod', description: '' },
+    ];
+
+    expect(validateValues(defaulted, {}, t)).toEqual({});
+  });
+
+  it('refuses a value that a number parameter cannot read', () => {
+    expect(validateValues(DECLARED, { ENV: 'prod', REPLICAS: 'many' }, t)).toEqual({
+      REPLICAS: t('runs.error.number'),
+    });
+  });
+
+  it('ignores a value for a parameter the header no longer declares', () => {
+    // Those are the form's custom rows, and the row rules are what judge them.
+    expect(validateValues(DECLARED, { ENV: 'prod', GONE: 'x' }, t)).toEqual({});
   });
 });
