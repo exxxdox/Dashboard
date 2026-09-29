@@ -17,4 +17,10 @@ export const queryKeys = {
   executions: (filter: Record<string, string | number | undefined>) =>
     ['executions', filter] as const,
   execution: (id: string) => ['executions', id] as const,
+
+  // One key for the whole DNS page: its state payload already carries the
+  // settings, the probe results and a preview of the history, so there is
+  // nothing to fetch in parallel with it.
+  dns: () => ['dns'] as const,
+  dnsChecks: (filter: { limit: number; offset: number }) => ['dns', 'checks', filter] as const,
 };

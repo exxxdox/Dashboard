@@ -13,6 +13,9 @@ export type Route =
   | { name: 'runs'; executionId: string | null; search: URLSearchParams }
   | { name: 'targets' }
   | { name: 'sources' }
+  // Carries the query string so the history's page number survives a reload and
+  // can be linked to, the way the runs list already does it.
+  | { name: 'dns'; search: URLSearchParams }
   | { name: 'notFound'; path: string };
 
 const DEFAULT_HASH = '#/';
@@ -35,6 +38,8 @@ export function parseRoute(hash: string): Route {
       return { name: 'targets' };
     case 'sources':
       return { name: 'sources' };
+    case 'dns':
+      return { name: 'dns', search };
     default:
       return { name: 'notFound', path };
   }

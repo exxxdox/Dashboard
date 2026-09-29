@@ -10,6 +10,7 @@ import { RunsPage } from './pages/RunsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { TargetsPage } from './pages/TargetsPage';
 import { SourcesPage } from './pages/SourcesPage';
+import { DnsPage } from './pages/DnsPage';
 import { SignInPage } from './pages/SignInPage';
 import { useAuthStatus } from './api/queries';
 import { UNAUTHORIZED_EVENT } from './api/client';
@@ -59,6 +60,8 @@ function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
       return <TargetsPage />;
     case 'sources':
       return <SourcesPage />;
+    case 'dns':
+      return <DnsPage search={route.search} />;
     case 'notFound':
       return (
         <PageBody>

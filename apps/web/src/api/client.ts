@@ -3,6 +3,13 @@ import type {
   CreateSourceInput,
   LoginInput,
   CreateTargetInput,
+  DnsCheckList,
+  DnsIpv6Probe,
+  DnsNotificationTest,
+  DnsRecordProbe,
+  DnsSettingsView,
+  DnsState,
+  DnsUpdateResult,
   ExecuteScriptInput,
   ExecutionLogChunk,
   ExecutionSummary,
@@ -14,6 +21,8 @@ import type {
   SyncResult,
   TargetCheckResult,
   TargetSummary,
+  TestDnsNotificationInput,
+  UpdateDnsSettingsInput,
   UpdateSourceInput,
   UpdateTargetInput,
 } from '@dashboard/shared';
@@ -200,4 +209,18 @@ export const api = {
     apiRequest<ExecutionSummary>(`/executions/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
   deleteExecution: (id: string) =>
     apiRequest<void>(`/executions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // The IPv6 DNS console. `state` is the whole page in one response, so the
+  // actions below only have to invalidate it.
+  dnsState: () => apiRequest<DnsState>('/dns'),
+  saveDnsSettings: (body: UpdateDnsSettingsInput) =>
+    apiRequest<DnsSettingsView>('/dns/settings', { method: 'PATCH', body }),
+  detectDnsIpv6: () => apiRequest<DnsIpv6Probe>('/dns/ipv6', { method: 'POST' }),
+  queryDnsRecord: () => apiRequest<DnsRecordProbe>('/dns/record', { method: 'POST' }),
+  runDnsUpdate: () => apiRequest<DnsUpdateResult>('/dns/update', { method: 'POST' }),
+  testDnsNotification: (body: TestDnsNotificationInput) =>
+    apiRequest<DnsNotificationTest>('/dns/notification-test', { method: 'POST', body }),
+  listDnsChecks: (filter: { limit?: number; offset?: number } = {}) =>
+    apiRequest<DnsCheckList>('/dns/checks', { query: filter }),
+  clearDnsChecks: () => apiRequest<void>('/dns/checks', { method: 'DELETE' }),
 };

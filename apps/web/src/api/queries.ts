@@ -15,6 +15,8 @@ import type {
   ScriptRunPrefill,
   ScriptSummary,
   TargetSummary,
+  TestDnsNotificationInput,
+  UpdateDnsSettingsInput,
   UpdateSourceInput,
   UpdateTargetInput,
 } from '@dashboard/shared';
@@ -336,5 +338,87 @@ export function useDeleteExecution() {
       void client.invalidateQueries({ queryKey: ['executions'] });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
     },
+  });
+}
+
+/* --------------------------------------------------------------------- dns */
+
+/**
+ * One invalidation for the whole console.
+ *
+ * `['dns']` is the prefix of every DNS key, so a single call refreshes the state
+ * payload and any page of history. Every action below uses it, including a
+ * failed update: a failure is a history row, and the page shows it as one.
+ */
+function useInvalidateDns(): () => void {
+  const client = useQueryClient();
+  return () => {
+    void client.invalidateQueries({ queryKey: ['dns'] });
+  };
+}
+
+export function useDnsState() {
+  return useQuery({
+    queryKey: queryKeys.dns(),
+    queryFn: api.dnsState,
+  });
+}
+
+export function useDnsChecks(filter: { limit: number; offset: number }) {
+  return useQuery({
+    queryKey: queryKeys.dnsChecks(filter),
+    queryFn: () => api.listDnsChecks(filter),
+    placeholderData: (previous) => previous,
+  });
+}
+
+export function useSaveDnsSettings() {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn: (input: UpdateDnsSettingsInput) => api.saveDnsSettings(input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useDetectDnsIpv6() {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn: () => api.detectDnsIpv6(),
+    onSuccess: invalidate,
+  });
+}
+
+export function useQueryDnsRecord() {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn: () => api.queryDnsRecord(),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRunDnsUpdate() {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn: () => api.runDnsUpdate(),
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * The test message is sent and its answer is kept by the caller, not cached: it
+ * says something about the credentials in the form, which the server has not
+ * stored yet.
+ */
+export function useTestDnsNotification() {
+  return useMutation({
+    mutationFn: (input: TestDnsNotificationInput) => api.testDnsNotification(input),
+  });
+}
+
+export function useClearDnsChecks() {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn: () => api.clearDnsChecks(),
+    onSuccess: invalidate,
   });
 }

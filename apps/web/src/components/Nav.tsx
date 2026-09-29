@@ -1,4 +1,4 @@
-import { Activity, FileCode, FolderTree, Server, Terminal } from 'lucide-react';
+import { Activity, FileCode, FolderTree, Globe, Server, Terminal } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { href, type Route } from '../lib/router';
 import { useAuthStatus, useHealth, useLogout } from '../api/queries';
@@ -16,6 +16,8 @@ export const NAV_ITEMS: NavItem[] = [
   { route: 'runs', label: 'Runs', path: '/runs', icon: Terminal },
   { route: 'targets', label: 'Targets', path: '/targets', icon: Server },
   { route: 'sources', label: 'Sources', path: '/sources', icon: FolderTree },
+  // Appended rather than inserted: nothing else on the rail moves for it.
+  { route: 'dns', label: 'DNS', path: '/dns', icon: Globe },
 ];
 
 export function Nav({ active }: { active: Route['name'] }) {
