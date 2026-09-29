@@ -86,7 +86,6 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
       <PageHeader
         eyebrow={t('dns.eyebrow')}
         title={t('dns.title')}
-        description={t('dns.description')}
         // What is configured, without opening anything: the settings are behind
         // a button now, so this is what keeps them from being hidden.
         hints={<StatusChip label={settingsSummary(t, settings)} muted={settings === null} />}

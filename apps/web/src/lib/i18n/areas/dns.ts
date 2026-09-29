@@ -10,8 +10,6 @@
 const en = {
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
-  'dns.description':
-    "Keep an AAAA record pointed at this host's public IPv6 address. A check that finds the same address writes nothing.",
 
   'dns.action.detect': 'Detect address',
   'dns.action.query': 'Query record',
@@ -127,8 +125,6 @@ const en = {
 const zh: Record<keyof typeof en, string> = {
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
-  'dns.description':
-    '让一条 AAAA 记录始终指向本机的公网 IPv6 地址。若检查发现地址未变，则不会写入任何内容。',
 
   'dns.action.detect': '探测地址',
   'dns.action.query': '查询记录',
