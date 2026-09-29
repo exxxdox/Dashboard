@@ -119,7 +119,7 @@ Gotify 通知只在记录真的发生变化时发送；发不出去不影响这�
 - **DNS 凭据与 SSH 凭据共用 `data/secret.key`**：密钥丢了，两边都要重新录入。
 - 数据库迁移**只往前、不回滚** —— 升级前先备份 `data/`。
 - `.ps1` 需要目标机上已安装 `pwsh`。
-- 镜像不算精简：带服务端生产依赖树、`git` 与 `ca-certificates`。
+- 镜像不算精简：带服务端生产依赖树、`git` 与 `ca-certificates`。构建时传 `WITH_GIT=false` 可去掉 git 及其独有依赖（119MB → 110MB），代价是 GitHub 源无法克隆，`local` 源不受影响。
 
 ## License
 

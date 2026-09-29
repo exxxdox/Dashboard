@@ -124,6 +124,13 @@ WORKDIR /app
 # privilege with. `nodejs` brings its own libstdc++ and ICU, so neither is named
 # here; the `npm` package is deliberately absent, as is `yarn`.
 #
+# `WITH_GIT=false` leaves git out, which also leaves out the closure only it
+# needs -- pcre2, libcurl, libidn2, libpsl, libunistring and libexpat -- for
+# 9 MB. What stops working is GitHub sources: the sync spawns git, so it fails
+# with `spawn git ENOENT`, while a source of kind `local` is plain filesystem
+# work in the shared mount and is unaffected. Measured on this project: 119 MB
+# with git, 110 MB without.
+#
 # Three of git's helpers are dropped in this same RUN, which is the only place a
 # deletion actually shrinks the image. git dispatches them by name, so their
 # absence is invisible to the four subcommands this app runs -- clone, fetch,
@@ -141,18 +148,23 @@ WORKDIR /app
 # Only the host is substituted, so the mirror has to carry alpine under the same
 # paths the official one does.
 ARG ALPINE_MIRROR=dl-cdn.alpinelinux.org
+ARG WITH_GIT=true
 RUN if [ "$ALPINE_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
       sed -i "s|dl-cdn.alpinelinux.org|$ALPINE_MIRROR|g" /etc/apk/repositories; \
     fi \
- && apk add --no-cache nodejs git ca-certificates setpriv \
- && rm -f /usr/libexec/git-core/git-http-push \
-          /usr/libexec/git-core/git-http-fetch \
-          /usr/libexec/git-core/git-sh-i18n--envsubst
+ && apk add --no-cache nodejs ca-certificates setpriv \
+ && if [ "$WITH_GIT" = "true" ]; then \
+      apk add --no-cache git \
+      && rm -f /usr/libexec/git-core/git-http-push \
+               /usr/libexec/git-core/git-http-fetch \
+               /usr/libexec/git-core/git-sh-i18n--envsubst; \
+    fi
 
 # Repositories are cloned into a bind-mounted directory whose owner is the host
 # user, which git regards as untrusted. Without this, every git command in the
-# mount fails with "detected dubious ownership".
-RUN git config --system --add safe.directory '*'
+# mount fails with "detected dubious ownership". Guarded so the `WITH_GIT=false`
+# build does not fail here on a missing binary.
+RUN if command -v git >/dev/null 2>&1; then git config --system --add safe.directory '*'; fi
 
 # The account the app runs as, created with the host directory owner's ids so
 # files cloned here are readable by the SSH target on the other side of the

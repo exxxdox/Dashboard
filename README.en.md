@@ -119,7 +119,7 @@ A Gotify notification is sent only when the record actually changed; a notificat
 - **The DNS credentials share `data/secret.key` with the SSH ones**: lose that file and both have to be entered again.
 - Database migrations are **forward-only** — back up `data/` before upgrading.
 - `.ps1` scripts need `pwsh` installed on the target.
-- The image is not minimal: it carries the server's production dependency tree, `git` and `ca-certificates`.
+- The image is not minimal: it carries the server's production dependency tree, `git` and `ca-certificates`. Building with `WITH_GIT=false` drops git and the libraries only it needs (119 MB → 110 MB), at the cost of GitHub sources; `local` ones are unaffected.
 
 ## License
 
