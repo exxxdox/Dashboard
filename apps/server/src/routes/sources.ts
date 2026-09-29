@@ -6,7 +6,7 @@ import {
   runDraftSchema,
   updateSourceSchema,
   type ScriptSummary,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { z } from 'zod';
 
 import type { AppContext } from '../context.js';

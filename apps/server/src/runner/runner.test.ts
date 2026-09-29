@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import type { ServerMessage } from '@script-dashboard/shared';
-import { cleanupStagingCommand, resolveInterpreter } from '@script-dashboard/shared';
+import type { ServerMessage } from '@dashboard/shared';
+import { cleanupStagingCommand, resolveInterpreter } from '@dashboard/shared';
 
 import { openDatabase, type Db } from '../db/client.js';
 import { createLogger } from '../lib/logger.js';

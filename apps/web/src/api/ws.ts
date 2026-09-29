@@ -3,7 +3,7 @@ import type {
   ExecutionLogChunk,
   ExecutionSummary,
   ServerMessage,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 
 export type SocketState = 'idle' | 'connecting' | 'open' | 'reconnecting';
 

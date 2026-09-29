@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { RunDraft, ScriptParam } from '@script-dashboard/shared';
+import type { RunDraft, ScriptParam } from '@dashboard/shared';
 
 import { openDatabase, type Db } from '../db/client.js';
 import { NotFoundError } from '../lib/errors.js';

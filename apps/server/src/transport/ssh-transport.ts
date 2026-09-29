@@ -14,7 +14,7 @@
 import type { Client as SshClient, ClientChannel, ConnectConfig } from 'ssh2';
 import * as ssh2Namespace from 'ssh2';
 
-import { PID_MARKER } from '@script-dashboard/shared';
+import { PID_MARKER } from '@dashboard/shared';
 
 import type { ExecOptions, ExecOutcome, Transport, TransportCheck } from './types.js';
 import { writeStdin } from './write-stdin.js';

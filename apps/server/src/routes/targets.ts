@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { createTargetSchema, updateTargetSchema } from '@script-dashboard/shared';
+import { createTargetSchema, updateTargetSchema } from '@dashboard/shared';
 
 import type { AppContext } from '../context.js';
 import {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { executionStatusSchema, syncStatusSchema } from '@script-dashboard/shared';
+import { executionStatusSchema, syncStatusSchema } from '@dashboard/shared';
 import {
   EXECUTION_STATUS_META,
   SYNC_STATUS_META,

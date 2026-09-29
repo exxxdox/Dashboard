@@ -15,8 +15,8 @@ import type {
   ExecutionSummary,
   ExecutionStream,
   ScriptSummary,
-} from '@script-dashboard/shared';
-import { resolveInterpreter, validateParams, type RunEnvName } from '@script-dashboard/shared';
+} from '@dashboard/shared';
+import { resolveInterpreter, validateParams, type RunEnvName } from '@dashboard/shared';
 
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/client.js';

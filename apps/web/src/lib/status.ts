@@ -1,4 +1,4 @@
-import type { ExecutionStatus, SyncStatus } from '@script-dashboard/shared';
+import type { ExecutionStatus, SyncStatus } from '@dashboard/shared';
 
 /** Semantic colour roles. Status is the only thing allowed to colour a dot. */
 export type Tone = 'ok' | 'warn' | 'danger' | 'info' | 'accent' | 'muted';

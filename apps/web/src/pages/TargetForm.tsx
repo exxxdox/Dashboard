@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Plug, Save, X } from 'lucide-react';
-import type { CreateTargetInput, TargetAuth, TargetSummary } from '@script-dashboard/shared';
+import type { CreateTargetInput, TargetAuth, TargetSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextArea, TextInput } from '../components/Form';

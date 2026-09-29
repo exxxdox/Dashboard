@@ -19,7 +19,7 @@ import {
   cleanupStagingCommand,
   PID_MARKER,
   resolveInterpreter,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { describe, expect, test } from 'vitest';
 
 type Run = { status: number | null; stdout: string; stderr: string };

@@ -17,7 +17,7 @@ import type {
   TargetSummary,
   UpdateSourceInput,
   UpdateTargetInput,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { api } from './client';
 import { queryKeys } from './queryKeys';
 import type { UpdateScriptInput } from './types';

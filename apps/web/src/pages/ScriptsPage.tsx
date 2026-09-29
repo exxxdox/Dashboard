@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FileCode, FolderTree, RefreshCw } from 'lucide-react';
-import type { ScriptTreeNode, SourceSummary } from '@script-dashboard/shared';
+import type { ScriptTreeNode, SourceSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';

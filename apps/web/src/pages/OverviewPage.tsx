@@ -1,5 +1,5 @@
 import { Activity, ArrowRight, CircleAlert, FileCode, Server, FolderTree } from 'lucide-react';
-import type { ExecutionSummary } from '@script-dashboard/shared';
+import type { ExecutionSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';

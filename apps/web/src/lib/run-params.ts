@@ -1,4 +1,4 @@
-import { PARAM_NAME_MESSAGE, paramNameProblem, type ScriptParam } from '@script-dashboard/shared';
+import { PARAM_NAME_MESSAGE, paramNameProblem, type ScriptParam } from '@dashboard/shared';
 
 /**
  * A parameter the operator adds by hand, because the script's header does not

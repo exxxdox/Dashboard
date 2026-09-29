@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FolderGit2, FolderTree, Pencil, Plus, RefreshCw, Trash } from 'lucide-react';
-import type { SourceSummary, SyncResult } from '@script-dashboard/shared';
+import type { SourceSummary, SyncResult } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';

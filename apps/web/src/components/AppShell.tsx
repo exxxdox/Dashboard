@@ -16,7 +16,7 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
         <a
           href={href('/')}
           className="focus-ring flex h-20 items-center gap-3.5 px-5"
-          aria-label="Script Dashboard, go to overview"
+          aria-label="Dashboard, go to overview"
         >
           {/* The wordmark is the one piece of furniture in the rail: it is sized
               to read as the product's name, not as another nav label. */}
@@ -37,7 +37,7 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
         {/* Below lg the rail becomes a horizontal strip; the tool is still usable. */}
         <div className="border-line bg-base/85 sticky top-0 z-20 border-b backdrop-blur lg:hidden">
           <div className="flex h-16 items-center gap-1 overflow-x-auto px-4">
-            <span className="mono text-ink text-brand mr-3 shrink-0 font-semibold">scriptdashboard</span>
+            <span className="mono text-ink text-brand mr-3 shrink-0 font-semibold">dashboard</span>
             <Nav active={route.name} />
           </div>
         </div>

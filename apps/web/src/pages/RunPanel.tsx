@@ -4,7 +4,7 @@ import {
   type ScriptParam,
   type ScriptSummary,
   type TargetSummary,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { ChevronRight, Play, Plus, Trash } from 'lucide-react';
 import { Button, IconButton } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';

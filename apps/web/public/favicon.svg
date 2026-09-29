@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Script Dashboard">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Dashboard">
   <!-- Solid accent tile rather than a dark glyph: tab strips and bookmark bars
        are mostly light, and a dark-on-dark mark disappears at 16px. The glyph
        is a shell prompt, which is what this app runs. -->

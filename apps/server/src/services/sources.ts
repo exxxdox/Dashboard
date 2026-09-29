@@ -22,8 +22,8 @@ import type {
   SourceSummary,
   SyncResult,
   UpdateSourceInput,
-} from '@script-dashboard/shared';
-import { assertValidBranch, parseGithubRepo } from '@script-dashboard/shared';
+} from '@dashboard/shared';
+import { assertValidBranch, parseGithubRepo } from '@dashboard/shared';
 
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/client.js';

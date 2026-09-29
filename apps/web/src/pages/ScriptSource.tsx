@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { ScriptFormat } from '@script-dashboard/shared';
+import type { ScriptFormat } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 
 const MAX_LINES = 400;

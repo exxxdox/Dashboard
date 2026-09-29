@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, Terminal } from 'lucide-react';
-import type { ExecutionStatus } from '@script-dashboard/shared';
+import type { ExecutionStatus } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';

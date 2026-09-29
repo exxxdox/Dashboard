@@ -24,7 +24,7 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const RENEW_AFTER_MS = 60 * 60 * 1000;
 
 /** Fixed salt: the derived key has to come out the same on every boot. */
-const KEY_SALT = 'script-dashboard-session-v1';
+const KEY_SALT = 'dashboard-session-v1';
 const TOKEN_VERSION = 'v1';
 
 export const SESSION_COOKIE = 'sd_session';

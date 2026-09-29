@@ -1,5 +1,5 @@
 {
-  "name": "@script-dashboard/web",
+  "name": "@dashboard/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@script-dashboard/shared": "workspace:*",
+    "@dashboard/shared": "workspace:*",
     "@tanstack/react-query": "^5.104.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",

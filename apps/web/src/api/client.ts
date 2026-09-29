@@ -16,7 +16,7 @@ import type {
   TargetSummary,
   UpdateSourceInput,
   UpdateTargetInput,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import type {
   BrowseResponse,
   ExecutionListResponse,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RunDraft, ScriptParam, ScriptRunPrefill } from '@script-dashboard/shared';
+import type { RunDraft, ScriptParam, ScriptRunPrefill } from '@dashboard/shared';
 
 import {
   describePrefill,

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------------------------------------------------------------------------
-# Script Dashboard
+# Dashboard
 #
 # The container holds the API and the web client, and it owns the *files* --
 # cloning repositories and scanning them happens here. It does not run the
@@ -79,7 +79,7 @@ COPY scripts/prune-runtime-deps.mjs scripts/
 ARG NPM_REGISTRY=https://registry.npmjs.org/
 RUN --mount=type=cache,id=pnpm-alpine,target=/pnpm/store \
     printf 'registry=%s\n' "$NPM_REGISTRY" > /app/.npmrc \
- && pnpm install --frozen-lockfile --prod --filter @script-dashboard/server... \
+ && pnpm install --frozen-lockfile --prod --filter @dashboard/server... \
  && node scripts/prune-runtime-deps.mjs /app
 
 # ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ FROM alpine:3.24 AS runtime
 ENV NODE_ENV=production \
     DATA_DIR=/data \
     SCRIPT_ROOT_CONTAINER=/workspace \
-    PORT=8080 \
+    PORT=50014 \
     # The config default (/app/web) does not match the workspace layout this
     # image copies. Without this the server starts fine, reports a warning, and
     # serves the API only -- every browser route, including "/", returns 404.
@@ -177,7 +177,7 @@ RUN addgroup -g "$PGID" -S node \
 # the whole workspace across, including the build's own node_modules.
 #
 # The tree is copied as a tree because pnpm links workspace packages by relative
-# symlink (`apps/server/node_modules/@script-dashboard/shared` -> `../../../packages/shared`),
+# symlink (`apps/server/node_modules/@dashboard/shared` -> `../../../packages/shared`),
 # so the target has to land at the same depth it was installed at.
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/server/node_modules ./apps/server/node_modules
@@ -198,7 +198,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # which docker stores as a fresh copy of each one, for no gain.
 
 USER node
-EXPOSE 8080
+EXPOSE 50014
 
 # Compose starts this container as root so the bind mounts can be brought in line
 # with PUID/PGID; the entrypoint drops back to that uid before the app starts.
@@ -210,6 +210,6 @@ ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||50014)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "apps/server/dist/index.js"]

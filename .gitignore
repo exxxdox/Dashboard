@@ -8,6 +8,10 @@ coverage/
 data/
 .smoke/
 
+# Default script checkout directory, used when SCRIPT_ROOT_HOST is left at its
+# relative default. It holds cloned repositories, not project source.
+/workspace/
+
 .env
 .env.*
 !.env.example

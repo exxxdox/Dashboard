@@ -6,7 +6,7 @@
  * slow or absent subscriber can never hold up an execution.
  */
 
-import type { ServerMessage } from '@script-dashboard/shared';
+import type { ServerMessage } from '@dashboard/shared';
 
 export type HubListener = (message: ServerMessage) => void;
 

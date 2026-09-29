@@ -10,8 +10,8 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { ScriptParam, ScriptMeta } from '@script-dashboard/shared';
-import { parseScriptMeta } from '@script-dashboard/shared';
+import type { ScriptParam, ScriptMeta } from '@dashboard/shared';
+import { parseScriptMeta } from '@dashboard/shared';
 
 import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';
@@ -22,9 +22,9 @@ const SUPPORTED_EXTENSIONS = new Set(['.sh', '.ps1']);
 
 /**
  * Directories never worth walking. `.git` alone can contain thousands of files;
- * `.script-dashboard` is our own internal state directory.
+ * `.dashboard` is our own internal state directory.
  */
-const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', '.script-dashboard', '.idea', '.vscode']);
+const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', '.dashboard', '.idea', '.vscode']);
 
 /** Guardrails so a hostile or accidental layout cannot hang the scan. */
 const MAX_DEPTH = 12;

@@ -5,7 +5,7 @@ import type {
   SourceKind,
   SourceSummary,
   UpdateSourceInput,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextInput } from '../components/Form';

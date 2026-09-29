@@ -5,7 +5,7 @@ import type {
   ExecutionLogChunk,
   ExecutionStream as StreamKind,
   ExecutionSummary,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import '@xterm/xterm/css/xterm.css';
 import { useExecutionStream } from '../api/useExecutionStream';
 

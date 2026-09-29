@@ -12,7 +12,7 @@ import {
   type RunDraft,
   type ScriptParam,
   type ScriptRunPrefill,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 
 import type { Db } from '../db/client.js';
 import { NotFoundError } from '../lib/errors.js';

@@ -9,7 +9,7 @@ import {
   executeScriptSchema,
   executionStatusSchema,
   type ServerMessage,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 import { z } from 'zod';
 
 import type { AppContext } from '../context.js';

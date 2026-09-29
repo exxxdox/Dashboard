@@ -8,7 +8,7 @@
  */
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { loginSchema, type AuthStatus } from '@script-dashboard/shared';
+import { loginSchema, type AuthStatus } from '@dashboard/shared';
 
 import type { AppContext } from '../context.js';
 import {

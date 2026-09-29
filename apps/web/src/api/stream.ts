@@ -1,4 +1,4 @@
-import type { ExecutionLogChunk } from '@script-dashboard/shared';
+import type { ExecutionLogChunk } from '@dashboard/shared';
 import { api, errorMessage } from './client';
 
 /**

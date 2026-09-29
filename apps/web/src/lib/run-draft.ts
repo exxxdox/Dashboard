@@ -1,4 +1,4 @@
-import type { RunDraft, ScriptParam, ScriptRunPrefill } from '@script-dashboard/shared';
+import type { RunDraft, ScriptParam, ScriptRunPrefill } from '@dashboard/shared';
 
 import { addRow, updateRow, type CustomParamRow } from './run-params';
 

@@ -1,4 +1,4 @@
-# Script Dashboard
+# Dashboard
 
 把你服务器上现成的 shell / PowerShell 脚本搬到浏览器里跑：参数可填、输出实时可见、每次运行都留档。
 
@@ -27,27 +27,31 @@ cp .env.example .env      # 至少改 SCRIPT_ROOT_HOST 与 PUID/PGID
 docker compose up -d --build
 ```
 
-打开 `http://localhost:8080`（或 `.env` 中的 `DASHBOARD_PORT`）。之后在界面上依次：添加 Target（SSH 目标）→ 添加 Source（脚本来源）→ 同步 → 运行。
+打开 `http://<宿主地址>:50014`（或 `.env` 中的 `DASHBOARD_PORT`）。之后在界面上依次：添加 Target（SSH 目标）→ 添加 Source（脚本来源）→ 同步 → 运行。
 
 ## docker compose
 
-仓库的 `docker-compose.yml` 是模板，要点就这几行：
+仓库的 `compose.yaml` 是模板，要点就这几行：
 
 ```yaml
 services:
   dashboard:
     build: .
     restart: unless-stopped
-    ports: ["${DASHBOARD_PORT:-8080}:8080"]         # 对外端口
+    network_mode: host                              # 见下：需要宿主原生 IPv6
+    environment:
+      PORT: ${DASHBOARD_PORT:-50014}                # host 网络下这就是宿主端口
     volumes:
       - ./data:/data                                 # 数据库 + 凭据加密密钥
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # 脚本目录（容器读它来克隆/扫描）
     user: "0:0"
 ```
 
-- **`./data` 必须备份**：里面是 SQLite 数据库与 `secret.key`。密钥丢了，已存的 SSH 凭据就解不开，只能重新录入。
+- **用 host 网络，不用端口映射**：DNS 那条链路必须走宿主自己的 IPv6 出口，网桥网络拿到的是另一个地址。代价是容器直接占用宿主端口，`DASHBOARD_PORT` 必须在本机空闲，且 `ports:` 与 `network_mode` 互斥、在这里根本不能写。
+- **要求宿主本身具备公网 IPv6 出站能力**：探测走 `api6.ipify.org` 的 IPv6 端点，探测不到就只报错、绝不写 DNS。
+- **`./data` 必须备份**：里面是 SQLite 数据库与 `secret.key`。密钥丢了，已存的 SSH 凭据与 DNS 服务商凭据就都解不开，只能重新录入。
 - **`user: "0:0"` 只在启动那一瞬是 root**：绑定挂载会遮住镜像层的属主设置，入口脚本把两个挂载点 `chown` 成 `PUID:PGID` 后立刻降权，仪表盘进程从不以 root 运行。所以 `PUID`/`PGID` 要与脚本目录属主一致。
-- **发布出去的端口绕过 ufw**（流量走 FORWARD 链）。要限制来源，就绑定网卡地址、用 `DOCKER-USER` 链，或放到反向代理后面。
+- **host 网络下服务监听宿主全部网卡**，本机可达即局域网可达。要限制来源，就设 `HOST` 绑到某个网卡地址，或放到反向代理后面。
 
 ## 环境变量
 
@@ -57,7 +61,7 @@ services:
 |---|---|---|
 | `SCRIPT_ROOT_HOST` | — | 存放脚本的宿主机目录，挂载进容器供扫描。**必填** |
 | `PUID` / `PGID` | `1000` | 上述目录的属主。容器接管挂载点属主后降权到该用户 |
-| `DASHBOARD_PORT` | `8080` | 对外端口 |
+| `DASHBOARD_PORT` | `50014` | 监听端口。host 网络下即宿主端口，必须本机空闲 |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | 未设 | 登录凭据，**必须同时设置**；不设则开放访问（启动告警） |
 | `LOG_LEVEL` | `info` | `fatal`…`trace` |
 | `MAX_CONCURRENT_EXECUTIONS` | `4` | 全局同时运行的脚本数 |

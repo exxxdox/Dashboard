@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { Search, X } from 'lucide-react';
-import type { ScriptSummary } from '@script-dashboard/shared';
+import type { ScriptSummary } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import { useScripts } from '../api/queries';
 import { useDebounced } from '../lib/useDebounced';

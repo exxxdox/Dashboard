@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { ArrowLeft, Ban, Trash } from 'lucide-react';
-import { TERMINAL_EXECUTION_STATUSES } from '@script-dashboard/shared';
+import { TERMINAL_EXECUTION_STATUSES } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
 import { Panel, Stat } from '../components/Panel';

@@ -1,4 +1,4 @@
-# Script Dashboard
+# Dashboard
 
 Run the shell and PowerShell scripts you already have on your servers from a browser: fill in parameters, watch the output live, and keep a record of every run.
 
@@ -27,27 +27,31 @@ cp .env.example .env      # change SCRIPT_ROOT_HOST and PUID/PGID at least
 docker compose up -d --build
 ```
 
-Open `http://localhost:8080` (or whatever `DASHBOARD_PORT` says in `.env`). Then, in the UI: add a Target (the SSH host) → add a Source (where the scripts come from) → sync → run.
+Open `http://<host address>:50014` (or whatever `DASHBOARD_PORT` says in `.env`). Then, in the UI: add a Target (the SSH host) → add a Source (where the scripts come from) → sync → run.
 
 ## docker compose
 
-The repository's `docker-compose.yml` is the template; the parts that matter are these:
+The repository's `compose.yaml` is the template; the parts that matter are these:
 
 ```yaml
 services:
   dashboard:
     build: .
     restart: unless-stopped
-    ports: ["${DASHBOARD_PORT:-8080}:8080"]         # published port
+    network_mode: host                              # see below: needs the host's own IPv6
+    environment:
+      PORT: ${DASHBOARD_PORT:-50014}                # under host networking this is the host port
     volumes:
       - ./data:/data                                 # database + credential encryption key
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # script directory (read for clone/scan)
     user: "0:0"
 ```
 
-- **Back up `./data`.** It holds the SQLite database and `secret.key`. Lose the key and the stored SSH credentials cannot be decrypted — you would have to enter them again.
+- **Host networking, not published ports.** The DNS check has to leave through the host's own IPv6 egress; a bridge network would report a different address. The cost is that the container takes a port on the machine itself, so `DASHBOARD_PORT` has to be free there, and `ports:` cannot be used at all — it is mutually exclusive with `network_mode`.
+- **The host itself must have working public IPv6 egress.** The probe asks `api6.ipify.org` over IPv6; if it cannot be reached the run fails with an error and writes nothing to DNS.
+- **Back up `./data`.** It holds the SQLite database and `secret.key`. Lose the key and the stored SSH credentials *and* the stored DNS provider credentials cannot be decrypted — you would have to enter them again.
 - **`user: "0:0"` is root for the first instant only.** A bind mount shadows the ownership set in the image, so the entrypoint `chown`s both mounts to `PUID:PGID` and then drops the privilege — the dashboard process never runs as root. That is why `PUID`/`PGID` must match the owner of the script directory.
-- **A published port bypasses ufw** (the traffic goes through the FORWARD chain). To restrict who can reach it, bind a specific address, use the `DOCKER-USER` chain, or put it behind a reverse proxy.
+- **Under host networking the app listens on every interface of the host**, so anything that can reach the machine can reach the dashboard. To restrict that, set `HOST` to a specific address or put a reverse proxy in front.
 
 ## Environment variables
 
@@ -57,7 +61,7 @@ Set in `.env`; the full example is `.env.example`:
 |---|---|---|
 | `SCRIPT_ROOT_HOST` | — | Host directory holding the scripts, mounted in for scanning. **Required** |
 | `PUID` / `PGID` | `1000` | Owner of that directory. The container takes ownership of the mounts, then drops to this user |
-| `DASHBOARD_PORT` | `8080` | Published port |
+| `DASHBOARD_PORT` | `50014` | Listen port. Under host networking this is the host port, so it must be free on the machine |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | unset | Sign-in credentials, **set both or neither**; unset runs open (with a boot warning) |
 | `LOG_LEVEL` | `info` | `fatal`…`trace` |
 | `MAX_CONCURRENT_EXECUTIONS` | `4` | Scripts running at once, across all targets |

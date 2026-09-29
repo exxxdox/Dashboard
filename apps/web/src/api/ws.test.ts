@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExecutionLogChunk, ExecutionSummary } from '@script-dashboard/shared';
+import type { ExecutionLogChunk, ExecutionSummary } from '@dashboard/shared';
 import {
   BASE_RETRY_MS,
   ExecutionSocket,

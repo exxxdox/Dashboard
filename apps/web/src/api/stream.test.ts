@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExecutionLogChunk, ExecutionStream } from '@script-dashboard/shared';
+import type { ExecutionLogChunk, ExecutionStream } from '@dashboard/shared';
 import { LogStream } from './stream';
 import { api } from './client';
 

@@ -1,4 +1,4 @@
-# Script Dashboard — contributor notes
+# Dashboard — contributor notes
 
 Self-hosted dashboard that runs shell/PowerShell scripts on remote Linux hosts over SSH, with live and historical execution output.
 
@@ -6,17 +6,17 @@ Self-hosted dashboard that runs shell/PowerShell scripts on remote Linux hosts o
 
 ```bash
 pnpm install
-pnpm --filter @script-dashboard/shared build   # MUST run before typechecking anything
+pnpm --filter @dashboard/shared build   # MUST run before typechecking anything
 pnpm -r typecheck
 pnpm -r test
 pnpm -r build
 pnpm dev                                       # shared build, then API :8080 + Vite :5173 in parallel
 
 # API alone, without the built UI
-DATA_DIR=./data SCRIPT_ROOT_CONTAINER=./workspace SERVE_WEB=false pnpm --filter @script-dashboard/server dev
+DATA_DIR=./data SCRIPT_ROOT_CONTAINER=./workspace SERVE_WEB=false pnpm --filter @dashboard/server dev
 
 # Container
-docker compose up -d --build
+docker compose up -d --build                   # one service, host networking, port from DASHBOARD_PORT
 ```
 
 `packages/shared` emits `dist/` and both consumers import from the package name, so a stale `dist` produces type errors that point at correct code. Rebuild it first whenever a type looks wrong.
@@ -100,6 +100,6 @@ Two consequences worth knowing before touching this: only the entry script is up
 - **The runtime stage is neither derived from `base` nor based on a node image.** It starts from bare `alpine:3.24` and copies `/usr/local/bin/node` out of `node:24-alpine`. `FROM node:24-alpine` reads better and is ~30 MB heavier, because that image also carries npm, corepack and yarn — and a `rm -rf` in a later layer cannot take them back out: **a file a child `RUN` deletes still occupies the layer its parent wrote**. That is why the npm removal the Dockerfile used to have freed nothing. Two consequences of not inheriting: `WORKDIR /app` and the pnpm `ENV`s are gone, so a copy destination added to that stage lands relative to `/`, the build succeeds, and the container dies at startup looking for `/app`; and `libstdc++` has to be installed by hand, because alpine ships only musl and the copied binary links against it.
 - **The build runs on Debian and the runtime on alpine.** The toolchain (TypeScript, Vite, esbuild, the rolldown binaries) is left on glibc deliberately — nothing native crosses the boundary except compiled JavaScript and one prebuilt SQLite binding. `prod-deps` is the exception and is based on `node:24-alpine` on purpose: `better-sqlite3` picks its prebuild by platform *and* libc, so installing on the platform that will execute it is what makes the prune keep the right one instead of depending on a target name passed in by hand.
 - **`apk add` is the runtime's entire OS surface**: `git ca-certificates libstdc++ setpriv`. The Debian version installed `git` with apt, which pulls `liberror-perl` and with it a whole perl (about 55 MB of the old image); alpine's git has no such dependency. `setpriv` is its own package there, and it is what the entrypoint drops privilege with. `PUID`/`PGID` are applied with busybox `addgroup`/`adduser` at build time rather than by renaming a built-in `node` user, which also means no `shadow` package.
-- **The image ships production dependencies only.** `prod-deps` installs with `--filter @script-dashboard/server...`, which leaves out the web client's packages — its build output is copied in as static files instead. So a dependency reachable only through `apps/web` is absent at runtime: if the server ever imports one, the image still builds and then dies on first use. Server and `packages/shared` are the two manifests the runtime tree is built from.
+- **The image ships production dependencies only.** `prod-deps` installs with `--filter @dashboard/server...`, which leaves out the web client's packages — its build output is copied in as static files instead. So a dependency reachable only through `apps/web` is absent at runtime: if the server ever imports one, the image still builds and then dies on first use. Server and `packages/shared` are the two manifests the runtime tree is built from.
 - **`scripts/prune-runtime-deps.mjs` strips build-only weight from the installed tree**, all of it inside `prod-deps`: the `better-sqlite3` prebuilds for other platforms, keeping the one matching the build machine *including its libc* (the script reads the same signal the package reads, so an alpine install keeps `linuxmusl-*`, not `linux-*`); the SQLite amalgamation it would only need in order to compile from source; a short named list of packages that are unreachable or required inside a bare `try`; and every `*.map`. A native dependency added later that ships prebuilds needs the same treatment, or the image quietly carries every platform it supports.
 - **`GIT_PROXY` reaches git as `-c http.proxy=…`, prepended inside `runGit`** in `services/sources.ts` — the override has to precede the subcommand, so no call site builds its own argv. It is deliberately not validated as a URL: git accepts a bare `host:port`, and `http.proxy` covers `https://` as well as `http://`.

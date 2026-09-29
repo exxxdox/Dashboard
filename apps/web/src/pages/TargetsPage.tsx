@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pencil, Plug, Plus, Server, ShieldCheck, Trash, TriangleAlert } from 'lucide-react';
-import type { TargetCheckResult, TargetSummary } from '@script-dashboard/shared';
+import type { TargetCheckResult, TargetSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';

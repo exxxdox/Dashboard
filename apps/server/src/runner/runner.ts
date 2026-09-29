@@ -8,12 +8,12 @@
  * loading the updated row to publish, is injected to avoid a module cycle.
  */
 
-import type { ExecutionStatus, ExecutionStream, ExecutionSummary } from '@script-dashboard/shared';
+import type { ExecutionStatus, ExecutionStream, ExecutionSummary } from '@dashboard/shared';
 import {
   buildCommand,
   cleanupStagingCommand,
   type InterpreterSpec,
-} from '@script-dashboard/shared';
+} from '@dashboard/shared';
 
 import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';

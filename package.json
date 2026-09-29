@@ -1,5 +1,5 @@
 {
-  "name": "script-dashboard",
+  "name": "dashboard",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,12 +8,12 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm --filter @script-dashboard/shared build && pnpm --filter @script-dashboard/server build && pnpm --filter @script-dashboard/web build",
-    "dev": "pnpm --filter @script-dashboard/shared build && pnpm -r --parallel dev",
+    "build": "pnpm --filter @dashboard/shared build && pnpm --filter @dashboard/server build && pnpm --filter @dashboard/web build",
+    "dev": "pnpm --filter @dashboard/shared build && pnpm -r --parallel dev",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "start": "node apps/server/dist/index.js",
-    "dbuild": "docker build -t script-dashboard:local . --build-arg NPM_REGISTRY=https://mirrors.cloud.tencent.com/npm/ --build-arg ALPINE_MIRROR=mirrors.cloud.tencent.com"
+    "dbuild": "docker build -t dashboard:local . --build-arg NPM_REGISTRY=https://mirrors.cloud.tencent.com/npm/ --build-arg ALPINE_MIRROR=mirrors.cloud.tencent.com"
   },
   "devDependencies": {
     "typescript": "~5.9.3"

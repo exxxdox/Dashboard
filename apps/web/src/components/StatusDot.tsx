@@ -1,4 +1,4 @@
-import type { ExecutionStatus, SyncStatus } from '@script-dashboard/shared';
+import type { ExecutionStatus, SyncStatus } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import {
   EXECUTION_STATUS_META,

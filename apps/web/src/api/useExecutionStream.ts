@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ExecutionLogChunk, ExecutionSummary } from '@script-dashboard/shared';
+import type { ExecutionLogChunk, ExecutionSummary } from '@dashboard/shared';
 import { LogStream } from './stream';
 import { executionSocket, type SocketState } from './ws';
 

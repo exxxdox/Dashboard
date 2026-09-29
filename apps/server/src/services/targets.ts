@@ -12,8 +12,8 @@ import type {
   TargetCheckResult,
   TargetSummary,
   UpdateTargetInput,
-} from '@script-dashboard/shared';
-import { quote } from '@script-dashboard/shared';
+} from '@dashboard/shared';
+import { quote } from '@dashboard/shared';
 
 import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';

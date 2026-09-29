@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FileCode, Folder, FolderOpen } from 'lucide-react';
-import type { ScriptTreeNode } from '@script-dashboard/shared';
+import type { ScriptTreeNode } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 
 type FlatRow = {

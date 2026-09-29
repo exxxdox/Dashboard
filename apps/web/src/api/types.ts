@@ -1,6 +1,6 @@
-import type { ExecutionSummary } from '@script-dashboard/shared';
+import type { ExecutionSummary } from '@dashboard/shared';
 
-/** Endpoints whose response shapes are not exported from `@script-dashboard/shared`. */
+/** Endpoints whose response shapes are not exported from `@dashboard/shared`. */
 
 export type HealthResponse = {
   status: 'ok';
