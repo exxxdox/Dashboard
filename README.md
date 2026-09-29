@@ -42,7 +42,7 @@ services:
     environment:
       PORT: ${DASHBOARD_PORT:-50014}                # host 网络下这就是宿主端口
     volumes:
-      - ./data:/data                                 # 数据库 + 凭据加密密钥
+      - ${DATA_DIR_HOST:-./data}:/data               # 数据库 + 凭据加密密钥
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # 脚本目录（容器读它来克隆/扫描）
     user: "0:0"
 ```
@@ -62,6 +62,7 @@ services:
 | 变量 | 默认 | 含义 |
 |---|---|---|
 | `SCRIPT_ROOT_HOST` | — | 存放脚本的宿主机目录，挂载进容器供扫描。**必填** |
+| `DATA_DIR_HOST` | `./data` | 放数据库与密钥的宿主机目录，挂载到 `/data`。必须是本机文件系统，不能是网络盘 |
 | `PUID` / `PGID` | `1000` | 上述目录的属主。容器接管挂载点属主后降权到该用户 |
 | `DASHBOARD_PORT` | `50014` | 监听端口。host 网络下即宿主端口，必须本机空闲 |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | 未设 | 登录凭据，**必须同时设置**；不设则开放访问（启动告警） |

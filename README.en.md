@@ -42,7 +42,7 @@ services:
     environment:
       PORT: ${DASHBOARD_PORT:-50014}                # under host networking this is the host port
     volumes:
-      - ./data:/data                                 # database + credential encryption key
+      - ${DATA_DIR_HOST:-./data}:/data               # database + credential encryption key
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # script directory (read for clone/scan)
     user: "0:0"
 ```
@@ -62,6 +62,7 @@ Set in `.env`; the full example is `.env.example`:
 | Variable | Default | Meaning |
 |---|---|---|
 | `SCRIPT_ROOT_HOST` | — | Host directory holding the scripts, mounted in for scanning. **Required** |
+| `DATA_DIR_HOST` | `./data` | Host directory holding the database and key, mounted at `/data`. Must be a local filesystem, never a network share |
 | `PUID` / `PGID` | `1000` | Owner of that directory. The container takes ownership of the mounts, then drops to this user |
 | `DASHBOARD_PORT` | `50014` | Listen port. Under host networking this is the host port, so it must be free on the machine |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | unset | Sign-in credentials, **set both or neither**; unset runs open (with a boot warning) |

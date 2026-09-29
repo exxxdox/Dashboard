@@ -41,6 +41,8 @@ services:
     container_name: dashboard
     network_mode: host
     restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
     init: true
     env_file:
       - .env
@@ -54,7 +56,11 @@ services:
     volumes:
       # SQLite database, the generated encryption key, and -- from the merge --
       # the DNS provider credentials, which are encrypted with the same key.
-      - ./data:/data
+      # The host side is a variable for the same reason SCRIPT_ROOT_HOST is, and
+      # it has to stay on a local filesystem: SQLite WAL does not work on a
+      # network share. The container side stays /data, which is what the app and
+      # the entrypoint expect.
+      - ${DATA_DIR_HOST:-./data}:/data
       # Where the container clones and reads scripts from. This is only how
       # they get *in*: a run uploads the script to the target and deletes it
       # there, so no target needs this directory mounted.
