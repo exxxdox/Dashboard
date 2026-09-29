@@ -1,83 +1,49 @@
-# The compose file this project ships, and the one a machine runs. Its defaults
-# are what a single-host install needs: put a `.env` beside it and
-# `docker compose up -d --build` is the whole procedure.
-#
-# What is local to one machine -- the image name, the container name, a port
-# that host already uses -- goes in `compose.override.yaml`. Compose merges that
-# file over this one automatically, and it is in .gitignore. Editing this file
-# instead turns every local difference into a merge conflict on the next update.
-#
-# The whole application: one process serving the API, the web client and the
-# scheduled IPv6 DNS check. Both former projects are merged into it, so there is
-# nothing else to start.
-#
-# Host networking, not published ports. The DNS console has to reach the
-# public internet over the *host's* native IPv6 -- the address it detects and
-# writes into the AAAA record is the host's own, and a bridge network would
-# report a different one. Two consequences worth remembering: the container's
-# PORT is the host's port (nothing is mapped, so it can collide with anything
-# already listening), and `ports:` cannot be used here at all, because it is
-# mutually exclusive with `network_mode`.
+# The compose file a machine runs, with defaults for a single-host install.
+# Values local to one machine -- image name, container name, a port already taken -- go in the `compose.override.yaml` beside this file.
+# Compose merges that file over this one automatically, and .gitignore keeps it out of the repository.
+# One process serves the API, the web client and the scheduled IPv6 DNS check; there is nothing else to start.
+# Host networking, not published ports: the DNS check must leave through the host's own IPv6.
+# Two consequences: the container's port is the host's port, and `ports:` cannot be used at all.
+# Every setting below is described in .env.example.
 name: dashboard
 
 services:
   dashboard:
     build:
       context: .
+      # Build arguments: what the image is built with, not what the container runs with.
       args:
-        # Match the owner of SCRIPT_ROOT_HOST so cloned repositories are
-        # writable here and readable by the SSH target on the host.
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-        # Only needed when the official mirrors are unreachable from this
-        # network. ALPINE_MIRROR takes a host name only; NPM_REGISTRY takes a
-        # full URL ending in /npm/.
         ALPINE_MIRROR: ${ALPINE_MIRROR:-dl-cdn.alpinelinux.org}
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
-        # false leaves git out of the image: about 10 MB smaller, and GitHub
-        # sources stop being syncable while local ones keep working.
         WITH_GIT: ${WITH_GIT:-true}
     image: dashboard:local
     container_name: dashboard
     network_mode: host
-    restart: unless-stopped
     extra_hosts:
       - host.docker.internal:host-gateway
+    restart: unless-stopped
     init: true
     env_file:
       - .env
     environment:
-      # The listen port. Under host networking this is the host port, so it has
-      # to be free on the machine itself. Set explicitly rather than letting a
-      # stray PORT from the host environment reach the container.
+      # Set here as well so a stray PORT from the host environment cannot reach the container.
       PORT: ${DASHBOARD_PORT:-50014}
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
     volumes:
-      # SQLite database, the generated encryption key, and -- from the merge --
-      # the DNS provider credentials, which are encrypted with the same key.
-      # The host side is a variable for the same reason SCRIPT_ROOT_HOST is, and
-      # it has to stay on a local filesystem: SQLite WAL does not work on a
-      # network share. The container side stays /data, which is what the app and
-      # the entrypoint expect.
+      # Both container paths are fixed: the app's DATA_DIR and SCRIPT_ROOT_CONTAINER defaults point at them.
       - ${DATA_DIR_HOST:-./data}:/data
-      # Where the container clones and reads scripts from. This is only how
-      # they get *in*: a run uploads the script to the target and deletes it
-      # there, so no target needs this directory mounted.
+      # A run uploads the script to the target and deletes it there, so no target needs this directory mounted.
       - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace
-    # Started as root on purpose: the entrypoint chowns the two bind mounts to
-    # PUID:PGID and then drops to that uid for the rest of the process's life.
-    # Running directly as PUID:PGID cannot work on a fresh clone -- Docker
-    # creates ./data as root, so the app dies on startup with
-    # `EACCES: permission denied, open '/data/secret.key'` and no way to recover.
+    # Root for the first instant only: the entrypoint chowns both mounts to PUID:PGID, then drops to it.
+    # Starting directly as PUID:PGID cannot work on a fresh clone, where Docker has already created ./data as root.
     user: "0:0"
-    # No healthcheck here: the image's own one already builds its URL from
-    # PORT, so overriding it would only create a second place to forget when
-    # the port changes.
+    # No healthcheck here: the image's own one already builds its URL from PORT.
     logging:
       driver: json-file
       options:
-        # The health check hits the API every 30 seconds, and long runs stream
-        # their output through it; json-file has no default cap.
+        # json-file has no default cap, and the health check plus streamed run output would grow without bound.
         max-size: "10m"
         max-file: "3"
