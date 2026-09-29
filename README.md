@@ -23,7 +23,8 @@ English: [README.en.md](README.en.md)
 ## 快速开始
 
 ```bash
-cp .env.example .env      # 至少改 SCRIPT_ROOT_HOST 与 PUID/PGID
+cp .env.example .env                  # 至少改 SCRIPT_ROOT_HOST 与 PUID/PGID
+cp compose.yaml.example compose.yaml  # 镜像名与挂载按本机改；该文件不入库
 docker compose up -d --build
 ```
 
@@ -31,7 +32,7 @@ docker compose up -d --build
 
 ## docker compose
 
-仓库的 `compose.yaml` 是模板，要点就这几行：
+仓库的 `compose.yaml.example` 是模板（复制成 `compose.yaml` 后按本机改，该文件已加入 `.gitignore`），要点就这几行：
 
 ```yaml
 services:

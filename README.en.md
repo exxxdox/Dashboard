@@ -23,7 +23,8 @@ This project pulls that back into one place:
 ## Quick start
 
 ```bash
-cp .env.example .env      # change SCRIPT_ROOT_HOST and PUID/PGID at least
+cp .env.example .env                  # change SCRIPT_ROOT_HOST and PUID/PGID at least
+cp compose.yaml.example compose.yaml  # adjust image name and mounts; it is not committed
 docker compose up -d --build
 ```
 
@@ -31,7 +32,7 @@ Open `http://<host address>:50014` (or whatever `DASHBOARD_PORT` says in `.env`)
 
 ## docker compose
 
-The repository's `compose.yaml` is the template; the parts that matter are these:
+The repository's `compose.yaml.example` is the template -- copy it to `compose.yaml` and adjust it, since that file is in `.gitignore`. The parts that matter are these:
 
 ```yaml
 services:

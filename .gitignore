@@ -26,3 +26,9 @@ Thumbs.db
 .claude/
 # Personal deployment notes: image tags, host paths, ports. Same reasoning.
 CLAUDE.local.md
+
+# The compose file a machine actually runs: its image name, container name and
+# mount paths are local, and the port it publishes is the one that machine uses.
+# `compose.yaml.example` is the template that is committed -- copy it to
+# `compose.yaml` and adjust.
+/compose.yaml
