@@ -22,7 +22,7 @@ const PAGE_SIZE = 25;
  * out of line with its heading.
  */
 const GRID_COLUMNS =
-  'grid-cols-[9.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[10rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]';
+  'grid-cols-[13.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[13.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]';
 
 function readPage(search: URLSearchParams): number {
   const raw = Number(search.get('page'));
@@ -93,17 +93,24 @@ export function DnsHistoryTable({ search }: { search: URLSearchParams }) {
                 role="row"
                 className={`border-line grid ${GRID_COLUMNS} items-center gap-3 border-b px-1 py-3 last:border-b-0`}
               >
-                <span className="mono text-mute text-meta" title={formatDateTime(check.at, locale)}>
-                  {formatRelative(check.at, t)}
-                </span>
+                {/* The exact moment rather than how long ago: this table is the
+                    record someone reads to reconstruct what happened, and an
+                    age cannot be compared with a provider's audit log or with
+                    another row. `formatRelative` stays in the summary above,
+                    where "when did it last change" is the question. */}
+                <span className="mono text-mute text-meta">{formatDateTime(check.at, locale)}</span>
                 <span className="text-mute text-meta">{sourceLabel(t, check.source)}</span>
                 <span className={check.ok ? 'text-ok text-meta' : 'text-danger text-meta'}>
                   {resultLabel(t, check.action)}
                 </span>
-                <span className="mono text-ink text-meta truncate">
+                {/* Wrapped rather than clipped: an address is 39 characters of
+                    colon-separated hex and a previous value can be any record
+                    content, so an ellipsis here hides the one field this table
+                    exists to show. */}
+                <span className="mono text-ink text-meta break-all">
                   {check.ipv6 === '' ? t('common.dash') : check.ipv6}
                 </span>
-                <span className="mono text-faint text-meta truncate">
+                <span className="mono text-faint text-meta break-all">
                   {check.previousValue ?? t('common.dash')}
                 </span>
                 <span className="text-faint text-meta hidden truncate xl:block">
