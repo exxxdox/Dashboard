@@ -113,8 +113,16 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               )}
             </Stat>
             <Stat label="Detected at" mono>
-              {formatRelative(data.ipv6CheckedAt)}
-              <span className="text-faint ml-2">{formatDateTime(data.ipv6CheckedAt)}</span>
+              {/* Both formatters answer '—' for null, which would print as two
+                  of them side by side; the empty case says so once instead. */}
+              {data.ipv6CheckedAt === null ? (
+                <span className="text-faint">Not yet</span>
+              ) : (
+                <>
+                  {formatRelative(data.ipv6CheckedAt)}
+                  <span className="text-faint ml-2">{formatDateTime(data.ipv6CheckedAt)}</span>
+                </>
+              )}
             </Stat>
             <Stat label="Provider">
               {settings === null ? (
@@ -131,10 +139,16 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               )}
             </Stat>
             <Stat label="Queried at" mono>
-              {formatRelative(probe?.queriedAt ?? data.recordCheckedAt)}
-              <span className="text-faint ml-2">
-                {formatDateTime(probe?.queriedAt ?? data.recordCheckedAt)}
-              </span>
+              {(probe?.queriedAt ?? data.recordCheckedAt) === null ? (
+                <span className="text-faint">Not yet</span>
+              ) : (
+                <>
+                  {formatRelative(probe?.queriedAt ?? data.recordCheckedAt)}
+                  <span className="text-faint ml-2">
+                    {formatDateTime(probe?.queriedAt ?? data.recordCheckedAt)}
+                  </span>
+                </>
+              )}
             </Stat>
             <Stat label="Schedule">
               {data.schedule === null || !data.schedule.enabled ? (
