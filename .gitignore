@@ -8,12 +8,6 @@ coverage/
 data/
 .smoke/
 
-# The standalone Python implementation of the DNS console, kept on disk as the
-# reference the TypeScript port was written against. Deliberately outside version
-# control: it has its own repository, and nothing here builds, tests or deploys
-# it. Delete the directory when it stops being useful.
-/reference-impl/
-
 # Default script checkout directory, used when SCRIPT_ROOT_HOST is left at its
 # relative default. It holds cloned repositories, not project source.
 /workspace/
