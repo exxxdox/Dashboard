@@ -1,0 +1,105 @@
+# Script Dashboard
+
+Run the shell and PowerShell scripts you already have on your servers from a browser: fill in parameters, watch the output live, and keep a record of every run.
+
+中文: [README.md](README.md)
+
+---
+
+## Purpose
+
+Once you have more than a couple of servers, script maintenance turns into this: dozens of `.sh` files scattered across `/root`, `/srv` and `/opt` on each machine, no two versions matching; you SSH in before every run, and when the output scrolls away nothing is left behind; and the same script is not even the same file on two hosts.
+
+This project pulls that back into one place:
+
+- **A script has exactly one source.** Your scripts live in a git repository or a shared directory, and the dashboard clones and scans them. The copy on the machine is a temporary upload for the duration of a run and is deleted afterwards — the two sides cannot disagree.
+- **No SSH first.** One click runs it, parameters go into a form, output is pushed back to the browser live, and past runs stay searchable.
+- **Zero dependencies on the host.** A target needs an SSH service and a POSIX shell: no agent to install, no git, no directory to mount, no path shared with the container.
+- **Parameters never pass through the command line.** Declared parameters arrive as **environment variables**, never as argv, so a value can never be taken for a flag or a command. A script that reads positional arguments can choose `argv` mode explicitly, where values are quoted and escaped into the command line.
+- **What ran is what is recorded.** Every run records its target, parameters, exit code and full output.
+
+**What it is not.** Not an orchestrator (no DAG, no retry policy, no idempotence guarantee), not configuration management (it does not maintain a desired state on the targets), not CI (it does not watch git events and never runs anything by itself). It runs scripts you already have and keeps a record of it.
+
+## Quick start
+
+```bash
+cp .env.example .env      # change SCRIPT_ROOT_HOST and PUID/PGID at least
+docker compose up -d --build
+```
+
+Open `http://localhost:8080` (or whatever `DASHBOARD_PORT` says in `.env`). Then, in the UI: add a Target (the SSH host) → add a Source (where the scripts come from) → sync → run.
+
+## docker compose
+
+The repository's `docker-compose.yml` is the template; the parts that matter are these:
+
+```yaml
+services:
+  dashboard:
+    build: .
+    restart: unless-stopped
+    ports: ["${DASHBOARD_PORT:-8080}:8080"]         # published port
+    volumes:
+      - ./data:/data                                 # database + credential encryption key
+      - ${SCRIPT_ROOT_HOST:-./workspace}:/workspace  # script directory (read for clone/scan)
+    user: "0:0"
+```
+
+- **Back up `./data`.** It holds the SQLite database and `secret.key`. Lose the key and the stored SSH credentials cannot be decrypted — you would have to enter them again.
+- **`user: "0:0"` is root for the first instant only.** A bind mount shadows the ownership set in the image, so the entrypoint `chown`s both mounts to `PUID:PGID` and then drops the privilege — the dashboard process never runs as root. That is why `PUID`/`PGID` must match the owner of the script directory.
+- **A published port bypasses ufw** (the traffic goes through the FORWARD chain). To restrict who can reach it, bind a specific address, use the `DOCKER-USER` chain, or put it behind a reverse proxy.
+
+## Environment variables
+
+Set in `.env`; the full example is `.env.example`:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SCRIPT_ROOT_HOST` | — | Host directory holding the scripts, mounted in for scanning. **Required** |
+| `PUID` / `PGID` | `1000` | Owner of that directory. The container takes ownership of the mounts, then drops to this user |
+| `DASHBOARD_PORT` | `8080` | Published port |
+| `AUTH_USERNAME` / `AUTH_PASSWORD` | unset | Sign-in credentials, **set both or neither**; unset runs open (with a boot warning) |
+| `LOG_LEVEL` | `info` | `fatal`…`trace` |
+| `MAX_CONCURRENT_EXECUTIONS` | `4` | Scripts running at once, across all targets |
+| `MAX_CONCURRENT_PER_TARGET` | `2` | Scripts running at once on one target |
+| `DEFAULT_TIMEOUT_SEC` | `1800` | Used when neither the script nor the run sets a timeout |
+| `MAX_LOG_BYTES` | `5242880` | **Stored** output per run before it is marked truncated |
+| `RETENTION_DAYS` | `30` | Delete finished runs older than this; `0` keeps everything |
+| `SECRET_KEY` | generated | Base64 of 32 random bytes, used to encrypt SSH credentials |
+| `GIT_PROXY` | none | Proxy for cloning repositories, e.g. `http://192.168.1.10:7890`; git transport only |
+| `NPM_REGISTRY` / `ALPINE_MIRROR` | official | npm / Alpine mirror for the image build. `ALPINE_MIRROR` takes a **host name only** — a full URL breaks the build, and the mirror must serve alpine under `/alpine` |
+
+Two paths inside the container: `DATA_DIR` (`/data`) holds the database and key, `SCRIPT_ROOT_CONTAINER` (`/workspace`) is the mount point.
+
+## Writing scripts
+
+Any `.sh` / `.ps1` file in a source is picked up (run with `bash` and `pwsh` respectively; `pwsh` must be installed on the target). The **leading** comment block becomes a form in the UI:
+
+```bash
+# @name Deploy API
+# @timeout 600
+# @param ENV required Target environment
+# @param REPLICAS type=number default=3 How many replicas
+```
+
+Declared parameters arrive as **environment variables**. Values the header does not declare can be added in the run form, one row at a time: `env` (an environment variable, whose name must be a shell identifier) or `argv` (positional arguments `$1`, `$2` …, in row order, where the name is only a label). Each script's form remembers what was last typed into it.
+
+## Limitations
+
+- One instance. SQLite in WAL mode and an in-process queue mean the API is not horizontally scalable.
+- **Sign-in is off by default.** Without `AUTH_USERNAME`/`AUTH_PASSWORD` the dashboard runs open (it says so at boot); setting only one is a startup error.
+- Even with sign-in on, the traffic is **plain HTTP** unless a TLS proxy sits in front; anyone who can watch the LAN can lift the session cookie.
+- **SSH host keys are not verified** — the connection trusts whatever key the host presents.
+- **Public GitHub repositories only**; cloning is unauthenticated HTTPS.
+- **Only the entry script is uploaded.** `source ./lib.sh`, `cd "$(dirname "$0")"` and a `.psm1` beside the script do not work: they resolve relative to the staged file in `/tmp`, not to your working directory.
+- **Every run on a target shares one working directory**, and two may run at once, so two scripts writing the same output file overwrite each other.
+- **A restart interrupts** queued and running work (the scripts themselves keep running on the host and are then reported as `interrupted`).
+- **Cancelling depends on `setsid`**; where it is missing, only the script process is killed, not the children it spawned.
+- Stored output is capped by `MAX_LOG_BYTES`; past that the run is marked truncated.
+- Database migrations are **forward-only** — back up `data/` before upgrading.
+- `.ps1` scripts need `pwsh` installed on the target.
+- The image is not minimal: it carries the server's production dependency tree, `git` and `ca-certificates`.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

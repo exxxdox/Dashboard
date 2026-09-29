@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/coverage
+data
+.smoke
+.git
+.github
+*.log
+.env
+.env.*
+!.env.example

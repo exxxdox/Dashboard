@@ -1,0 +1,24 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# pnpm blocks dependency build scripts by default. Only esbuild needs approval:
+# its install script places the platform binary the bundler executes.
+#
+# better-sqlite3, ssh2 and cpu-features are deliberately NOT listed. Approving a
+# package that ships a `binding.gyp` makes pnpm run `node-gyp rebuild` even when
+# the package declares `"gypfile": false`, which needs a Python toolchain:
+#   * better-sqlite3 needs no build at all -- its prebuilds ship inside the
+#     published tarball and are what `lib/binding.js` loads. The rebuild produces
+#     no binary and only breaks images that have no compiler.
+#   * cpu-features fails outright without a compiler, and ssh2 treats it as
+#     optional.
+#   * ssh2's own binding is a performance extra; it falls back to pure JS.
+# pnpm 11 replaced `onlyBuiltDependencies` with this map form, and records an
+# explicit `false` rather than omitting the key -- an omitted package leaves the
+# decision pending, which fails an install with ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  better-sqlite3: false
+  cpu-features: false
+  esbuild: true
+  ssh2: false

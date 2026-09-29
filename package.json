@@ -1,0 +1,23 @@
+{
+  "name": "script-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm --filter @script-dashboard/shared build && pnpm --filter @script-dashboard/server build && pnpm --filter @script-dashboard/web build",
+    "dev": "pnpm --filter @script-dashboard/shared build && pnpm -r --parallel dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "start": "node apps/server/dist/index.js",
+    "dbuild": "docker build -t script-dashboard:local . --build-arg NPM_REGISTRY=https://mirrors.cloud.tencent.com/npm/ --build-arg ALPINE_MIRROR=mirrors.cloud.tencent.com"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  },
+  "description": "Self-hosted dashboard for running shell and PowerShell scripts on remote Linux hosts over SSH, with live and historical execution output.",
+  "license": "MIT"
+}

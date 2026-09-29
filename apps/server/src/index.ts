@@ -1,0 +1,167 @@
+/**
+ * Process entry point: assemble the object graph, start serving, shut down
+ * cleanly.
+ *
+ * Everything is constructed here and injected downwards, so there is exactly one
+ * place that decides how a database, an encryption key, and a queue are built --
+ * and exactly one place a test has to replace to run the whole thing on fakes.
+ */
+
+import { buildApp } from './app.js';
+import { loadConfig } from './config.js';
+import type { AppContext } from './context.js';
+import { openDatabase } from './db/client.js';
+import { createAuthenticator, createLoginThrottle } from './lib/auth.js';
+import { createSecretBox, resolveSecretKey } from './lib/crypto.js';
+import { createLogger } from './lib/logger.js';
+import { createQueue } from './runner/queue.js';
+import { createExecutionRunner } from './runner/runner.js';
+import { createExecutionService, type ExecutionService } from './services/executions.js';
+import { createExecutionHub } from './ws/hub.js';
+
+/** How often retention runs. Daily is plenty for a self-hosted dashboard. */
+const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** How long running scripts are given to finish after a shutdown signal. */
+const SHUTDOWN_GRACE_MS = 10_000;
+
+async function main(): Promise<void> {
+  const config = loadConfig();
+  const logger = createLogger({ level: config.logLevel, pretty: config.logPretty });
+
+  if (!config.scriptRootContainer.startsWith('/')) {
+    logger.warn(
+      { scriptRootContainer: config.scriptRootContainer },
+      'SCRIPT_ROOT_CONTAINER is not absolute. That is only correct for local development; ' +
+        'in a container it is the mount point and must be an absolute path such as /workspace.',
+    );
+  }
+
+  const keyResolution = resolveSecretKey(config.dataDir, config.secretKey);
+  if (keyResolution.source === 'generated') {
+    logger.warn(
+      { path: keyResolution.path },
+      'generated a new encryption key; back it up alongside the database or stored credentials become unrecoverable',
+    );
+  }
+
+  const db = openDatabase(config.databaseFile);
+  const box = createSecretBox(keyResolution.key);
+  const hub = createExecutionHub();
+
+  const auth = createAuthenticator({
+    username: config.authUsername,
+    password: config.authPassword,
+  });
+  if (!auth.enabled) {
+    // Not fatal: local development and the container's first run both start
+    // without credentials, and refusing would be a worse default than saying so.
+    logger.warn(
+      'AUTH_USERNAME and AUTH_PASSWORD are not set: the dashboard is open to anyone who can reach it',
+    );
+  }
+
+  let shuttingDown = false;
+
+  const queue = createQueue({
+    concurrency: config.maxConcurrentExecutions,
+    perKeyConcurrency: config.maxConcurrentPerTarget,
+    onEvent: (event) => {
+      if (event.type === 'settled' && event.outcome === 'failed') {
+        logger.warn({ executionId: event.id }, 'execution task failed outside the runner');
+      }
+    },
+  });
+
+  // The runner publishes updated rows and the execution service owns the
+  // queries, so the two reference each other. Resolving it lazily through this
+  // closure avoids a module cycle while keeping both dependencies explicit.
+  let executions!: ExecutionService;
+
+  const runner = createExecutionRunner({
+    db,
+    hub,
+    logger,
+    maxLogBytes: config.maxLogBytes,
+    loadSummary: (executionId) => executions.get(executionId),
+  });
+
+  executions = createExecutionService({ db, box, config, hub, logger, runner, queue });
+
+  const ctx: AppContext = {
+    config,
+    db,
+    box,
+    logger,
+    hub,
+    queue,
+    runner,
+    executions,
+    auth,
+    loginThrottle: createLoginThrottle(),
+    isShuttingDown: () => shuttingDown,
+  };
+
+  // Anything the previous process left mid-flight is not running any more, and
+  // reporting otherwise would strand the UI on a run that will never finish.
+  executions.markInterrupted();
+  executions.prune();
+
+  const pruneTimer = setInterval(() => {
+    try {
+      executions.prune();
+    } catch (error) {
+      logger.warn({ err: error }, 'retention prune failed');
+    }
+  }, PRUNE_INTERVAL_MS);
+  // Do not hold the process open purely for the timer.
+  pruneTimer.unref();
+
+  const app = await buildApp(ctx);
+
+  const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, 'shutting down');
+
+    clearInterval(pruneTimer);
+
+    // Stop accepting work first, then give the queue a bounded window to finish.
+    // Runs that do not finish are reported as interrupted on the next boot.
+    try {
+      await app.close();
+    } catch (error) {
+      logger.warn({ err: error }, 'error while closing the HTTP server');
+    }
+
+    const deadline = Date.now() + SHUTDOWN_GRACE_MS;
+    while ((queue.activeCount > 0 || queue.pendingCount > 0) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    db.close();
+    logger.info('shutdown complete');
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
+
+  await app.listen({ port: config.port, host: config.host });
+
+  logger.info(
+    {
+      port: config.port,
+      dataDir: config.dataDir,
+      scriptRoot: config.scriptRootContainer,
+      keySource: keyResolution.source,
+      maxConcurrentExecutions: config.maxConcurrentExecutions,
+    },
+    'script dashboard ready',
+  );
+}
+
+main().catch((error: unknown) => {
+  // At this point no logger is guaranteed to exist, so go to stderr directly.
+  console.error('Failed to start:', error instanceof Error ? error.message : error);
+  process.exit(1);
+});

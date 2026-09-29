@@ -1,0 +1,24 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Runtime state: SQLite database, generated key, local smoke-test scratch.
+data/
+.smoke/
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+*.log
+
+# Local agent state and working plans. These describe how the work was done on
+# one machine rather than what the project is, so they stay out of the repo.
+# Use `git add -f` if a file here is ever meant to be shared.
+.claude/
+# Personal deployment notes: image tags, host paths, ports. Same reasoning.
+CLAUDE.local.md

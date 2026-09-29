@@ -1,0 +1,312 @@
+@import 'tailwindcss';
+
+/* ------------------------------------------------------------------------- */
+/* Tokens                                                                    */
+/*                                                                           */
+/* Raw custom properties are the source of truth so they can be read from    */
+/* plain CSS (xterm theme, component classes) as well as Tailwind utilities. */
+/* @theme `inline` below only exposes them to Tailwind.                      */
+/* ------------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces step by lift, not by border weight: the hairline separates, the
+     lighter surface is what says "this is above that". */
+  --bg: #0b0e13;
+  --surface: #12171f;
+  --surface-2: #1a212b;
+  --surface-3: #232c38;
+  --border: #222b36;
+  --border-strong: #38465a;
+
+  --text: #e6edf4;
+  --muted: #9dabb9;
+  --faint: #7b8a97;
+
+  --accent: #f0a92c;
+  --accent-ink: #1a1204;
+  --accent-soft: rgb(240 169 44 / 14%);
+  --accent-line: rgb(240 169 44 / 42%);
+
+  --ok: #4fbf8b;
+  --warn: #e8c256;
+  --danger: #f0736c;
+  --info: #86a6cf;
+
+  /* Elevation is subtle on purpose: on a dark surface a shadow reads as a
+     smudge, so the top hairline carries most of the "lifted" signal. */
+  --sheen: inset 0 1px 0 rgb(255 255 255 / 4%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 12px 32px -12px rgb(0 0 0 / 70%);
+  --shadow-accent: 0 8px 24px -10px rgb(240 169 44 / 55%);
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* No web fonts: the container is expected to be offline. */
+  --stack-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --stack-mono: ui-monospace, 'Cascadia Mono', 'Cascadia Code', 'JetBrains Mono', 'SFMono-Regular',
+    Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+@theme inline {
+  --color-base: var(--bg);
+  --color-panel: var(--surface);
+  --color-panel-2: var(--surface-2);
+  --color-panel-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+
+  --color-ink: var(--text);
+  --color-mute: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --font-sans: var(--stack-sans);
+  --font-mono: var(--stack-mono);
+
+  /* One type scale, named by role. Every size in the app comes from here, so
+     the next "make it bigger" is one edit rather than a sweep of arbitrary
+     values scattered across the pages. */
+  --text-micro: 0.8125rem;
+  --text-micro--line-height: 1.4;
+  --text-meta: 0.875rem;
+  --text-meta--line-height: 1.5;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.55;
+  --text-lead: 1rem;
+  --text-lead--line-height: 1.5;
+  --text-brand: 1.25rem;
+  --text-brand--line-height: 1.1;
+  /* 1.25 rather than something tighter: both sizes are used on headings that
+     truncate, and `overflow: hidden` clips to the line box. Anything under the
+     glyph's own height cuts the descenders -- the "g" in Targets, the "p" in a
+     script path. */
+  --text-title: 1.625rem;
+  --text-title--line-height: 1.25;
+  --text-display: 2rem;
+  --text-display--line-height: 1.25;
+  --text-stat: 2.25rem;
+  --text-stat--line-height: 1;
+
+  --shadow-sheen: var(--sheen);
+  --shadow-card: var(--shadow-sm);
+  --shadow-float: var(--shadow-md);
+  --shadow-glow: var(--shadow-accent);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+  }
+
+  body {
+    margin: 0;
+    /* Two faint off-screen lights keep the flat near-black from reading as a
+       dead panel. Fixed, so the atmosphere does not travel with long logs. */
+    background:
+      radial-gradient(1100px 560px at 12% -12%, rgb(240 169 44 / 6%), transparent 62%),
+      radial-gradient(900px 520px at 100% 0%, rgb(120 160 220 / 6%), transparent 58%), var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--stack-sans);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /*
+   * Shared styling for form controls.
+   *
+   * This lives in the components layer on purpose: any utility the caller adds
+   * (`w-[152px]`, `mono`, …) is in the utilities layer and therefore wins. The
+   * base width is a default, not a decision made on the caller's behalf.
+   */
+  .control {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--surface-2);
+    padding: 0.5625rem 0.8125rem;
+    color: var(--text);
+    transition:
+      border-color 150ms var(--ease),
+      background-color 150ms var(--ease);
+  }
+
+  .control::placeholder {
+    color: var(--faint);
+  }
+
+  .control:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background: var(--surface-3);
+  }
+
+  .control:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .control:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Machine data: paths, commands, ids, codes, parameter values. */
+  .mono {
+    font-family: var(--stack-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'calt' 0;
+  }
+
+  /* Field and section labels borrow the shell's voice: terse, uppercase. */
+  .label {
+    font-family: var(--stack-mono);
+    font-size: 0.75rem;
+    line-height: 1.2;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Raised surface. Every panel-shaped container uses this, so "a card" has
+     one definition instead of an ad-hoc border per component. */
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--surface);
+    box-shadow: var(--sheen), var(--shadow-sm);
+  }
+
+  /* The terminal panel gets a whisper of scanline: enough to read as a
+     phosphor surface, not enough to fight the text on top of it. */
+  .scanlines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 1.6%) 0 1px,
+      transparent 1px 3px
+    );
+  }
+
+  .dot-live::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+    animation: dot-pulse 1.8s ease-out infinite;
+  }
+
+  /* The run rail: a full-height line whose colour IS the run's state. */
+  .rail-live::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    height: 30%;
+    background: rgb(255 255 255 / 55%);
+    animation: rail-travel 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .row-active {
+    background: var(--surface-2);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+}
+
+@keyframes dot-pulse {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+
+@keyframes rail-travel {
+  0% {
+    transform: translateY(-110%);
+  }
+  100% {
+    transform: translateY(340%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 160ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
