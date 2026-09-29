@@ -80,6 +80,51 @@ function installAuthGuard(app: FastifyInstance, ctx: AppContext): void {
   });
 }
 
+/**
+ * Security headers, sent with every response.
+ *
+ * This console can rewrite a DNS record, so being frameable is not academic:
+ * clickjacking a "check and update" button costs someone their domain's
+ * address. Nothing was sent before this -- the guard and the API's shapes were
+ * the whole of it.
+ *
+ * `style-src` needs `'unsafe-inline'` because the terminal renders through
+ * xterm, which injects style elements. That is weaker than the strict
+ * `default-src 'none'` the standalone DNS console could afford, which was only
+ * possible because it was hand-written HTML with no framework; it is a good deal
+ * stronger than no policy at all.
+ *
+ * `form-action 'none'` is safe here: the client's forms call preventDefault and
+ * send their own requests.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  // The execution stream is a same-origin WebSocket.
+  "connect-src 'self'",
+  "form-action 'none'",
+  "base-uri 'none'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+function installSecurityHeaders(app: FastifyInstance): void {
+  app.addHook('onSend', (request, reply, payload, done) => {
+    void reply.header('content-security-policy', CONTENT_SECURITY_POLICY);
+    void reply.header('x-content-type-options', 'nosniff');
+    void reply.header('x-frame-options', 'DENY');
+    void reply.header('referrer-policy', 'no-referrer');
+    // API answers are never cacheable: they carry the live state of a page that
+    // holds credentials. Hashed static assets are left alone so the browser can
+    // keep them.
+    if (request.url.startsWith('/api')) void reply.header('cache-control', 'no-store');
+    done(null, payload);
+  });
+}
+
 export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // Widen to Fastify's own logger interface before handing it over. Passing the
   // concrete pino type makes Fastify *infer* an instance parameterised by pino's
@@ -94,6 +139,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
     // Script sources can be large, but a request body never legitimately is.
     bodyLimit: 2 * 1024 * 1024,
   });
+
+  // Installed before anything can answer, so no response can miss it.
+  installSecurityHeaders(app);
 
   await app.register(fastifyWebsocket);
 

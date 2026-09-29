@@ -58,17 +58,32 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: AppContext): void 
     if (!auth.enabled) return { required: false, signedIn: true };
 
     const address = request.ip;
-    if (loginThrottle.isLocked(address, Date.now())) {
-      // 429 rather than 401: this caller is not necessarily wrong, they are
-      // being told to stop guessing for a while.
-      void reply.header('retry-after', '900');
-      throw new RateLimitedError();
-    }
-
     const input = loginSchema.parse(request.body);
+    const now = Date.now();
+
+    // The credentials are checked *before* the lock, and a correct password
+    // always gets in.
+    //
+    // Behind a reverse proxy every client shares one source address -- there is
+    // no `trustProxy` here on purpose, because X-Forwarded-For is client
+    // forgeable and trusting it would switch this limiter off. Deciding on the
+    // lock first therefore means five wrong guesses by anyone lock out everyone
+    // for fifteen minutes, and a few requests per window sustain that forever.
+    //
+    // Checking credentials first does not weaken brute-force resistance: an
+    // attacker without the password never reaches the branch below that issues a
+    // session.
     if (!auth.checkCredentials(input.username, input.password)) {
-      loginThrottle.recordFailure(address, Date.now());
+      loginThrottle.recordFailure(address, now);
       logger.warn({ address }, 'failed sign-in attempt');
+      if (loginThrottle.isLocked(address, now)) {
+        // 429 rather than 401: this caller is not necessarily wrong, they are
+        // being told to stop guessing for a while. The body is parsed before
+        // this point, so a malformed request from a locked address answers 422
+        // instead -- the price of the rule above, and the cheaper of the two.
+        void reply.header('retry-after', '900');
+        throw new RateLimitedError();
+      }
       throw new UnauthorizedError('That username and password do not match');
     }
 
