@@ -32,7 +32,6 @@ const en = {
   'dns.noRecord':
     'The provider has no AAAA record for this name yet. A check creates one on Cloudflare; Alibaba Cloud is never allowed to create one.',
 
-  'dns.result.title': 'Result',
   'dns.result.notificationFailed':
     'The record was updated, but the Gotify notification could not be sent.',
 
@@ -56,8 +55,6 @@ const en = {
   'dns.form.interval': 'Interval (minutes)',
   'dns.form.intervalHint': 'A check that finds the same address writes nothing.',
   'dns.form.save': 'Save settings',
-  'dns.form.saved': 'Settings saved.',
-  'dns.form.cleared': '{name} cleared.',
   'dns.form.blockedClear': 'The selected provider still needs this credential.',
 
   // -- the settings dialog -------------------------------------------------
@@ -147,7 +144,6 @@ const zh: Record<keyof typeof en, string> = {
   'dns.noRecord':
     '服务商上还没有这个域名的 AAAA 记录。Cloudflare 会由检查自动创建；阿里云则永远不会创建。',
 
-  'dns.result.title': '执行结果',
   'dns.result.notificationFailed': '记录已更新，但 Gotify 通知发送失败。',
 
   'dns.settings.title': '设置',
@@ -169,8 +165,6 @@ const zh: Record<keyof typeof en, string> = {
   'dns.form.interval': '检查间隔（分钟）',
   'dns.form.intervalHint': '若检查发现地址未变，则不会写入任何内容。',
   'dns.form.save': '保存设置',
-  'dns.form.saved': '设置已保存。',
-  'dns.form.cleared': '已清除{name}。',
   'dns.form.blockedClear': '当前选中的服务商仍需要该凭据。',
 
   'dns.action.settings': '设置',

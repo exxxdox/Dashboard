@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FolderGit2, FolderTree, Pencil, Plus, RefreshCw, Trash } from 'lucide-react';
-import type { SourceSummary, SyncResult } from '@dashboard/shared';
+import type { SourceSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -12,7 +12,6 @@ import { useDeleteSource, useSources, useSyncSource } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
 import { formatDateTime, formatRelative } from '../lib/format';
-import { navigate } from '../lib/router';
 import { SourceForm } from './SourceForm';
 
 export function SourcesPage() {
@@ -113,7 +112,6 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
   const remove = useDeleteSource();
   // Kept per row so the last sync's counts stay visible after the toast-less
   // mutation settles.
-  const [lastSync, setLastSync] = useState<SyncResult | null>(null);
 
   const Icon = source.kind === 'github' ? FolderGit2 : FolderTree;
 
@@ -164,9 +162,7 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             size="sm"
             icon={<RefreshCw className="size-4" aria-hidden />}
             loading={sync.isPending}
-            onClick={() =>
-              sync.mutate(source.id, { onSuccess: (result) => setLastSync(result) })
-            }
+            onClick={() => sync.mutate(source.id)}
           >
             {i18n.t('sources.syncNow')}
           </Button>
@@ -185,56 +181,7 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
       </div>
 
       {source.syncError !== null ? <ErrorBanner message={source.syncError} /> : null}
-      {sync.isError ? <ErrorBanner message={errorMessage(sync.error, i18n)} /> : null}
-      {remove.isError ? <ErrorBanner message={errorMessage(remove.error, i18n)} /> : null}
-
-      {lastSync ? (
-        <div className="border-line bg-panel-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2">
-          <SyncCount label={i18n.t('sources.sync.added')} value={lastSync.added} />
-          <SyncCount label={i18n.t('sources.sync.updated')} value={lastSync.updated} />
-          <SyncCount label={i18n.t('sources.sync.removed')} value={lastSync.removed} />
-          <span className="mono text-mute text-meta">
-            {i18n.t('sources.sync.total', { count: lastSync.total })}
-          </span>
-          {lastSync.warnings.length > 0 ? (
-            <span className="text-warn text-meta">
-              {i18n.t(
-                lastSync.warnings.length === 1
-                  ? 'sources.sync.warning.one'
-                  : 'sources.sync.warning.many',
-                { count: lastSync.warnings.length },
-              )}
-            </span>
-          ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="ml-auto"
-            onClick={() => navigate('/scripts')}
-          >
-            {i18n.t('sources.openScripts')}
-          </Button>
-        </div>
-      ) : null}
-
-      {lastSync && lastSync.warnings.length > 0 ? (
-        <ul className="grid gap-1">
-          {lastSync.warnings.map((warning) => (
-            <li key={warning} className="text-mute mono text-meta">
-              {warning}
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
 
-function SyncCount({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5">
-      <span className={`mono text-lead ${value > 0 ? 'text-ink' : 'text-faint'}`}>{value}</span>
-      <span className="label">{label}</span>
-    </span>
-  );
-}

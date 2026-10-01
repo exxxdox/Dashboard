@@ -7,10 +7,8 @@ import type {
   UpdateSourceInput,
 } from '@dashboard/shared';
 import { Button } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextInput } from '../components/Form';
 import { useCreateSource, useUpdateSource } from '../api/queries';
-import { errorMessage } from '../api/client';
 import { useI18n, type Translate } from '../lib/i18n';
 
 type FormState = {
@@ -228,8 +226,6 @@ export function SourceForm({
           {i18n.t('sources.form.editNote.after')}
         </p>
       ) : null}
-
-      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error, i18n)} /> : null}
 
       <div className="flex items-center gap-2">
         <Button

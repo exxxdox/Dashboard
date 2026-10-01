@@ -16,10 +16,8 @@ import type { DnsProviderName, DnsSettingsView, UpdateDnsSettingsInput } from '@
 import { Save } from 'lucide-react';
 
 import { Button } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, Switch, TextInput } from '../components/Form';
 import { SecretField } from '../components/SecretField';
-import { errorMessage } from '../api/client';
 import { useSaveDnsSettings } from '../api/queries';
 import { providerLabel } from '../lib/dns';
 import { useI18n } from '../lib/i18n';
@@ -68,13 +66,11 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
   const { t } = i18n;
   const save = useSaveDnsSettings();
   const [state, setState] = useState<FormState>(() => toFormState(settings));
-  const [notice, setNotice] = useState<string | null>(null);
 
   const isCloudflare = state.provider === 'cloudflare';
 
   function patch(next: Partial<FormState>): void {
     setState((current) => ({ ...current, ...next }));
-    setNotice(null);
   }
 
   /** Only credentials that say something are sent; blank means "keep". */
@@ -98,10 +94,10 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
 
   function submit(event: FormEvent): void {
     event.preventDefault();
-    setNotice(null);
+    // The save reports itself through a toast; what is left here is the part a
+    // toast cannot do.
     save.mutate(buildUpdate(), {
       onSuccess: () => {
-        setNotice(t('dns.form.saved'));
         // Empty the credential boxes: the server now holds those values, and
         // leaving them filled would make the next save look like a change.
         setState((current) => ({
@@ -113,10 +109,8 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
     });
   }
 
-  function clear(flag: 'clearCloudflareToken' | 'clearAlibabaAccessKeySecret', name: string): void {
-    save.mutate(buildUpdate({ [flag]: true }), {
-      onSuccess: () => setNotice(t('dns.form.cleared', { name })),
-    });
+  function clear(flag: 'clearCloudflareToken' | 'clearAlibabaAccessKeySecret'): void {
+    save.mutate(buildUpdate({ [flag]: true }));
   }
 
   return (
@@ -142,7 +136,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
             saved={settings?.hasCloudflareToken ?? false}
             value={state.cloudflareToken}
             onChange={(value) => patch({ cloudflareToken: value })}
-            onClear={() => clear('clearCloudflareToken', t('dns.form.cloudflareToken'))}
+            onClear={() => clear('clearCloudflareToken')}
             blockedReason={t('dns.form.blockedClear')}
             pending={save.isPending}
           />
@@ -188,7 +182,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
             value={state.alibabaAccessKeySecret}
             onChange={(value) => patch({ alibabaAccessKeySecret: value })}
             onClear={() =>
-              clear('clearAlibabaAccessKeySecret', t('dns.form.alibabaAccessKeySecret'))
+              clear('clearAlibabaAccessKeySecret')
             }
             blockedReason={t('dns.form.blockedClear')}
             pending={save.isPending}
@@ -228,12 +222,6 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         </Field>
       </div>
 
-      {save.isError ? <ErrorBanner message={errorMessage(save.error, i18n)} /> : null}
-      {notice === null ? null : (
-        <p role="status" className="text-ok text-meta">
-          {notice}
-        </p>
-      )}
 
       <div className="flex items-center gap-2">
         <Button

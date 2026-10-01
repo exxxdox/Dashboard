@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Save } from 'lucide-react';
 import type { ScriptSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Field, TextArea, TextInput } from '../components/Form';
 import { useUpdateScript } from '../api/queries';
-import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
 
 /**
@@ -110,8 +108,6 @@ export function ScriptMetadataForm({ script }: { script: ScriptSummary }) {
           )}
         </Field>
       </div>
-
-      {update.isError ? <ErrorBanner message={errorMessage(update.error, i18n)} /> : null}
 
       {/* The hint sits beside the button rather than in the dialog header: it is
           about this form's state, and the header is about what the dialog is. */}

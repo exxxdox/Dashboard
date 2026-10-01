@@ -4,6 +4,7 @@ import {
   MAX_TOASTS,
   TOAST_EXIT_MS,
   TOAST_TTL,
+  TOAST_TTL_DETAIL,
   clearToasts,
   dismissToast,
   getToasts,
@@ -42,6 +43,23 @@ describe('pushToast', () => {
 
     vi.advanceTimersByTime(1);
     expect(getToasts()).toHaveLength(0);
+  });
+
+  it('gives a row carrying a result the longer read', () => {
+    pushToast('updated', { detail: 'example.com → 2001:db8::1' });
+
+    vi.advanceTimersByTime(TOAST_TTL);
+    expect(getToasts()[0]?.leaving).toBe(false);
+
+    vi.advanceTimersByTime(TOAST_TTL_DETAIL - TOAST_TTL);
+    expect(getToasts()[0]?.leaving).toBe(true);
+  });
+
+  it('lets a caller override the lifetime either way', () => {
+    pushToast('sticky', { detail: 'a result', ttl: 1000 });
+
+    vi.advanceTimersByTime(1000);
+    expect(getToasts()[0]?.leaving).toBe(true);
   });
 
   it('keeps the stack bounded, dropping the oldest', () => {

@@ -580,6 +580,12 @@
     color: var(--toast-tone);
   }
 
+  .toast-body {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
   .toast-text {
     margin: 0;
     min-width: 0;
@@ -587,6 +593,21 @@
     font-size: var(--text-meta);
     line-height: 1.5;
     overflow-wrap: anywhere;
+  }
+
+  /* What the operation found. A step down in weight rather than in size: it is
+     a second sentence, not fine print, and it is often the part that decides
+     what someone does next. */
+  .toast-detail {
+    margin: 0;
+    min-width: 0;
+    color: var(--muted);
+    font-size: var(--text-micro);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    /* Callers compose this from several facts and separate them with newlines
+       when one line would be a paragraph. */
+    white-space: pre-line;
   }
 
   .toast-close {

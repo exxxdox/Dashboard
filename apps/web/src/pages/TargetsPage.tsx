@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pencil, Plug, Plus, Server, ShieldCheck, Trash, TriangleAlert } from 'lucide-react';
-import type { TargetCheckResult, TargetSummary } from '@dashboard/shared';
+import type { TargetSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
@@ -109,7 +109,6 @@ function TargetRow({ target, onEdit }: { target: TargetSummary; onEdit: () => vo
   const i18n = useI18n();
   const check = useCheckTarget();
   const remove = useDeleteTarget();
-  const result: TargetCheckResult | undefined = check.data;
 
   return (
     <div className="grid gap-3 px-4 py-4">
@@ -153,9 +152,8 @@ function TargetRow({ target, onEdit }: { target: TargetSummary; onEdit: () => vo
         </div>
       </div>
 
-      {check.isError ? <ErrorBanner message={errorMessage(check.error, i18n)} /> : null}
-      {remove.isError ? <ErrorBanner message={errorMessage(remove.error, i18n)} /> : null}
-      {result ? <CheckResultBlock result={result} /> : null}
+      {/* Both of these report through a toast, and a check reports what it
+          found there too -- the row's own stamp is the part worth keeping. */}
     </div>
   );
 }
@@ -185,77 +183,3 @@ function TargetCheckStamp({ target }: { target: TargetSummary }) {
   );
 }
 
-/**
- * A failed check is the loud case: the host answers, but it cannot provide what
- * a run needs, so every execution would fail at the point of starting.
- */
-function CheckResultBlock({ result }: { result: TargetCheckResult }) {
-  const i18n = useI18n();
-  const notReady = !result.workDirOk || !result.stagingOk;
-
-  return (
-    <div
-      className={cn(
-        'rounded-lg border px-3 py-2',
-        notReady ? 'border-danger bg-danger/10' : 'border-line bg-panel-2',
-      )}
-    >
-      {notReady ? (
-        <p className="text-danger mb-1.5 flex items-center gap-2 text-body font-semibold">
-          <TriangleAlert className="size-4 shrink-0" aria-hidden />
-          {i18n.t('targets.cannotRun')}
-        </p>
-      ) : null}
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <CheckFact label={i18n.t('targets.fact.reachable')} ok={result.reachable} />
-        <CheckFact label={i18n.t('targets.fact.workDir')} ok={result.workDirOk} />
-        <CheckFact label={i18n.t('targets.fact.staging')} ok={result.stagingOk} />
-        {result.latencyMs !== null ? (
-          <span className="mono text-mute text-meta">{result.latencyMs}ms</span>
-        ) : null}
-        {result.hostUser !== null ? (
-          <span className="mono text-mute text-meta">{result.hostUser}</span>
-        ) : null}
-        {result.hostShell !== null ? (
-          <span className="mono text-mute text-meta">{result.hostShell}</span>
-        ) : null}
-      </div>
-
-      {result.detail ? (
-        <p className={cn('mt-1.5 text-meta', notReady ? 'text-ink' : 'text-mute')}>
-          {result.detail}
-        </p>
-      ) : null}
-
-      {notReady ? (
-        <p className="text-mute mt-2 text-meta">
-          {i18n.t('targets.workDirNote.before')}
-          {/* The token is a config field name, so it is the same in every language. */}
-          <span className="mono text-ink"> workDir</span>
-          {i18n.t('targets.workDirNote.after')}
-        </p>
-      ) : null}
-
-      {/* Not blocking: runs still work, cancelling one is just less thorough. */}
-      {!result.hasSetsid ? (
-        <p className="text-warn mt-2 flex items-start gap-2 text-meta">
-          <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
-          <span>
-            <span className="mono">setsid</span> {i18n.t('targets.setsidNote')}
-          </span>
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function CheckFact({ label, ok }: { label: string; ok: boolean }) {
-  const i18n = useI18n();
-  return (
-    <span className={cn('inline-flex items-center gap-1.5 text-meta', ok ? 'text-ok' : 'text-danger')}>
-      <span className={cn('size-1.5 rounded-full', ok ? 'bg-ok' : 'bg-danger')} aria-hidden />
-      {label} {ok ? i18n.t('targets.fact.ok') : i18n.t('targets.fact.failed')}
-    </span>
-  );
-}

@@ -20,7 +20,6 @@ const en = {
   'toast.targetCreated': 'Host added',
   'toast.targetSaved': 'Host saved',
   'toast.targetDeleted': 'Host removed',
-  'toast.targetChecked': 'Host check complete',
 
   'toast.sourceCreated': 'Source added',
   'toast.sourceSaved': 'Source saved',
@@ -36,7 +35,6 @@ const en = {
   'toast.dnsSettingsSaved': 'DNS settings saved',
   'toast.dnsAddressDetected': 'Public address detected',
   'toast.dnsRecordQueried': 'Record queried',
-  'toast.dnsUpdateRan': 'Update finished',
 
   'toast.settingsSaved': 'Settings saved',
   'toast.notificationSent': 'Test message sent',
@@ -51,7 +49,6 @@ const zh: Record<keyof typeof en, string> = {
   'toast.targetCreated': '主机已添加',
   'toast.targetSaved': '主机已保存',
   'toast.targetDeleted': '主机已删除',
-  'toast.targetChecked': '主机检查完成',
 
   'toast.sourceCreated': '脚本源已添加',
   'toast.sourceSaved': '脚本源已保存',
@@ -67,7 +64,6 @@ const zh: Record<keyof typeof en, string> = {
   'toast.dnsSettingsSaved': 'DNS 设置已保存',
   'toast.dnsAddressDetected': '已探测到公网地址',
   'toast.dnsRecordQueried': '记录已查询',
-  'toast.dnsUpdateRan': '更新已完成',
 
   'toast.settingsSaved': '设置已保存',
   'toast.notificationSent': '测试消息已发送',

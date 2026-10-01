@@ -15,6 +15,18 @@ export type Toast = {
   id: number;
   tone: ToastTone;
   message: string;
+  /**
+   * What the operation actually found, when that is more than a confirmation.
+   *
+   * A run of the DNS console answers with an address it created or a reason it
+   * refused, and a check answers with which of a host's capabilities failed.
+   * That used to be a panel on the page; it is a second line here, because a
+   * result nobody asked to keep is not worth a permanent box.
+   *
+   * Newlines are honoured, so a caller with several lines of it does not have
+   * to compose one long sentence.
+   */
+  detail?: string;
   /** Total lifetime; the progress bar draws itself from this. */
   ttl: number;
   /** The exit animation is playing and the row is still mounted. */
@@ -25,11 +37,20 @@ export type Toast = {
 
 export type ToastOptions = {
   tone?: ToastTone;
+  detail?: string;
   ttl?: number;
 };
 
 /** Long enough to read a sentence, short enough that it is not furniture. */
 export const TOAST_TTL = 5200;
+
+/**
+ * A row carrying a result gets longer, because there is more to read: the
+ * headline says what happened and the line under it says what it found. The
+ * long form is implied by the detail rather than asked for at each call site,
+ * since every caller would pass the same number.
+ */
+export const TOAST_TTL_DETAIL = 8200;
 
 /** Matches `toast-out` in index.css: the row is dropped when it has played. */
 export const TOAST_EXIT_MS = 260;
@@ -107,11 +128,12 @@ function beginExit(id: number): void {
  * moves; when the stack is full it is the oldest that goes.
  */
 export function pushToast(message: string, options: ToastOptions = {}): number {
-  const ttl = options.ttl ?? TOAST_TTL;
+  const ttl = options.ttl ?? (options.detail === undefined ? TOAST_TTL : TOAST_TTL_DETAIL);
   const toast: Toast = {
     id: nextId++,
     tone: options.tone ?? 'info',
     message,
+    detail: options.detail,
     ttl,
     leaving: false,
     paused: false,

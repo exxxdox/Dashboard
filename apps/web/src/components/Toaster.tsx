@@ -64,7 +64,10 @@ function ToastRow({ toast, dismissLabel }: { toast: Toast; dismissLabel: string 
       onPointerLeave={() => resumeToast(toast.id)}
     >
       <Icon className="toast-icon" aria-hidden />
-      <p className="toast-text">{toast.message}</p>
+      <div className="toast-body">
+        <p className="toast-text">{toast.message}</p>
+        {toast.detail === undefined ? null : <p className="toast-detail">{toast.detail}</p>}
+      </div>
       <button
         type="button"
         className={cn('toast-close', 'focus-ring')}

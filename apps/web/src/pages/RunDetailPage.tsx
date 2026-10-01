@@ -143,12 +143,6 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
           </div>
         </header>
 
-        {cancel.isError ? (
-          <ErrorBanner className="mt-4" message={errorMessage(cancel.error, i18n)} />
-        ) : null}
-        {remove.isError ? (
-          <ErrorBanner className="mt-4" message={errorMessage(remove.error, i18n)} />
-        ) : null}
         {data.errorMessage ? (
           <ErrorBanner className="mt-4" message={data.errorMessage} />
         ) : null}

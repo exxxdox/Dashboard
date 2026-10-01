@@ -13,10 +13,8 @@ import type { AppSettingsView, UpdateAppSettingsInput } from '@dashboard/shared'
 import { Save, Send } from 'lucide-react';
 
 import { Button } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Field, TextInput } from '../components/Form';
 import { SecretField } from '../components/SecretField';
-import { errorMessage } from '../api/client';
 import { useSaveAppSettings, useTestNotification } from '../api/queries';
 import { cn } from '../lib/cn';
 import { formatDateTime } from '../lib/format';
@@ -38,11 +36,9 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
   const save = useSaveAppSettings();
   const test = useTestNotification();
   const [state, setState] = useState<FormState>(() => toFormState(settings));
-  const [notice, setNotice] = useState<string | null>(null);
 
   function patch(next: Partial<FormState>): void {
     setState((current) => ({ ...current, ...next }));
-    setNotice(null);
   }
 
   /** Only a credential that says something is sent; blank means "keep". */
@@ -54,10 +50,10 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
 
   function submit(event: FormEvent): void {
     event.preventDefault();
-    setNotice(null);
+    // The save reports itself through a toast, like every other mutation; what
+    // is left here is the one thing a toast cannot do.
     save.mutate(buildUpdate(), {
       onSuccess: () => {
-        setNotice(t('settings.notifications.saved'));
         // Empty the box: the server holds the value now, and leaving it filled
         // would make the next save look like a change.
         setState((current) => ({ ...current, gotifyToken: '' }));
@@ -91,15 +87,10 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
         value={state.gotifyToken}
         onChange={(value) => patch({ gotifyToken: value })}
         onClear={() =>
-          save.mutate(buildUpdate({ clearGotifyToken: true }), {
-            onSuccess: () => setNotice(t('settings.notifications.cleared')),
-          })
+          save.mutate(buildUpdate({ clearGotifyToken: true }))
         }
         pending={save.isPending}
       />
-
-      {save.isError ? <ErrorBanner message={errorMessage(save.error, i18n)} /> : null}
-      {test.isError ? <ErrorBanner message={errorMessage(test.error, i18n)} /> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -117,7 +108,6 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
           onClick={() =>
             test.mutate(
               { gotifyAddress: state.gotifyAddress, gotifyToken: state.gotifyToken },
-              { onSuccess: () => setNotice(t('settings.notifications.testSent')) },
             )
           }
         >
@@ -133,12 +123,6 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
               when: formatDateTime(settings.updatedAt, locale),
             })}
       </p>
-
-      {notice === null ? null : (
-        <p role="status" className="text-ok text-meta">
-          {notice}
-        </p>
-      )}
     </form>
   );
 }

@@ -1,6 +1,7 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query';
 
 import { globalLookup, globalTranslate, type MessageKey } from '../lib/i18n';
+import type { Outcome } from '../lib/outcome';
 import { pushToast } from '../lib/toast';
 import { ApiError, errorMessage } from './client';
 
@@ -31,12 +32,24 @@ declare module '@tanstack/react-query' {
   }
 }
 
+/**
+ * Say how an operation turned out.
+ *
+ * The one place that maps an outcome onto a toast, so the declarative path
+ * below and a mutation reporting a result both end up in the same stack with
+ * the same rules. `lib/outcome.ts` decides the words and the tone; this decides
+ * only that they are a toast.
+ */
+export function report(outcome: Outcome): void {
+  pushToast(outcome.message, { tone: outcome.tone, detail: outcome.detail });
+}
+
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     mutationCache: new MutationCache({
       onSuccess: (_data, _variables, _context, mutation) => {
         const key = mutation.meta?.success;
-        if (key) pushToast(globalTranslate(key), { tone: 'success' });
+        if (key) report({ message: globalTranslate(key), tone: 'success' });
       },
       onError: (error, _variables, _context, mutation) => {
         if (mutation.meta?.quiet) return;

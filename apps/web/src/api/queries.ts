@@ -22,8 +22,18 @@ import type {
   UpdateTargetInput,
 } from '@dashboard/shared';
 import { api } from './client';
+import { report } from './query-client';
 import { queryKeys } from './queryKeys';
 import type { UpdateScriptInput } from './types';
+import { globalTranslate, type Translate } from '../lib/i18n';
+import {
+  ipv6ProbeOutcome,
+  recordProbeOutcome,
+  syncOutcome,
+  targetCheckOutcome,
+  updateOutcome,
+  type Outcome,
+} from '../lib/outcome';
 
 /* -------------------------------------------------------------------- auth */
 
@@ -121,10 +131,13 @@ export function useCheckTarget() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.checkTarget(id),
-    meta: { success: 'toast.targetChecked' },
-    // The check also re-stamps `lastCheck*` on the target, which the list shows.
-    onSuccess: () => {
+    // No `meta.success`: a check answers with which of the host's capabilities
+    // it could and could not confirm, and a bare "check complete" would throw
+    // away the only part worth reading.
+    onSuccess: (result) => {
+      // The check also re-stamps `lastCheck*` on the target, which the list shows.
       void client.invalidateQueries({ queryKey: queryKeys.targets() });
+      report(targetCheckOutcome(globalTranslate, result));
     },
   });
 }
@@ -194,12 +207,14 @@ export function useSyncSource() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.syncSource(id),
-    meta: { success: 'toast.sourceSynced' },
-    onSuccess: (_result, id) => {
+    onSuccess: (result, id) => {
       void client.invalidateQueries({ queryKey: queryKeys.sources() });
       void client.invalidateQueries({ queryKey: queryKeys.sourceTree(id) });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
       void client.invalidateQueries({ queryKey: ['scripts'] });
+      // What a sync did is a count and whatever it complained about; the counts
+      // are the answer to "did it work", so they travel with the message.
+      report(syncOutcome(globalTranslate, result));
     },
   });
 }
@@ -367,6 +382,26 @@ function useInvalidateDns(): () => void {
   };
 }
 
+/**
+ * The three console actions report what they found, so none of them declares a
+ * `meta.success`: the message is the result. Each still invalidates, because a
+ * probe's answer is also new page state -- the address it detected is the
+ * record's subject.
+ */
+function useDnsAction<TResult>(
+  mutationFn: () => Promise<TResult>,
+  describe: (t: Translate, result: TResult) => Outcome,
+) {
+  const invalidate = useInvalidateDns();
+  return useMutation({
+    mutationFn,
+    onSuccess: (result: TResult) => {
+      invalidate();
+      report(describe(globalTranslate, result));
+    },
+  });
+}
+
 export function useDnsState() {
   return useQuery({
     queryKey: queryKeys.dns(),
@@ -392,30 +427,15 @@ export function useSaveDnsSettings() {
 }
 
 export function useDetectDnsIpv6() {
-  const invalidate = useInvalidateDns();
-  return useMutation({
-    mutationFn: () => api.detectDnsIpv6(),
-    meta: { success: 'toast.dnsAddressDetected' },
-    onSuccess: invalidate,
-  });
+  return useDnsAction(api.detectDnsIpv6, ipv6ProbeOutcome);
 }
 
 export function useQueryDnsRecord() {
-  const invalidate = useInvalidateDns();
-  return useMutation({
-    mutationFn: () => api.queryDnsRecord(),
-    meta: { success: 'toast.dnsRecordQueried' },
-    onSuccess: invalidate,
-  });
+  return useDnsAction(api.queryDnsRecord, recordProbeOutcome);
 }
 
 export function useRunDnsUpdate() {
-  const invalidate = useInvalidateDns();
-  return useMutation({
-    mutationFn: () => api.runDnsUpdate(),
-    meta: { success: 'toast.dnsUpdateRan' },
-    onSuccess: invalidate,
-  });
+  return useDnsAction(api.runDnsUpdate, updateOutcome);
 }
 
 /* ---------------------------------------------------------------- settings */

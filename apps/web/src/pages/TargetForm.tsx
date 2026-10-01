@@ -2,10 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { Plug, Save, X } from 'lucide-react';
 import type { CreateTargetInput, TargetAuth, TargetSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Field, Select, TextArea, TextInput } from '../components/Form';
 import { useCreateTarget, useUpdateTarget } from '../api/queries';
-import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
 
 type AuthMethod = 'key' | 'password';
@@ -289,8 +287,6 @@ export function TargetForm({
           />
         )}
       </Field>
-
-      {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error, i18n)} /> : null}
 
       <div className="flex items-center gap-2">
         <Button

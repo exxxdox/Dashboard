@@ -7,25 +7,27 @@
  * whole history -- are behind buttons, because a page someone opens to see
  * whether the record is right should not be mostly a form and a table.
  *
- * Results render in place rather than as toasts: there is no toast primitive
- * here, and a result you cannot re-read is the wrong shape for something that
- * rewrites a DNS record.
+ * What each action found arrives as a toast rather than as a panel: a result
+ * is a message about something that just happened, and the page is for what is
+ * true now. Nothing is lost by it -- the address a probe detected and the
+ * record a query read both land in the panel above, because the same action
+ * that reports them also invalidates the state it reports them into.
  */
 
 import { useState } from 'react';
-import type { DnsRecordProbe, DnsSettingsView, DnsUpdateResult } from '@dashboard/shared';
+import type { DnsSettingsView } from '@dashboard/shared';
 import { RefreshCw, Search, SlidersHorizontal, Zap } from 'lucide-react';
 
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
-import { ErrorBanner, LoadingBlock, WarningBanner } from '../components/Feedback';
+import { ErrorBanner, LoadingBlock } from '../components/Feedback';
 import { Modal } from '../components/Modal';
 import { MonoValue } from '../components/MonoValue';
 import { PageHeader } from '../components/PageHeader';
 import { Panel, Stat } from '../components/Panel';
 import { errorMessage } from '../api/client';
 import { useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } from '../api/queries';
-import { describeUpdate, providerLabel } from '../lib/dns';
+import { providerLabel } from '../lib/dns';
 import { formatDateTime, formatRelative } from '../lib/format';
 import { useI18n, type Translate } from '../lib/i18n';
 import { DnsHistoryPreview } from './DnsHistoryPreview';
@@ -40,11 +42,6 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
   const query = useQueryDnsRecord();
   const update = useRunDnsUpdate();
 
-  // The answers are held rather than read off the mutation: a mutation's data is
-  // cleared the next time it runs, and the last result is exactly what someone
-  // re-reads while deciding what to do next.
-  const [probe, setProbe] = useState<DnsRecordProbe | null>(null);
-  const [result, setResult] = useState<DnsUpdateResult | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -78,8 +75,6 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
   const data = state.data;
   const settings = data.settings;
   const busy = detect.isPending || query.isPending || update.isPending;
-  const shownRecord = probe?.record ?? data.record;
-  const shownRecordAt = probe?.queriedAt ?? data.recordCheckedAt;
 
   return (
     <PageBody>
@@ -109,7 +104,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               icon={<Search className="size-[18px]" aria-hidden />}
               loading={query.isPending}
               disabled={busy || settings === null}
-              onClick={() => query.mutate(undefined, { onSuccess: setProbe })}
+              onClick={() => query.mutate()}
             >
               {t('dns.action.query')}
             </Button>
@@ -118,7 +113,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               icon={<Zap className="size-[18px]" aria-hidden />}
               loading={update.isPending}
               disabled={busy}
-              onClick={() => update.mutate(undefined, { onSuccess: setResult })}
+              onClick={() => update.mutate()}
             >
               {t('dns.action.checkAndUpdate')}
             </Button>
@@ -160,21 +155,21 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
                 address painted over the neighbouring stat. Each gets a line,
                 and the address breaks rather than overflows. */}
             <Stat label={t('dns.stat.record')}>
-              {shownRecord === null ? (
+              {data.record === null ? (
                 <span className="text-faint">{t('dns.value.notQueried')}</span>
               ) : (
                 <span className="grid gap-1">
-                  <span className="text-mute text-meta break-all">{shownRecord.recordName}</span>
-                  <MonoValue value={shownRecord.value} wrap />
+                  <span className="text-mute text-meta break-all">{data.record.recordName}</span>
+                  <MonoValue value={data.record.value} wrap />
                 </span>
               )}
             </Stat>
 
             <Stat label={t('dns.stat.queriedAt')}>
-              {shownRecordAt === null ? (
+              {data.recordCheckedAt === null ? (
                 <span className="text-faint">{t('common.notYet')}</span>
               ) : (
-                <RelativeTime iso={shownRecordAt} />
+                <RelativeTime iso={data.recordCheckedAt} />
               )}
             </Stat>
 
@@ -194,34 +189,6 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
             </Stat>
           </div>
         </Panel>
-
-        {detect.isError ? <ErrorBanner message={errorMessage(detect.error, i18n)} /> : null}
-        {query.isError ? <ErrorBanner message={errorMessage(query.error, i18n)} /> : null}
-        {update.isError ? <ErrorBanner message={errorMessage(update.error, i18n)} /> : null}
-
-        {probe !== null && probe.record === null ? (
-          <Panel>
-            <p className="text-mute text-body">{t('dns.noRecord')}</p>
-          </Panel>
-        ) : null}
-
-        {result === null ? null : (
-          <Panel
-            title={t('dns.result.title')}
-            className={result.action === 'failed' ? 'card-accent' : undefined}
-          >
-            <p
-              className={result.action === 'failed' ? 'text-danger text-body' : 'text-ink text-body'}
-            >
-              {describeUpdate(t, result)}
-            </p>
-            {result.notificationFailed ? (
-              <div className="mt-4">
-                <WarningBanner>{t('dns.result.notificationFailed')}</WarningBanner>
-              </div>
-            ) : null}
-          </Panel>
-        )}
 
         <Panel title={t('dns.history.title')} flush>
           <DnsHistoryPreview

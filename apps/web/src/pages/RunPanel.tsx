@@ -7,7 +7,6 @@ import {
 } from '@dashboard/shared';
 import { ChevronRight, Play, Plus, Trash } from 'lucide-react';
 import { Button, IconButton } from '../components/Button';
-import { ErrorBanner } from '../components/Feedback';
 import { Select, Switch, TextInput } from '../components/Form';
 import {
   useExecuteScript,
@@ -15,7 +14,6 @@ import {
   useScriptRunDraft,
   useTargets,
 } from '../api/queries';
-import { errorMessage } from '../api/client';
 import { cn } from '../lib/cn';
 import { useI18n } from '../lib/i18n';
 import { navigate } from '../lib/router';
@@ -453,8 +451,6 @@ export function RunPanel({ script }: RunPanelProps) {
           )}
         </RunRow>
       </div>
-
-      {execute.isError ? <ErrorBanner message={errorMessage(execute.error, i18n)} /> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
