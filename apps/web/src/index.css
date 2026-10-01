@@ -11,44 +11,60 @@
   color-scheme: dark;
 
   /* Surfaces step by lift, not by border weight: the hairline separates, the
-     lighter surface is what says "this is above that". */
-  --bg: #090c11;
-  --surface: #111721;
-  --surface-2: #19212d;
-  --surface-3: #232d3b;
-  --surface-4: #2d3949;
-  --border: #222c39;
-  --border-strong: #3a4a60;
+     lighter surface is what says "this is above that". Cooler and darker than
+     the amber-era palette, so the cyan accent reads as light rather than as
+     paint. */
+  --bg: #04060c;
+  --surface: #0a1119;
+  --surface-2: #101a26;
+  --surface-3: #172334;
+  --surface-4: #1f2f44;
+  --border: #1a2534;
+  --border-strong: #2f4664;
 
-  --text: #eef3f9;
-  --muted: #a3b1c1;
-  --faint: #7d8b99;
+  --text: #e6f1ff;
+  --muted: #93a8c4;
+  --faint: #6b7f9b;
 
-  --accent: #f5ad30;
-  --accent-ink: #1a1204;
-  --accent-soft: rgb(245 173 48 / 15%);
-  --accent-line: rgb(245 173 48 / 45%);
-  --accent-glow: rgb(245 173 48 / 45%);
+  /* Electric cyan, and a violet that only ever appears beside it. The pair is
+     what the page's atmosphere, its gradients and its focus states are mixed
+     from -- one accent alone on a dark surface reads as a highlight, two read
+     as a light source. */
+  --accent: #2ee6ff;
+  --accent-2: #a855f7;
+  --accent-ink: #032027;
+  --accent-soft: rgb(46 230 255 / 14%);
+  --accent-line: rgb(46 230 255 / 42%);
+  --accent-glow: rgb(46 230 255 / 45%);
+  --accent-2-soft: rgb(168 85 247 / 16%);
 
-  --ok: #4fca92;
-  --warn: #ecc75c;
-  --danger: #f4786f;
-  --info: #8db0dd;
+  --ok: #3ee0a0;
+  --warn: #ffc857;
+  --danger: #ff6b81;
+  --info: #8ab4ff;
 
   /* Ink for a solid `ok` surface -- the run button is the first one. The green
      is light enough that only a dark foreground stays readable on it, which is
      the same relationship `--accent-ink` has to `--accent`. */
-  --ok-ink: #05231a;
+  --ok-ink: #032a1c;
 
   /* Elevation is subtle on purpose: on a dark surface a shadow reads as a
-     smudge, so the top hairline carries most of the "lifted" signal. */
-  --sheen: inset 0 1px 0 rgb(255 255 255 / 5%);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 45%);
-  --shadow-md: 0 18px 44px -16px rgb(0 0 0 / 75%);
-  --shadow-accent: 0 10px 30px -10px rgb(245 173 48 / 55%);
+     smudge, so the top hairline carries most of the "lifted" signal -- and the
+     accent bloom is what carries "lit". */
+  --sheen: inset 0 1px 0 rgb(255 255 255 / 6%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 50%);
+  --shadow-md: 0 18px 44px -16px rgb(0 0 0 / 80%);
+  --shadow-accent: 0 10px 30px -10px rgb(46 230 255 / 55%);
 
   --radius: 0.875rem;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A softer curve for the pointer light, which should trail rather than snap. */
+  --ease-trail: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Where the pointer is, in viewport coordinates. Written by
+     `lib/pointer-effects.ts`; read by the aura and by every `.spotlight`. */
+  --pointer-x: 50vw;
+  --pointer-y: 26vh;
 
   /* No web fonts: the container is expected to be offline. */
   --stack-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto,
@@ -71,6 +87,7 @@
   --color-faint: var(--faint);
 
   --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-ok: var(--ok);
@@ -119,21 +136,16 @@
 }
 
 @layer base {
+  /* The atmosphere is drawn by the fixed layers below rather than by `body`'s
+     own background: a background on `body` paints in the in-flow step, which
+     would cover every one of them. `html` keeps the flat colour so the canvas
+     -- overscroll included -- is never white. */
   html {
     background: var(--bg);
   }
 
   body {
     margin: 0;
-    /* Three faint off-screen lights keep the flat near-black from reading as a
-       dead panel, and give the accent somewhere to come from. Fixed, so the
-       atmosphere does not travel with a long log. */
-    background:
-      radial-gradient(1200px 620px at 8% -14%, rgb(245 173 48 / 9%), transparent 60%),
-      radial-gradient(1000px 560px at 102% -4%, rgb(120 165 230 / 8%), transparent 58%),
-      radial-gradient(900px 700px at 50% 118%, rgb(245 173 48 / 4%), transparent 62%),
-      var(--bg);
-    background-attachment: fixed;
     color: var(--text);
     font-family: var(--stack-sans);
     font-size: 17px;
@@ -142,9 +154,41 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Three faint off-screen lights keep the flat near-black from reading as a
+     dead panel, and give the two accents somewhere to come from. Fixed, so the
+     atmosphere does not travel with a long log. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    pointer-events: none;
+    background:
+      radial-gradient(1200px 620px at 8% -14%, rgb(46 230 255 / 10%), transparent 60%),
+      radial-gradient(1000px 560px at 102% -4%, rgb(168 85 247 / 12%), transparent 58%),
+      radial-gradient(900px 700px at 50% 118%, rgb(46 230 255 / 5%), transparent 62%);
+  }
+
+  /* The measurement grid. It is the one piece of decoration that says
+     "instrument" rather than "web page", and it is masked to the top of the
+     viewport so it never runs under a table of numbers. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgb(255 255 255 / 2.4%) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(255 255 255 / 2.4%) 1px, transparent 1px);
+    background-size: 56px 56px;
+    -webkit-mask-image: radial-gradient(120% 85% at 50% 0%, #000, transparent 72%);
+    mask-image: radial-gradient(120% 85% at 50% 0%, #000, transparent 72%);
+  }
+
   ::selection {
-    background: var(--accent-soft);
-    color: var(--text);
+    background: color-mix(in oklab, var(--accent) 30%, transparent);
+    color: #fff;
   }
 
   * {
@@ -169,7 +213,7 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
+    background: var(--accent);
     background-clip: content-box;
   }
 }
@@ -245,9 +289,70 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background:
-      linear-gradient(180deg, rgb(255 255 255 / 2.2%), transparent 22%),
+      linear-gradient(180deg, rgb(255 255 255 / 2.4%), transparent 22%),
       var(--surface);
     box-shadow: var(--sheen), var(--shadow-sm);
+    transition: border-color 200ms var(--ease);
+  }
+
+  /*
+   * A light that follows the pointer across the surface.
+   *
+   * `--mx`/`--my` are written by the one delegated listener in
+   * `lib/pointer-effects.ts`, and only for elements carrying `data-glow`. A
+   * card without it still lights up -- from its centre, because the fallback is
+   * `50% 50%` -- which is the difference between "this responds" and "this
+   * tracks", and either is better than a flat rectangle under the cursor.
+   */
+  .card::after,
+  .spotlight::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 260ms var(--ease);
+    background: radial-gradient(
+      340px circle at var(--mx, 50%) var(--my, 50%),
+      rgb(46 230 255 / 16%),
+      rgb(46 230 255 / 4%) 45%,
+      transparent 74%
+    );
+  }
+
+  /* Anything not already positioned gets it from here, so `spotlight` can be
+     dropped on a plain element without a second thought. */
+  .spotlight {
+    position: relative;
+  }
+
+  /* The hairline lights up and a bloom opens under the card, so a surface the
+     pointer is on is unmistakably the surface the pointer is on. It is spent
+     on hover alone: the same shadow on a resting card would be a page of
+     glowing rectangles, which says nothing about where the pointer is. */
+  .card:hover {
+    border-color: color-mix(in oklab, var(--border-strong) 72%, var(--accent));
+    box-shadow:
+      var(--sheen),
+      var(--shadow-sm),
+      0 0 0 1px rgb(46 230 255 / 10%),
+      0 18px 44px -26px rgb(46 230 255 / 45%);
+  }
+
+  .card:hover::after,
+  .spotlight:hover::after {
+    opacity: 1;
+  }
+
+  /* An icon button is too small for a bloom in its own colour to read as
+     anything but a smudge, so its lift is a neutral halo and the hairline.
+     Neutral rather than accented because the same component is the delete
+     control, where a cyan glow behind a red icon would be a lie. */
+  .icon-glow:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    box-shadow: 0 6px 20px -10px rgb(255 255 255 / 45%);
   }
 
   /* A card that answers a state rather than holding one: the accent edge is
@@ -261,16 +366,17 @@
     position: absolute;
     inset-inline: 0;
     top: 0;
+    z-index: 1;
     height: 2px;
     border-radius: var(--radius) var(--radius) 0 0;
     background: linear-gradient(
       90deg,
       transparent,
       var(--accent) 22%,
-      var(--accent) 78%,
+      var(--accent-2) 78%,
       transparent
     );
-    opacity: 0.75;
+    opacity: 0.85;
   }
 
   /* The terminal panel gets a whisper of scanline: enough to read as a
@@ -330,18 +436,195 @@
   }
 
   .modal-panel::backdrop {
-    background: rgb(4 6 10 / 72%);
-    backdrop-filter: blur(3px);
+    background: rgb(2 4 9 / 76%);
+    backdrop-filter: blur(4px);
   }
 
   .modal-panel[open] {
-    animation: modal-in 180ms var(--ease);
+    animation: modal-in 200ms var(--ease);
   }
 
   /* The wordmark's mark sits on a near-black rail, where a flat fill reads as a
      sticker. A faint accent bloom behind it is what makes it look lit. */
   .mark-glow {
-    filter: drop-shadow(0 0 12px rgb(245 173 48 / 28%));
+    filter: drop-shadow(0 0 12px rgb(46 230 255 / 34%));
+  }
+
+  /*
+   * The light that crosses a button under the pointer.
+   *
+   * An animation rather than a transition, so it always sweeps forwards: a
+   * transition would rewind on the way out, and a rewind is the one motion that
+   * reads as a mistake.
+   */
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      transparent 34%,
+      rgb(255 255 255 / 34%) 50%,
+      transparent 66%
+    );
+    transform: translateX(-140%);
+  }
+
+  .btn-sheen:hover:not(:disabled)::after {
+    animation: sheen-sweep 720ms var(--ease);
+  }
+
+  /*
+   * The pointer light, drawn behind everything.
+   *
+   * A fixed circle the width of a dialog, translated to the cursor -- transform
+   * only, so it stays on the compositor and the page keeps its frame budget
+   * while the mouse is moving. The transition is what makes it trail.
+   */
+  .pointer-aura {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -2;
+    width: 44rem;
+    height: 44rem;
+    margin: -22rem 0 0 -22rem;
+    border-radius: 999px;
+    pointer-events: none;
+    will-change: transform;
+    transition: transform 480ms var(--ease-trail);
+    background: radial-gradient(circle, rgb(46 230 255 / 8%), transparent 62%);
+    transform: translate3d(var(--pointer-x), var(--pointer-y), 0);
+  }
+
+  /* -------------------------------------------------------------------- */
+  /* Feedback                                                              */
+  /*                                                                        */
+  /* The stack is fixed and empty of pointer events; each row turns them    */
+  /* back on for itself, so a message can never block the control behind    */
+  /* it. Every lifetime rule is in `lib/toast.ts` -- these are the pixels.  */
+  /* -------------------------------------------------------------------- */
+
+  .toast-stack {
+    position: fixed;
+    inset-inline-end: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    width: min(23rem, calc(100vw - 2.5rem));
+    pointer-events: none;
+  }
+
+  .toast {
+    --toast-tone: var(--accent);
+
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.7rem;
+    overflow: hidden;
+    padding: 0.75rem 0.7rem 0.9rem 0.9rem;
+    border: 1px solid color-mix(in oklab, var(--toast-tone) 34%, transparent);
+    border-radius: 0.875rem;
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--toast-tone) 13%, transparent), transparent 62%),
+      color-mix(in oklab, var(--surface) 94%, black);
+    box-shadow:
+      var(--sheen),
+      0 20px 44px -20px rgb(0 0 0 / 90%);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+    animation: toast-in 280ms var(--ease) both;
+  }
+
+  .toast[data-tone='success'] {
+    --toast-tone: var(--ok);
+  }
+
+  .toast[data-tone='error'] {
+    --toast-tone: var(--danger);
+  }
+
+  .toast[data-tone='warning'] {
+    --toast-tone: var(--warn);
+  }
+
+  /* The tone's own edge: a bar down the leading side, which is what tells four
+     kinds apart at a glance from across the room. */
+  .toast::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 2px;
+    background: linear-gradient(180deg, transparent, var(--toast-tone), transparent);
+  }
+
+  .toast[data-leaving='true'] {
+    animation: toast-out 260ms var(--ease) forwards;
+  }
+
+  .toast-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 0.15rem;
+    color: var(--toast-tone);
+  }
+
+  .toast-text {
+    margin: 0;
+    min-width: 0;
+    color: var(--text);
+    font-size: var(--text-meta);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+
+  .toast-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+    transition:
+      color 140ms var(--ease),
+      background-color 140ms var(--ease);
+  }
+
+  .toast-close:hover {
+    color: var(--text);
+    background: color-mix(in oklab, var(--toast-tone) 20%, transparent);
+  }
+
+  /* How long is left, drawn by the same clock the store runs on: both are
+     paused together when the pointer arrives, so the bar never lies. */
+  .toast-timer {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 2px;
+    transform-origin: left center;
+    background: linear-gradient(90deg, transparent, var(--toast-tone));
+    opacity: 0.75;
+    animation: toast-timer var(--toast-ttl, 5200ms) linear both;
+  }
+
+  .toast[data-paused='true'] .toast-timer {
+    animation-play-state: paused;
   }
 }
 
@@ -369,7 +652,7 @@
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -387,6 +670,51 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes sheen-sweep {
+  from {
+    transform: translateX(-140%);
+  }
+  to {
+    transform: translateX(140%);
+  }
+}
+
+/* A toast arrives out of focus and from below the corner it lives in, so the
+   eye is drawn to it without the page appearing to jump. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.96);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.97);
+    filter: blur(4px);
+  }
+}
+
+@keyframes toast-timer {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
   }
 }
 

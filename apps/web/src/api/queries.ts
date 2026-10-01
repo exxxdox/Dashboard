@@ -45,6 +45,7 @@ export function useLogin() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => api.login(input),
+    meta: { success: 'toast.signedIn' },
     onSuccess: (status: AuthStatus) => {
       client.setQueryData(queryKeys.auth(), status);
       // Everything cached was fetched while signed out (or by someone else), so
@@ -58,6 +59,7 @@ export function useLogout() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: () => api.logout(),
+    meta: { success: 'toast.signedOut' },
     onSuccess: (status: AuthStatus) => {
       client.setQueryData(queryKeys.auth(), status);
       client.clear();
@@ -91,6 +93,7 @@ export function useCreateTarget() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateTargetInput) => api.createTarget(input),
+    meta: { success: 'toast.targetCreated' },
     onSuccess: (target) => {
       client.setQueryData<TargetSummary[]>(queryKeys.targets(), (current) =>
         current ? [...current, target] : [target],
@@ -105,6 +108,7 @@ export function useUpdateTarget() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateTargetInput }) =>
       api.updateTarget(id, input),
+    meta: { success: 'toast.targetSaved' },
     onSuccess: (target) => {
       client.setQueryData<TargetSummary[]>(queryKeys.targets(), (current) =>
         current?.map((item) => (item.id === target.id ? target : item)),
@@ -117,6 +121,7 @@ export function useCheckTarget() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.checkTarget(id),
+    meta: { success: 'toast.targetChecked' },
     // The check also re-stamps `lastCheck*` on the target, which the list shows.
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.targets() });
@@ -128,6 +133,7 @@ export function useDeleteTarget() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteTarget(id),
+    meta: { success: 'toast.targetDeleted' },
     onSuccess: (_result, id) => {
       client.setQueryData<TargetSummary[]>(queryKeys.targets(), (current) =>
         current?.filter((item) => item.id !== id),
@@ -147,6 +153,7 @@ export function useCreateSource() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateSourceInput) => api.createSource(input),
+    meta: { success: 'toast.sourceCreated' },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.sources() });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
@@ -159,6 +166,7 @@ export function useUpdateSource() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSourceInput }) =>
       api.updateSource(id, input),
+    meta: { success: 'toast.sourceSaved' },
     onSuccess: (source) => {
       void client.invalidateQueries({ queryKey: queryKeys.sources() });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
@@ -174,6 +182,7 @@ export function useDeleteSource() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteSource(id),
+    meta: { success: 'toast.sourceDeleted' },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.sources() });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
@@ -185,6 +194,7 @@ export function useSyncSource() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.syncSource(id),
+    meta: { success: 'toast.sourceSynced' },
     onSuccess: (_result, id) => {
       void client.invalidateQueries({ queryKey: queryKeys.sources() });
       void client.invalidateQueries({ queryKey: queryKeys.sourceTree(id) });
@@ -224,6 +234,7 @@ export function useUpdateScript() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateScriptInput }) =>
       api.updateScript(id, input),
+    meta: { success: 'toast.scriptSaved' },
     onSuccess: (script: ScriptSummary) => {
       void client.invalidateQueries({ queryKey: queryKeys.script(script.id) });
       void client.invalidateQueries({ queryKey: ['scripts'] });
@@ -258,6 +269,9 @@ export function useSaveScriptRunDraft() {
     onSuccess: (prefill: ScriptRunPrefill, { id }) => {
       client.setQueryData(queryKeys.scriptRunDraft(id), prefill);
     },
+    // A debounced background write: it repeats on its own, so announcing it
+    // would be a toast per pause in typing, and announcing each failure worse.
+    meta: { quiet: true },
   });
 }
 
@@ -266,6 +280,7 @@ export function useExecuteScript() {
   return useMutation({
     mutationFn: ({ scriptId, input }: { scriptId: string; input: ExecuteScriptInput }) =>
       api.executeScript(scriptId, input),
+    meta: { success: 'toast.runStarted' },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['executions'] });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
@@ -316,6 +331,7 @@ export function useCancelExecution() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.cancelExecution(id),
+    meta: { success: 'toast.runCancelled' },
     onSuccess: (execution) => {
       client.setQueryData(queryKeys.execution(execution.id), execution);
       void client.invalidateQueries({ queryKey: ['executions'] });
@@ -327,6 +343,7 @@ export function useDeleteExecution() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.deleteExecution(id),
+    meta: { success: 'toast.runDeleted' },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['executions'] });
       void client.invalidateQueries({ queryKey: queryKeys.overview() });
@@ -369,6 +386,7 @@ export function useSaveDnsSettings() {
   const invalidate = useInvalidateDns();
   return useMutation({
     mutationFn: (input: UpdateDnsSettingsInput) => api.saveDnsSettings(input),
+    meta: { success: 'toast.dnsSettingsSaved' },
     onSuccess: invalidate,
   });
 }
@@ -377,6 +395,7 @@ export function useDetectDnsIpv6() {
   const invalidate = useInvalidateDns();
   return useMutation({
     mutationFn: () => api.detectDnsIpv6(),
+    meta: { success: 'toast.dnsAddressDetected' },
     onSuccess: invalidate,
   });
 }
@@ -385,6 +404,7 @@ export function useQueryDnsRecord() {
   const invalidate = useInvalidateDns();
   return useMutation({
     mutationFn: () => api.queryDnsRecord(),
+    meta: { success: 'toast.dnsRecordQueried' },
     onSuccess: invalidate,
   });
 }
@@ -393,6 +413,7 @@ export function useRunDnsUpdate() {
   const invalidate = useInvalidateDns();
   return useMutation({
     mutationFn: () => api.runDnsUpdate(),
+    meta: { success: 'toast.dnsUpdateRan' },
     onSuccess: invalidate,
   });
 }
@@ -407,6 +428,7 @@ export function useSaveAppSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateAppSettingsInput) => api.saveSettings(input),
+    meta: { success: 'toast.settingsSaved' },
     // The response is the saved row, so the cache is set rather than
     // invalidated: a refetch would answer with the same object.
     onSuccess: (settings) => {
@@ -423,5 +445,6 @@ export function useSaveAppSettings() {
 export function useTestNotification() {
   return useMutation({
     mutationFn: (input: TestNotificationInput) => api.testNotification(input),
+    meta: { success: 'toast.notificationSent' },
   });
 }

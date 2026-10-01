@@ -15,7 +15,10 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
   const t = useT();
 
   return (
-    <div className="bg-base flex min-h-screen">
+    // No background of its own: the atmosphere and the pointer light are fixed
+    // layers painted behind everything, and an opaque panel here would cover
+    // both. The rail and the mobile strip stay translucent for the same reason.
+    <div className="flex min-h-screen">
       <aside className="border-line bg-base/80 sticky top-0 hidden h-screen w-[272px] shrink-0 flex-col border-r backdrop-blur-xl lg:flex">
         <a
           href={href('/')}

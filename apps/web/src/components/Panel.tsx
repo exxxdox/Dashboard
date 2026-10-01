@@ -18,7 +18,10 @@ export function Panel({
   flush?: boolean;
 }) {
   return (
-    <section className={cn('card overflow-hidden', className)}>
+    // `data-glow` is what makes the card's highlight follow the pointer instead
+    // of sitting in the middle of it; the listener that feeds it is mounted
+    // once, in `App`.
+    <section data-glow className={cn('card overflow-hidden', className)}>
       {title ? (
         <header className="border-line bg-panel-2/50 flex h-16 items-center justify-between gap-3 border-b px-5">
           {/* A long title truncates and the aside keeps its own width: a title

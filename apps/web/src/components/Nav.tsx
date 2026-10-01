@@ -37,10 +37,15 @@ export function Nav({ active }: { active: Route['name'] }) {
             key={item.route}
             href={href(item.path)}
             aria-current={isActive ? 'page' : undefined}
+            data-glow
             className={cn(
-              'focus-ring group text-body relative flex h-11 items-center gap-3 rounded-lg px-3',
-              'transition-colors duration-150 ease-out',
-              isActive ? 'bg-accent-soft text-ink' : 'text-mute hover:bg-panel-2 hover:text-ink',
+              // No `overflow-hidden` here: the active mark sits outside this
+              // box, at `-left-3`, and clipping would swallow it.
+              'focus-ring spotlight group text-body relative flex h-11 items-center gap-3 rounded-lg px-3',
+              'transition-all duration-200 ease-out',
+              isActive
+                ? 'bg-accent-soft text-ink shadow-[inset_0_0_0_1px_var(--accent-line)]'
+                : 'text-mute hover:bg-panel-2 hover:text-ink hover:translate-x-0.5',
             )}
           >
             {/* The active mark repeats the run rail's language at nav scale. */}

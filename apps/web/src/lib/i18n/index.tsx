@@ -36,6 +36,7 @@ import { scriptsMessages } from './areas/scripts';
 import { settingsMessages } from './areas/settings';
 import { sourcesMessages } from './areas/sources';
 import { targetsMessages } from './areas/targets';
+import { toastMessages } from './areas/toast';
 
 export type Locale = 'en' | 'zh';
 
@@ -56,6 +57,7 @@ const AREAS = {
   sources: sourcesMessages,
   overview: overviewMessages,
   auth: authMessages,
+  toast: toastMessages,
 } satisfies Record<string, MessageArea>;
 
 export type MessageKey = {
@@ -106,6 +108,21 @@ function interpolate(
 }
 
 /**
+ * A key this code did not choose, in the given language.
+ *
+ * Null says the dictionary has no such key, which is an ordinary answer rather
+ * than a failure: the server names its own messages, and most of them are shown
+ * exactly as they arrived.
+ *
+ * Shared by the React context below and by `globalLookup`, so "how a message is
+ * resolved" has one definition rather than two that drift.
+ */
+function resolve(locale: Locale, key: string, params?: MessageParams): string | null {
+  const template = lookup(locale, key) ?? lookup('en', key);
+  return template === undefined ? null : interpolate(template, params, locale);
+}
+
+/**
  * A message in the given language.
  *
  * Falls back to English and then to the key itself. The key as a last resort is
@@ -113,8 +130,7 @@ function interpolate(
  * nothing has a translation for.
  */
 export function translate(locale: Locale, key: MessageKey, params?: MessageParams): string {
-  const template = lookup(locale, key) ?? lookup('en', key) ?? key;
-  return interpolate(template, params, locale);
+  return resolve(locale, key, params) ?? key;
 }
 
 const STORAGE_KEY = 'dashboard.locale';
@@ -143,6 +159,29 @@ function readStoredLocale(): Locale | null {
   }
 }
 
+/**
+ * The language, for code that runs with no component to read a hook from.
+ *
+ * `api/query-client.ts` turns every settled mutation into a toast, and a toast
+ * is built the moment the request answers -- there is no render to hang a
+ * `useT` off. The provider keeps this in step with its own state, so
+ * `globalTranslate` and `useT` cannot disagree for longer than one effect.
+ */
+let activeLocale: Locale = 'en';
+
+/** Where the provider publishes the current language. */
+export function setActiveLocale(locale: Locale): void {
+  activeLocale = locale;
+}
+
+export function globalTranslate(key: MessageKey, params?: MessageParams): string {
+  return translate(activeLocale, key, params);
+}
+
+export function globalLookup(key: string, params?: MessageParams): string | null {
+  return resolve(activeLocale, key, params);
+}
+
 type LocaleContextValue = {
   locale: Locale;
   setLocale: (next: Locale) => void;
@@ -167,6 +206,8 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     // The document's own language, so the browser hyphenates, spell-checks and
     // picks a font for the right script.
     document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+    // Anything built outside a render reads the language from here.
+    setActiveLocale(locale);
     try {
       window.localStorage.setItem(STORAGE_KEY, locale);
     } catch {
@@ -181,10 +222,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       locale,
       setLocale,
       t: (key, params) => translate(locale, key, params),
-      lookup: (key, params) => {
-        const template = lookup(locale, key) ?? lookup('en', key);
-        return template === undefined ? null : interpolate(template, params, locale);
-      },
+      lookup: (key, params) => resolve(locale, key, params),
     }),
     [locale, setLocale],
   );

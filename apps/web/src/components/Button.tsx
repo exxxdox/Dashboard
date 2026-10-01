@@ -56,7 +56,9 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       className={cn(
-        'focus-ring inline-flex items-center justify-center rounded-[10px] border font-medium whitespace-nowrap',
+        'focus-ring btn-sheen inline-flex items-center justify-center rounded-[10px] border font-medium whitespace-nowrap',
+        // Pressing is a 1px drop; the light crossing the face on hover is
+        // `.btn-sheen`, which is a keyframe so it always travels the same way.
         'transition-all duration-150 ease-out active:translate-y-px',
         'disabled:pointer-events-none disabled:opacity-45',
         SIZE_CLASS[size],
@@ -84,7 +86,7 @@ export function IconButton({ label, className, children, type = 'button', ...res
       title={label}
       className={cn(
         'focus-ring text-mute hover:text-ink hover:bg-panel-3 inline-flex size-9 items-center justify-center',
-        'rounded-lg border border-transparent transition-colors duration-150 ease-out',
+        'icon-glow rounded-lg border border-transparent transition-all duration-150 ease-out',
         'disabled:pointer-events-none disabled:opacity-45',
         className,
       )}

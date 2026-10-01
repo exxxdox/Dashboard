@@ -3,7 +3,9 @@ import { AppShell, PageBody } from './components/AppShell';
 import { PageHeader } from './components/PageHeader';
 import { EmptyState } from './components/Feedback';
 import { Button } from './components/Button';
+import { Toaster } from './components/Toaster';
 import { useRoute, navigate } from './lib/router';
+import { usePointerEffects } from './lib/pointer-effects';
 import { OverviewPage } from './pages/OverviewPage';
 import { ScriptsPage } from './pages/ScriptsPage';
 import { RunsPage } from './pages/RunsPage';
@@ -37,13 +39,36 @@ export function App() {
   // guessing would either flash the app for a signed-out visitor or flash the
   // login form on every reload of an open deployment.
   if (auth.isPending) return null;
-  if (auth.data?.required && !auth.data.signedIn) return <SignInPage />;
+
+  const signedOut = Boolean(auth.data?.required) && !auth.data?.signedIn;
 
   return (
-    <AppShell route={route}>
-      <RouteView route={route} />
-    </AppShell>
+    <>
+      <PointerLight />
+      {signedOut ? (
+        <SignInPage />
+      ) : (
+        <AppShell route={route}>
+          {/* Keyed by the route's name and not by the whole route: a change of
+              page should fade in, but a hash change *within* one page -- the
+              DNS history's paging -- must not remount it, or the dialog it is
+              showing would close on every page of the table. */}
+          <div key={route.name} className="animate-fade-in">
+            <RouteView route={route} />
+          </div>
+        </AppShell>
+      )}
+      {/* Outside the route: a message about an action outlives the page that
+          took it, and a failed sign-in has to be reported here too. */}
+      <Toaster />
+    </>
   );
+}
+
+/** The cursor's own light, drawn behind the page. */
+function PointerLight() {
+  usePointerEffects();
+  return <div className="pointer-aura" aria-hidden />;
 }
 
 function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {

@@ -10,16 +10,15 @@ import '@xterm/xterm/css/xterm.css';
 import { useExecutionStream } from '../api/useExecutionStream';
 
 /**
- * xterm's own palette, kept in step with the CSS tokens so the terminal reads as
- * part of the page rather than an embedded widget. xterm cannot read custom
- * properties, so these literals have to be edited alongside `index.css`.
+ * xterm's own palette.
+ *
+ * The ANSI sixteen are literals -- they are the terminal's vocabulary, not the
+ * page's, and a script's red should stay red whichever accent the dashboard is
+ * wearing. The five that belong to the *chrome* are read from the tokens at
+ * mount, because xterm cannot resolve a custom property and a literal copy of
+ * the accent is a second answer waiting to go stale.
  */
-const TERMINAL_THEME = {
-  background: '#0b0e13',
-  foreground: '#e6edf4',
-  cursor: '#f0a92c',
-  cursorAccent: '#0b0e13',
-  selectionBackground: 'rgba(240, 169, 44, 0.28)',
+const ANSI_PALETTE = {
   black: '#12171f',
   red: '#f0736c',
   green: '#4fbf8b',
@@ -38,11 +37,46 @@ const TERMINAL_THEME = {
   brightWhite: '#f2f6f9',
 } as const;
 
+/**
+ * Called where the terminal is created, not at import time: the chrome half
+ * reads the tokens, and at import time the stylesheet may not be in the
+ * document yet, which would leave every one of them on its fallback.
+ */
+function terminalTheme(): Record<string, string> {
+  return { ...chromeTheme(), ...ANSI_PALETTE };
+}
+
+/** One token, resolved, with a literal to fall back on outside a browser. */
+function token(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value === '' ? fallback : value;
+}
+
 /** Resolve the monospace stack from the token layer, at mount, not import time. */
 function resolveMonoStack(): string {
-  if (typeof document === 'undefined') return 'monospace';
-  const value = getComputedStyle(document.documentElement).getPropertyValue('--stack-mono').trim();
-  return value === '' ? 'monospace' : value;
+  return token('--stack-mono', 'monospace');
+}
+
+/**
+ * The parts of the terminal that are the page rather than the output: its
+ * surface, its ink, its cursor and what a selection looks like.
+ */
+function chromeTheme() {
+  const surface = token('--surface', '#0a1119');
+  const accent = token('--accent', '#2ee6ff');
+  // The accent at 30%, written as `#rrggbbaa`. Not `color-mix()`: xterm hands
+  // this string to a canvas `fillStyle` in its canvas renderer, which takes a
+  // plain colour and nothing else.
+  const selection = /^#[0-9a-f]{6}$/i.test(accent) ? `${accent}4d` : '#2ee6ff4d';
+
+  return {
+    background: surface,
+    foreground: token('--text', '#e6f1ff'),
+    cursor: accent,
+    cursorAccent: surface,
+    selectionBackground: selection,
+  };
 }
 
 /**
@@ -92,7 +126,7 @@ export function RunTerminal({
       disableStdin: true,
       convertEol: true,
       scrollback: 10_000,
-      theme: TERMINAL_THEME,
+      theme: terminalTheme(),
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
