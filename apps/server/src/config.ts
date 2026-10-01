@@ -114,8 +114,6 @@ const envSchema = z.object({
 });
 
 export type AppConfig = {
-  nodeEnv: 'development' | 'production' | 'test';
-  isProduction: boolean;
   port: number;
   host: string;
   dataDir: string;
@@ -177,8 +175,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const dataDir = resolve(value.DATA_DIR);
 
   return {
-    nodeEnv: value.NODE_ENV,
-    isProduction,
     port: value.PORT,
     host: value.HOST,
     dataDir,

@@ -8,12 +8,8 @@
  */
 
 export type GithubRepoRef = {
-  owner: string;
-  repo: string;
   /** HTTPS clone URL, always with a `.git` suffix. */
   cloneUrl: string;
-  /** Browser URL for display. */
-  webUrl: string;
   /** Filesystem-safe directory name derived from owner and repo. */
   slug: string;
 };
@@ -103,10 +99,7 @@ export function parseGithubRepo(input: string): GithubRepoRef {
   }
 
   return {
-    owner,
-    repo: normalizedRepo,
     cloneUrl: `https://github.com/${owner}/${normalizedRepo}.git`,
-    webUrl: `https://github.com/${owner}/${normalizedRepo}`,
     // Both segments are already restricted to a safe alphabet, so the join
     // cannot introduce a path separator or a traversal segment.
     slug: `${owner}__${normalizedRepo}`,

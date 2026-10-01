@@ -15,7 +15,6 @@ import { joinRoot } from '../lib/paths.js';
 import { getExecution } from '../services/executions.js';
 import { getRunPrefill, saveRunDraft } from '../services/run-draft.js';
 import {
-  browseMount,
   createSource,
   deleteSource,
   getSource,
@@ -81,11 +80,6 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: AppContext): voi
 
   app.get<{ Params: { id: string } }>('/api/sources/:id/tree', (request) =>
     getSourceTree(ctx.db, request.params.id),
-  );
-
-  app.get<{ Params: { id: string }; Querystring: { path?: string } }>(
-    '/api/sources/:id/browse',
-    (request) => browseMount(ctx.config, request.query.path ?? ''),
   );
 
   // ---------------------------------------------------------------------

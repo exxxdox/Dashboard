@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  baseName,
   formatBytes,
   formatDuration,
   formatExit,
-  formatParams,
   formatRelative,
   runTag,
 } from './format';
@@ -83,16 +81,6 @@ describe('formatExit', () => {
   });
 });
 
-describe('formatParams', () => {
-  it('says so when a script takes no parameters', () => {
-    expect(formatParams({}, en)).toBe('(none)');
-  });
-
-  it('renders an environment assignment per value', () => {
-    expect(formatParams({ A: '1', B: 'two words' }, en)).toBe('A=1  B=two words');
-  });
-});
-
 describe('formatRelative', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -122,13 +110,5 @@ describe('formatRelative', () => {
     // The unit is the translator's business rather than this module's, so the
     // same instant reads differently through a different one.
     expect(formatRelative('2026-09-27T09:00:00.000Z', zh)).toBe('3 小时前');
-  });
-});
-
-describe('baseName', () => {
-  it('returns the last path segment', () => {
-    expect(baseName('deploy/api.sh')).toBe('api.sh');
-    expect(baseName('api.sh')).toBe('api.sh');
-    expect(baseName('a/b/')).toBe('b');
   });
 });

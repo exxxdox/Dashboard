@@ -171,52 +171,44 @@ export function saveSettings(
   if (problem !== null) throw new ValidationError(problem.message, undefined, problem.i18n);
 
   const timestamp = nowIso();
-  if (row) {
-    db.prepare(
-      `UPDATE dns_settings SET
-         provider = ?, schedule_enabled = ?, interval_minutes = ?,
-         cloudflare_zone_id = ?, cloudflare_record_name = ?, cloudflare_token_encrypted = ?,
-         alibaba_access_key_id = ?, alibaba_record_id = ?, alibaba_record_type = ?,
-         alibaba_access_key_secret_encrypted = ?, updated_at = ?
-       WHERE id = ?`,
-    ).run(
-      merged.provider,
-      merged.scheduleEnabled ? 1 : 0,
-      merged.intervalMinutes,
-      merged.cloudflareZoneId,
-      merged.cloudflareRecordName,
-      encryptSecret(merged.cloudflareToken, box),
-      merged.alibabaAccessKeyId,
-      merged.alibabaRecordId,
-      ALIBABA_RECORD_TYPE,
-      encryptSecret(merged.alibabaAccessKeySecret, box),
-      timestamp,
-      SETTINGS_ID,
-    );
-  } else {
-    db.prepare(
-      `INSERT INTO dns_settings (
-         id, provider, schedule_enabled, interval_minutes,
-         cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
-         alibaba_access_key_id, alibaba_record_id, alibaba_record_type,
-         alibaba_access_key_secret_encrypted, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      SETTINGS_ID,
-      merged.provider,
-      merged.scheduleEnabled ? 1 : 0,
-      merged.intervalMinutes,
-      merged.cloudflareZoneId,
-      merged.cloudflareRecordName,
-      encryptSecret(merged.cloudflareToken, box),
-      merged.alibabaAccessKeyId,
-      merged.alibabaRecordId,
-      ALIBABA_RECORD_TYPE,
-      encryptSecret(merged.alibabaAccessKeySecret, box),
-      timestamp,
-      timestamp,
-    );
-  }
+  // One statement for both cases: the row either does not exist yet (the insert
+  // half) or is replaced by exactly these values (the update half). `created_at`
+  // is set on insert only, so a rewrite cannot claim the settings are newer than
+  // the credential in them.
+  db.prepare(
+    `INSERT INTO dns_settings (
+       id, provider, schedule_enabled, interval_minutes,
+       cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
+       alibaba_access_key_id, alibaba_record_id, alibaba_record_type,
+       alibaba_access_key_secret_encrypted, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       provider = excluded.provider,
+       schedule_enabled = excluded.schedule_enabled,
+       interval_minutes = excluded.interval_minutes,
+       cloudflare_zone_id = excluded.cloudflare_zone_id,
+       cloudflare_record_name = excluded.cloudflare_record_name,
+       cloudflare_token_encrypted = excluded.cloudflare_token_encrypted,
+       alibaba_access_key_id = excluded.alibaba_access_key_id,
+       alibaba_record_id = excluded.alibaba_record_id,
+       alibaba_record_type = excluded.alibaba_record_type,
+       alibaba_access_key_secret_encrypted = excluded.alibaba_access_key_secret_encrypted,
+       updated_at = excluded.updated_at`,
+  ).run(
+    SETTINGS_ID,
+    merged.provider,
+    merged.scheduleEnabled ? 1 : 0,
+    merged.intervalMinutes,
+    merged.cloudflareZoneId,
+    merged.cloudflareRecordName,
+    encryptSecret(merged.cloudflareToken, box),
+    merged.alibabaAccessKeyId,
+    merged.alibabaRecordId,
+    ALIBABA_RECORD_TYPE,
+    encryptSecret(merged.alibabaAccessKeySecret, box),
+    timestamp,
+    timestamp,
+  );
 
   const stored = readSettingsRow(db);
   if (!stored) throw new ConflictError('The DNS settings could not be stored');

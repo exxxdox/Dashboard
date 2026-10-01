@@ -54,7 +54,7 @@ apps/web/src
 
 ## Architecture, and why it is this way
 
-**Execution goes through a `Transport` interface.** `SshTransport` is the only implementation. Everything above the interface assumes only "run this command string on the machine that owns the scripts, stream its output, stop it". A host agent that avoids needing sshd would be one new branch in `transport/index.ts`, not a change to the runner, queue, or routes. Do not let SSH-specific assumptions leak upward.
+**Execution goes through a `Transport` interface.** `SshTransport` is the only implementation. Everything above the interface assumes only "run this command string on the machine that owns the scripts, stream its output, stop it". A host agent that avoids needing sshd would be one new branch in `createTransportForTarget` (`services/targets.ts`), not a change to the runner, queue, or routes. Do not let SSH-specific assumptions leak upward.
 
 **The container owns the script; the host only runs it.** Repositories are cloned inside the container into the bind-mounted directory, and scanning is plain filesystem work. A run then uploads the script to a staging directory on the host, runs it with the target's `workDir` as cwd, and deletes it. So there is no path that has to mean the same thing on both sides — the old `mappingOk` nonce check is gone with the requirement it existed to verify. What replaced it is a readiness check: can the working directory be entered, and can a staging directory be created and removed.
 

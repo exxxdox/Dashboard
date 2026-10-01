@@ -103,9 +103,6 @@ export type BuiltCommand = {
   command: string;
   /** Human-readable equivalent for display and audit; no wrapper plumbing. */
   display: string;
-  /** The real invocation, shown in the UI. */
-  interpreterLabel: string;
-  scriptPath: string;
 };
 
 /**
@@ -168,7 +165,7 @@ export function buildCommand(input: BuildCommandInput): BuiltCommand {
     `then ${assignments}setsid -w sh -c ${quotedInner}; ` +
     `else ${assignments}sh -c ${quotedInner}; fi`;
 
-  return { command, display, interpreterLabel: interpreter.label, scriptPath };
+  return { command, display };
 }
 
 /**

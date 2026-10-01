@@ -19,17 +19,6 @@ export type RunFormState = {
   timeoutSec: string;
 };
 
-export function emptyDraft(): RunDraft {
-  return { params: {}, custom: [], timeoutSec: '' };
-}
-
-/** A draft with nothing in it: the fallback to the last run depends on this. */
-export function isDraftEmpty(draft: RunDraft): boolean {
-  return (
-    Object.keys(draft.params).length === 0 && draft.custom.length === 0 && draft.timeoutSec === ''
-  );
-}
-
 export function draftFromForm(state: RunFormState): RunDraft {
   return {
     params: state.values,

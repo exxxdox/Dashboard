@@ -5,7 +5,6 @@ import {
   describePrefill,
   draftFromForm,
   formFromDraft,
-  isDraftEmpty,
   sameDraft,
   type RunFormState,
 } from './run-draft';
@@ -17,19 +16,6 @@ const DECLARED: ScriptParam[] = [
 ];
 
 const EMPTY: RunDraft = { params: {}, custom: [], timeoutSec: '' };
-
-describe('isDraftEmpty', () => {
-  it('is true only when nothing has been touched', () => {
-    expect(isDraftEmpty(EMPTY)).toBe(true);
-    expect(isDraftEmpty({ ...EMPTY, params: { ENV: 'prod' } })).toBe(false);
-    expect(isDraftEmpty({ ...EMPTY, timeoutSec: '60' })).toBe(false);
-    expect(isDraftEmpty({ ...EMPTY, custom: [{ name: '', value: '', mode: 'argv' }] })).toBe(false);
-  });
-
-  it('counts a row that exists but is blank, because someone added it', () => {
-    expect(isDraftEmpty({ ...EMPTY, custom: [{ name: '', value: '', mode: 'env' }] })).toBe(false);
-  });
-});
 
 describe('formFromDraft', () => {
   it('starts from the declared defaults when the draft says nothing', () => {

@@ -5,7 +5,6 @@ import { api } from './client';
 
 vi.mock('./client', () => ({
   api: { getExecutionLogs: vi.fn() },
-  errorMessage: (error: unknown) => (error instanceof Error ? error.message : 'Unexpected error'),
 }));
 
 const getExecutionLogs = vi.mocked(api.getExecutionLogs);
@@ -27,13 +26,8 @@ function deferred<T>() {
 
 function makeStream() {
   const received: number[] = [];
-  const errors: string[] = [];
-  const stream = new LogStream(
-    'ex-1',
-    (incoming) => received.push(incoming.seq),
-    (message) => errors.push(message),
-  );
-  return { stream, received, errors };
+  const stream = new LogStream('ex-1', (incoming) => received.push(incoming.seq));
+  return { stream, received };
 }
 
 beforeEach(() => {
@@ -172,16 +166,16 @@ describe('LogStream live merging', () => {
     expect(stream.lastSeq).toBe(5);
   });
 
-  it('surfaces a failed fill without wedging the stream', async () => {
+  it('retries the hole after a failed fill instead of wedging the stream', async () => {
     getExecutionLogs.mockResolvedValueOnce([]);
-    const { stream, received, errors } = makeStream();
+    const { stream, received } = makeStream();
     await stream.loadHistory();
 
+    // The fill that would deliver seq 1 fails; the stream must not treat that as
+    // "nothing is coming" and lock the hole out.
     getExecutionLogs.mockRejectedValueOnce(new Error('network_error'));
     await stream.resync();
-    expect(errors).toEqual(['network_error']);
 
-    // A later chunk still lands.
     stream.push(chunk(1));
     expect(received).toEqual([1]);
   });

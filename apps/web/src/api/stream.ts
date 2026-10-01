@@ -1,5 +1,5 @@
 import type { ExecutionLogChunk } from '@dashboard/shared';
-import { api, errorMessage } from './client';
+import { api } from './client';
 
 /**
  * Merges a run's log chunks from two sources — the stored history and the live
@@ -20,7 +20,6 @@ export class LogStream {
   constructor(
     private readonly executionId: string,
     private readonly onChunk: (chunk: ExecutionLogChunk) => void,
-    private readonly onError: (message: string) => void,
   ) {}
 
   /** Highest `seq` handed to the consumer so far. */
@@ -78,9 +77,10 @@ export class LogStream {
         this.cursor = chunk.seq;
         this.onChunk(chunk);
       }
-    } catch (error) {
-      this.onError(errorMessage(error));
-      // Allow a later chunk to retry the same hole rather than locking it out.
+    } catch {
+      // A failed fill is not fatal and has nowhere to be reported: the hole is
+      // still in the stream, and the next chunk re-requests it. Clearing the
+      // attempt marker is what allows that retry instead of locking it out.
       this.lastFillFrom = -1;
     } finally {
       this.filling = false;

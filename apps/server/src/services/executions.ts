@@ -232,7 +232,6 @@ export type ExecutionService = {
   markInterrupted: () => number;
   /** Drop history older than the configured retention window. */
   prune: () => number;
-  stats: () => { active: number; pending: number };
 };
 
 export function createExecutionService(deps: ExecutionServiceDeps): ExecutionService {
@@ -441,7 +440,5 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       }
       return result.changes;
     },
-
-    stats: () => ({ active: queue.activeCount, pending: queue.pendingCount }),
   };
 }

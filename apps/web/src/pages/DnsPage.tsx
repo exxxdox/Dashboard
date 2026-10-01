@@ -261,11 +261,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
 function StatusChip({ label, muted }: { label: string; muted: boolean }) {
   return (
     <span
-      className={
-        muted
-          ? 'border-line bg-panel-2 text-faint text-meta mono rounded-full border px-3 py-1.5'
-          : 'border-line bg-panel-2 text-mute text-meta mono rounded-full border px-3 py-1.5'
-      }
+      className={`border-line bg-panel-2 ${muted ? 'text-faint' : 'text-mute'} text-meta mono rounded-full border px-3 py-1.5`}
     >
       {label}
     </span>

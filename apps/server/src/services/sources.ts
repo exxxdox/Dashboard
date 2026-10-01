@@ -11,9 +11,10 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
-import { mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { existsSync, mkdirSync } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import type {
   CreateSourceInput,
@@ -159,17 +160,31 @@ type SourceShape = {
 };
 
 /**
- * The validators below report bad input by throwing plain errors, because they
- * live in the shared package and must not depend on the server's error types.
- * Re-wrap them, or a user's typo surfaces as a 500.
+ * Turn a path meant to sit inside the shared root into an absolute one, or
+ * refuse it. Traversal first, then escape: the same two checks everywhere, in
+ * one place rather than once per caller.
  */
-function asValidation<T>(fn: () => T): T {
+function resolveInsideRoot(
+  config: AppConfig,
+  relativePath: string,
+): { safe: string; absolute: string } {
+  let safe: string;
   try {
-    return fn();
+    safe = assertSafeRelative(normalizePosix(relativePath));
   } catch (error) {
-    if (error instanceof AppError) throw error;
     throw new ValidationError(errorMessage(error));
   }
+
+  if (safe === '') {
+    throw new ValidationError('A local source needs a subdirectory inside the shared root');
+  }
+
+  const absolute = joinRoot(config.scriptRootContainer, safe);
+  if (!isInside(config.scriptRootContainer, absolute)) {
+    throw new ValidationError('The local path must stay inside the shared script root');
+  }
+
+  return { safe, absolute };
 }
 
 /** `mountPath` is derived, never taken from input: it is where the checkout lives. */
@@ -198,15 +213,7 @@ function localShape(config: AppConfig, subPath: string | null): SourceShape {
   }
 
   // Reject traversal before it can ever reach a filesystem call.
-  const safe = assertSafeRelative(normalizePosix(requested));
-  if (safe === '') {
-    throw new ValidationError('A local source needs a subdirectory inside the shared root');
-  }
-
-  const absolute = joinRoot(config.scriptRootContainer, safe);
-  if (!isInside(config.scriptRootContainer, absolute)) {
-    throw new ValidationError('The local path must stay inside the shared script root');
-  }
+  const { safe } = resolveInsideRoot(config, requested);
 
   return { repoUrl: null, branch: null, subPath: safe, mountPath: safe };
 }
@@ -216,9 +223,17 @@ function shapeFor(
   kind: SourceKind,
   fields: { repoUrl: string; branch: string | null; subPath: string | null },
 ): SourceShape {
-  return asValidation(() =>
-    kind === 'github' ? githubShape(fields) : localShape(config, fields.subPath),
-  );
+  if (kind !== 'github') return localShape(config, fields.subPath);
+
+  // The shared validators report bad input by throwing plain errors, because
+  // they live in the shared package and must not depend on the server's error
+  // types. Re-wrap, or a user's typo surfaces as a 500.
+  try {
+    return githubShape(fields);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new ValidationError(errorMessage(error));
+  }
 }
 
 /**
@@ -231,11 +246,7 @@ function shapeFor(
  * longer has to be seeded by hand before it can be synced.
  */
 function ensureLocalDirectory(config: AppConfig, mountPath: string): void {
-  const absolute = joinRoot(config.scriptRootContainer, mountPath);
-
-  if (!isInside(config.scriptRootContainer, absolute)) {
-    throw new ValidationError('The local path must stay inside the shared script root');
-  }
+  const { absolute } = resolveInsideRoot(config, mountPath);
 
   try {
     mkdirSync(absolute, { recursive: true });
@@ -418,35 +429,34 @@ export function gitProxyArgs(gitProxy: string | undefined): string[] {
   return gitProxy === undefined ? [] : ['-c', `http.proxy=${gitProxy}`];
 }
 
+const execFileAsync = promisify(execFile);
+
 /** Run git without a shell, with prompts disabled so it fails instead of hanging. */
-function runGit(config: AppConfig, args: string[], cwd?: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(
-      'git',
-      [...gitProxyArgs(config.gitProxy), ...args],
-      {
-        cwd,
-        timeout: GIT_TIMEOUT_MS,
-        maxBuffer: 8 * 1024 * 1024,
-        env: {
-          ...process.env,
-          // Fail fast instead of blocking on a credential prompt: only public
-          // repositories are supported, so any prompt means a wrong URL.
-          GIT_TERMINAL_PROMPT: '0',
-          GIT_ASKPASS: '/bin/echo',
-          // Ignore host-level config so behaviour is identical everywhere.
-          GIT_CONFIG_NOSYSTEM: '1',
-        },
+async function runGit(config: AppConfig, args: string[], cwd?: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', [...gitProxyArgs(config.gitProxy), ...args], {
+      cwd,
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: 8 * 1024 * 1024,
+      env: {
+        ...process.env,
+        // Fail fast instead of blocking on a credential prompt: only public
+        // repositories are supported, so any prompt means a wrong URL.
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_ASKPASS: '/bin/echo',
+        // Ignore host-level config so behaviour is identical everywhere.
+        GIT_CONFIG_NOSYSTEM: '1',
       },
-      (error, stdout, stderr) => {
-        if (error) {
-          reject(new TargetError(`git ${args[0]} failed: ${stderr.trim() || error.message}`));
-          return;
-        }
-        resolve(stdout);
-      },
+    });
+    return stdout;
+  } catch (error) {
+    // `stderr` is where git explains itself; `error.message` is the generic
+    // "Command failed: git ..." that carries no reason.
+    const stderr = (error as { stderr?: string }).stderr ?? '';
+    throw new TargetError(
+      `git ${args[0]} failed: ${stderr.trim() || errorMessage(error)}`,
     );
-  });
+  }
 }
 
 async function ensureGitRepository(
@@ -456,10 +466,7 @@ async function ensureGitRepository(
 ): Promise<void> {
   if (!row.repo_url) throw new ValidationError('This source has no repository URL');
 
-  const hasClone = await stat(join(absolute, '.git')).then(
-    () => true,
-    () => false,
-  );
+  const hasClone = existsSync(join(absolute, '.git'));
 
   if (!hasClone) {
     await mkdir(absolute, { recursive: true });
@@ -586,49 +593,3 @@ function sortTree(node: ScriptTreeNode): void {
   for (const child of node.children) sortTree(child);
 }
 
-export type BrowseEntry = {
-  name: string;
-  type: 'dir' | 'file';
-  sizeBytes: number | null;
-};
-
-/** List a directory inside the shared root, for the local-source picker. */
-export async function browseMount(config: AppConfig, requestedPath: string): Promise<BrowseEntry[]> {
-  const safe = assertSafeRelative(normalizePosix(requestedPath));
-  const absolute = joinRoot(config.scriptRootContainer, safe);
-
-  if (!isInside(config.scriptRootContainer, absolute)) {
-    throw new ValidationError('Path escapes the shared script root');
-  }
-
-  let entries;
-  try {
-    entries = await readdir(absolute, { withFileTypes: true });
-  } catch (error) {
-    throw new AppError(
-      `Cannot read "${safe || '/'}": ${error instanceof Error ? error.message : String(error)}`,
-      404,
-      'not_found',
-    );
-  }
-
-  const result: BrowseEntry[] = [];
-  for (const entry of entries) {
-    // Hidden entries are never selectable as a source root, so do not offer them.
-    if (entry.name.startsWith('.')) continue;
-
-    if (entry.isDirectory()) {
-      result.push({ name: entry.name, type: 'dir', sizeBytes: null });
-    } else if (entry.isFile()) {
-      const info = await stat(join(absolute, entry.name)).catch(() => null);
-      result.push({ name: entry.name, type: 'file', sizeBytes: info?.size ?? null });
-    }
-  }
-
-  result.sort((left, right) => {
-    if (left.type !== right.type) return left.type === 'dir' ? -1 : 1;
-    return left.name.localeCompare(right.name);
-  });
-
-  return result;
-}

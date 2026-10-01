@@ -33,11 +33,6 @@ export function openDatabase(file: string): Db {
   return db;
 }
 
-/** Run `fn` inside a transaction, rolling back if it throws. */
-export function transaction<T>(db: Db, fn: () => T): T {
-  return db.transaction(fn)();
-}
-
 /** ISO 8601 UTC timestamp, the only datetime format stored in this database. */
 export function nowIso(): string {
   return new Date().toISOString();

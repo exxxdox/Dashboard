@@ -202,14 +202,6 @@ export function useSourceTree(sourceId: string | null, enabled = true) {
   });
 }
 
-export function useSourceBrowse(sourceId: string | null, path: string, enabled: boolean) {
-  return useQuery({
-    queryKey: queryKeys.sourceBrowse(sourceId ?? '', path),
-    queryFn: () => api.browseSource(sourceId ?? '', path),
-    enabled: enabled && Boolean(sourceId),
-  });
-}
-
 /* ----------------------------------------------------------------- scripts */
 
 export function useScripts(filter: { sourceId?: string; q?: string } = {}) {
@@ -431,13 +423,5 @@ export function useSaveAppSettings() {
 export function useTestNotification() {
   return useMutation({
     mutationFn: (input: TestNotificationInput) => api.testNotification(input),
-  });
-}
-
-export function useClearDnsChecks() {
-  const invalidate = useInvalidateDns();
-  return useMutation({
-    mutationFn: () => api.clearDnsChecks(),
-    onSuccess: invalidate,
   });
 }

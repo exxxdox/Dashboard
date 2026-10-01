@@ -96,10 +96,6 @@ export function listChecks(db: Db, filter: DnsCheckFilter): DnsCheckList {
   return { items: rows.map(toCheck), total: total?.count ?? 0 };
 }
 
-export function listRecentChecks(db: Db, limit: number): DnsCheck[] {
-  return listChecks(db, { limit, offset: 0 }).items;
-}
-
 /**
  * Totals over the whole table.
  *

@@ -149,11 +149,14 @@ describe('GET /api/dns', () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ settings: unknown; history: { total: number } }>();
+      const body = response.json<{
+        settings: unknown;
+        history: { summary: { total: number } };
+      }>();
       // Null rather than a defaulted object: the page has to tell "never
       // configured" from "configured and empty".
       expect(body.settings).toBeNull();
-      expect(body.history.total).toBe(0);
+      expect(body.history.summary.total).toBe(0);
     } finally {
       await h.close();
     }

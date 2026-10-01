@@ -5,10 +5,7 @@ import { assertValidBranch, InvalidRepoError, parseGithubRepo } from './github.j
 describe('parseGithubRepo', () => {
   test('accepts the shorthand owner/repo form', () => {
     expect(parseGithubRepo('acme/ops-scripts')).toEqual({
-      owner: 'acme',
-      repo: 'ops-scripts',
       cloneUrl: 'https://github.com/acme/ops-scripts.git',
-      webUrl: 'https://github.com/acme/ops-scripts',
       slug: 'acme__ops-scripts',
     });
   });
@@ -21,11 +18,11 @@ describe('parseGithubRepo', () => {
   });
 
   test('accepts a host-prefixed reference without a scheme', () => {
-    expect(parseGithubRepo('github.com/acme/ops').repo).toBe('ops');
+    expect(parseGithubRepo('github.com/acme/ops').slug).toBe('acme__ops');
   });
 
   test('trims surrounding whitespace', () => {
-    expect(parseGithubRepo('  acme/ops  ').owner).toBe('acme');
+    expect(parseGithubRepo('  acme/ops  ').cloneUrl).toBe('https://github.com/acme/ops.git');
   });
 
   test('rejects references carrying credentials', () => {
@@ -62,8 +59,12 @@ describe('parseGithubRepo', () => {
   });
 
   test('ignores a query string or fragment instead of letting it add segments', () => {
-    expect(parseGithubRepo('https://github.com/acme/ops?ref=main').repo).toBe('ops');
-    expect(parseGithubRepo('https://github.com/acme/ops#readme').repo).toBe('ops');
+    expect(parseGithubRepo('https://github.com/acme/ops?ref=main').cloneUrl).toBe(
+      'https://github.com/acme/ops.git',
+    );
+    expect(parseGithubRepo('https://github.com/acme/ops#readme').cloneUrl).toBe(
+      'https://github.com/acme/ops.git',
+    );
   });
 
   test('rejects an empty reference', () => {

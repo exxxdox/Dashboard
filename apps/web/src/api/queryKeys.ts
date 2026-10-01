@@ -8,7 +8,6 @@ export const queryKeys = {
 
   sources: () => ['sources'] as const,
   sourceTree: (id: string) => ['sources', id, 'tree'] as const,
-  sourceBrowse: (id: string, path: string) => ['sources', id, 'browse', path] as const,
 
   scripts: (filter: { sourceId?: string; q?: string }) => ['scripts', filter] as const,
   script: (id: string) => ['scripts', id] as const,

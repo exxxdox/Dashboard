@@ -203,12 +203,6 @@ export function useT(): LocaleContextValue['t'] {
   return useLocaleContext().t;
 }
 
-/** The chosen language, for a control that changes it. */
-export function useLocale(): { locale: Locale; setLocale: (next: Locale) => void } {
-  const { locale, setLocale } = useLocaleContext();
-  return { locale, setLocale };
-}
-
 /**
  * Both halves at once, which is what most pages want: the translator for the
  * words, and the locale for the dates. A page that formatted a date with only

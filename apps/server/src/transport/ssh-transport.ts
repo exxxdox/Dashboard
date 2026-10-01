@@ -90,7 +90,7 @@ export function createSshTransport(config: SshTransportConfig): Transport {
           { timeoutMs: 15_000 },
         );
 
-        const values = parseKeyValues(probe.stdout);
+        const values = parseKeyValues(probe);
         const shellVersion = values.get('shell');
         return {
           reachable: true,
@@ -115,7 +115,6 @@ export function createSshTransport(config: SshTransportConfig): Transport {
     },
 
     async exec(options: ExecOptions): Promise<ExecOutcome> {
-      const startedAt = Date.now();
       const client = new Client();
       let remotePid: number | null = null;
 
@@ -159,7 +158,7 @@ export function createSshTransport(config: SshTransportConfig): Transport {
 
         const stdinError = await writing;
 
-        return { ...outcome, durationMs: Date.now() - startedAt, remotePid, stdinError };
+        return { ...outcome, stdinError };
       } finally {
         releaseWriter();
         client.end();
@@ -172,7 +171,7 @@ export function createSshTransport(config: SshTransportConfig): Transport {
   };
 }
 
-type PumpResult = Omit<ExecOutcome, 'durationMs' | 'remotePid' | 'stdinError'>;
+type PumpResult = Omit<ExecOutcome, 'stdinError'>;
 
 /**
  * Stream a channel's output until it closes, its aborts, or it times out.
@@ -353,12 +352,12 @@ async function killProcessGroup(client: SshClient, pid: number): Promise<void> {
   await runCommand(client, signal('KILL'), { timeoutMs: 5_000 }).catch(() => undefined);
 }
 
-/** Run a command, buffering its output. Used for probes and kill signals. */
-function runCommand(
-  client: SshClient,
-  command: string,
-  options: { timeoutMs: number },
-): Promise<{ stdout: string; stderr: string; code: number | null }> {
+/**
+ * Run a command, buffering its stdout. Used for probes and kill signals, where
+ * the only thing read back is the output -- a kill reports success by closing
+ * the channel, and a probe reports by what it printed.
+ */
+function runCommand(client: SshClient, command: string, options: { timeoutMs: number }): Promise<string> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Remote command timed out')), options.timeoutMs);
 
@@ -370,16 +369,12 @@ function runCommand(
       }
 
       let stdout = '';
-      let stderr = '';
       channel.on('data', (buffer: Buffer) => {
         stdout += buffer.toString('utf8');
       });
-      channel.stderr.on('data', (buffer: Buffer) => {
-        stderr += buffer.toString('utf8');
-      });
-      channel.on('close', (code: number | null) => {
+      channel.on('close', () => {
         clearTimeout(timer);
-        resolve({ stdout, stderr, code: typeof code === 'number' ? code : null });
+        resolve(stdout);
       });
     });
   });

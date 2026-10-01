@@ -65,14 +65,6 @@ export const TONE_TEXT: Record<Tone, string> = {
   muted: 'text-mute',
 };
 
-export const TONE_BORDER: Record<Tone, string> = {
-  ok: 'border-ok',
-  warn: 'border-warn',
-  danger: 'border-danger',
-  info: 'border-info',
-  accent: 'border-accent',
-  muted: 'border-faint',
-};
 
 export const TONE_RAIL: Record<Tone, string> = {
   ok: 'bg-ok',

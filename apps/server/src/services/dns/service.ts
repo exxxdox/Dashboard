@@ -35,7 +35,7 @@ import type {
   DnsUpdateResult,
   UpdateDnsSettingsInput,
 } from '@dashboard/shared';
-import { DNS_CHECK_PREVIEW, MAX_DNS_CHECKS } from '@dashboard/shared';
+import { DNS_CHECK_PREVIEW } from '@dashboard/shared';
 
 import type { Db } from '../../db/client.js';
 import { nowIso } from '../../db/client.js';
@@ -51,7 +51,6 @@ import { createAlibabaProvider } from './aliyun.js';
 import {
   clearChecks,
   listChecks,
-  listRecentChecks,
   recordCheck,
   summarizeChecks,
   type DnsCheckFilter,
@@ -339,10 +338,8 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
         schedule: deps.getSchedule?.() ?? null,
         history: {
           summary,
-          records: listRecentChecks(db, DNS_CHECK_PREVIEW),
-          total: summary.total,
+          records: listChecks(db, { limit: DNS_CHECK_PREVIEW, offset: 0 }).items,
         },
-        limits: { historyPreviewSize: DNS_CHECK_PREVIEW, historyMaxRecords: MAX_DNS_CHECKS },
       };
     },
 

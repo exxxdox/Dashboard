@@ -34,13 +34,3 @@ export type UpdateScriptInput = {
   interpreterOverride?: string[] | null;
 };
 
-export type BrowseEntry = {
-  name: string;
-  type: 'dir' | 'file';
-  sizeBytes: number | null;
-};
-
-export type BrowseResponse = {
-  path: string;
-  entries: BrowseEntry[];
-};

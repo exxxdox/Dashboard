@@ -56,22 +56,7 @@ export function formatBytes(bytes: number | null): string {
  * hundred rows would otherwise build one per cell. Two locales means at most
  * two entries, so the cache needs no eviction.
  */
-const timeFormats = new Map<Locale, Intl.DateTimeFormat>();
 const dateTimeFormats = new Map<Locale, Intl.DateTimeFormat>();
-
-function timeFormat(locale: Locale): Intl.DateTimeFormat {
-  let format = timeFormats.get(locale);
-  if (!format) {
-    format = new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-    timeFormats.set(locale, format);
-  }
-  return format;
-}
 
 function dateTimeFormat(locale: Locale): Intl.DateTimeFormat {
   let format = dateTimeFormats.get(locale);
@@ -94,11 +79,6 @@ function parseIso(iso: string | null | undefined): Date | null {
   if (!iso) return null;
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? null : date;
-}
-
-export function formatTime(iso: string | null, locale: Locale): string {
-  const date = parseIso(iso);
-  return date ? timeFormat(locale).format(date) : '—';
 }
 
 export function formatDateTime(iso: string | null, locale: Locale): string {
@@ -129,15 +109,3 @@ export function formatExit(exitCode: number | null, signal: string | null): stri
   return '—';
 }
 
-/** Parameter values travel as environment variables, never as argv. */
-export function formatParams(values: Record<string, string>, t: Translate): string {
-  const entries = Object.entries(values);
-  if (entries.length === 0) return t('common.none');
-  return entries.map(([key, value]) => `${key}=${value}`).join('  ');
-}
-
-/** Trailing path segment, for compact breadcrumbs. */
-export function baseName(path: string): string {
-  const segments = path.split('/').filter((segment) => segment !== '');
-  return segments[segments.length - 1] ?? path;
-}

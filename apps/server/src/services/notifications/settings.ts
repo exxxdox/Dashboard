@@ -122,24 +122,16 @@ export function saveAppSettings(
   };
 
   const timestamp = nowIso();
-  if (row) {
-    db.prepare(
-      `UPDATE app_settings SET
-         gotify_address = ?, gotify_token_encrypted = ?, updated_at = ?
-       WHERE id = ?`,
-    ).run(merged.gotifyAddress, encryptSecret(merged.gotifyToken, box), timestamp, SETTINGS_ID);
-  } else {
-    db.prepare(
-      `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(
-      SETTINGS_ID,
-      merged.gotifyAddress,
-      encryptSecret(merged.gotifyToken, box),
-      timestamp,
-      timestamp,
-    );
-  }
+  // `created_at` belongs to the insert half only: replacing the address or the
+  // token does not change when the row was first written.
+  db.prepare(
+    `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       gotify_address = excluded.gotify_address,
+       gotify_token_encrypted = excluded.gotify_token_encrypted,
+       updated_at = excluded.updated_at`,
+  ).run(SETTINGS_ID, merged.gotifyAddress, encryptSecret(merged.gotifyToken, box), timestamp, timestamp);
 
   const stored = readSettingsRow(db);
   if (!stored) throw new ConflictError('The application settings could not be stored');

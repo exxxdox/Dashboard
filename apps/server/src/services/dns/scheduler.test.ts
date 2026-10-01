@@ -71,8 +71,6 @@ describe('configure', () => {
       enabled: true,
       intervalMinutes: 15,
       nextRunAt: '2026-01-01T00:15:00.000Z',
-      lastRunAt: null,
-      lastOk: null,
     });
   });
 
@@ -119,8 +117,6 @@ describe('a firing timer', () => {
     await flush();
 
     expect(calls).toEqual(['scheduled']);
-    expect(scheduler.snapshot().lastOk).toBe(true);
-    expect(scheduler.snapshot().lastRunAt).toBe('2026-01-01T00:00:00.000Z');
     // Re-armed after the run rather than on a fixed cadence: a run longer than
     // the interval must not overlap itself.
     expect(timers.pending()).toBe(1);
@@ -163,7 +159,9 @@ describe('a firing timer', () => {
     expect(scheduler.snapshot().running).toBe(false);
   });
 
-  test('records a failed run as a failure rather than throwing', async () => {
+  test('keeps the schedule alive when a run comes back failed', async () => {
+    // A failed check is a result, not an exception: the timer must still be
+    // re-armed, or the record would stay wrong until someone noticed.
     const { scheduler, timers } = setup({
       service: {
         update: async (): Promise<UpdateResult> => ({
@@ -177,10 +175,8 @@ describe('a firing timer', () => {
     timers.fire();
     await flush();
 
-    expect(scheduler.snapshot()).toMatchObject({
-      lastOk: false,
-      lastFailureReason: 'dns_query_failed',
-    });
+    expect(timers.pending()).toBe(1);
+    expect(scheduler.snapshot().running).toBe(false);
   });
 
   test('keeps the schedule alive when a run throws unexpectedly', async () => {
@@ -196,7 +192,6 @@ describe('a firing timer', () => {
     timers.fire();
     await flush();
 
-    expect(scheduler.snapshot().lastOk).toBe(false);
     expect(timers.pending()).toBe(1);
   });
 });

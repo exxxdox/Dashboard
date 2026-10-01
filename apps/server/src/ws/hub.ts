@@ -13,8 +13,6 @@ export type HubListener = (message: ServerMessage) => void;
 export type ExecutionHub = {
   publish: (executionId: string, message: ServerMessage) => void;
   subscribe: (executionId: string, listener: HubListener) => () => void;
-  /** How many listeners a given execution currently has. For diagnostics. */
-  listenerCount: (executionId: string) => number;
 };
 
 export function createExecutionHub(): ExecutionHub {
@@ -51,10 +49,6 @@ export function createExecutionHub(): ExecutionHub {
         // without bound over a long-running process.
         if (current.size === 0) listeners.delete(executionId);
       };
-    },
-
-    listenerCount(executionId): number {
-      return listeners.get(executionId)?.size ?? 0;
     },
   };
 }

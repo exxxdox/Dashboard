@@ -11,7 +11,7 @@
  * left the tab alone.
  */
 
-import type { DnsFailureReason, DnsSchedulerView } from '@dashboard/shared';
+import type { DnsSchedulerView } from '@dashboard/shared';
 
 import { errorMessage } from '../../lib/errors.js';
 import type { Logger } from '../../lib/logger.js';
@@ -44,10 +44,10 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
   const clearTimer = deps.clearTimer ?? ((timer): void => clearTimeout(timer));
 
   let timer: NodeJS.Timeout | null = null;
-  /** The pair the timer was armed for; null until the first `configure`. */
-  let signature: string | null = null;
   let intervalMinutes = 0;
   let enabled = false;
+  /** False until the first `configure`, so it always arms once. */
+  let configured = false;
   /**
    * Bumped by every `configure` and by `stop`. A tick that finishes after one of
    * those happened no longer owns the timer and must not re-arm it -- otherwise
@@ -56,9 +56,6 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
    */
   let generation = 0;
   let nextRunAt: number | null = null;
-  let lastRunAt: number | null = null;
-  let lastOk: boolean | null = null;
-  let lastFailureReason: DnsFailureReason | null = null;
   let running = false;
 
   function cancel(): void {
@@ -91,17 +88,12 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
     } else {
       running = true;
       try {
-        const result = await deps.service.update('scheduled');
-        lastRunAt = now();
-        lastOk = result.action !== 'failed';
-        lastFailureReason = result.failureReason;
+        // The run records itself where an operator reads it: the check history.
+        await deps.service.update('scheduled');
       } catch (error) {
         // `update` reports everything an operator can act on as a result, so an
         // exception here is a bug. Log it and keep the schedule alive rather than
         // letting one bad run stop the timer for good.
-        lastRunAt = now();
-        lastOk = false;
-        lastFailureReason = null;
         deps.logger.error(
           { err: errorMessage(error) },
           'the scheduled DNS check failed unexpectedly',
@@ -116,10 +108,19 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
 
   return {
     configure(settings) {
-      const next = `${settings.scheduleEnabled ? 'on' : 'off'}:${settings.intervalMinutes}`;
-      if (next === signature) return;
+      // Idempotent on the pair the timer was armed for: the page asks for the
+      // state on every visit, and re-arming there would push the next run forward
+      // each time someone opened it. `configured` rather than the pair alone,
+      // because a fresh scheduler is not yet armed for anything.
+      if (
+        configured &&
+        enabled === settings.scheduleEnabled &&
+        intervalMinutes === settings.intervalMinutes
+      ) {
+        return;
+      }
 
-      signature = next;
+      configured = true;
       enabled = settings.scheduleEnabled;
       intervalMinutes = settings.intervalMinutes;
       generation += 1;
@@ -133,16 +134,13 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
         running,
         intervalMinutes,
         nextRunAt: nextRunAt === null ? null : new Date(nextRunAt).toISOString(),
-        lastRunAt: lastRunAt === null ? null : new Date(lastRunAt).toISOString(),
-        lastOk,
-        lastFailureReason,
       };
     },
 
     stop() {
       generation += 1;
       enabled = false;
-      signature = null;
+      configured = false;
       cancel();
     },
   };

@@ -32,7 +32,6 @@ import type {
 } from '@dashboard/shared';
 import type { ErrorTranslator } from '../lib/i18n';
 import type {
-  BrowseResponse,
   ExecutionListResponse,
   HealthResponse,
   OverviewResponse,
@@ -189,7 +188,6 @@ export const api = {
   overview: () => apiRequest<OverviewResponse>('/overview'),
 
   listTargets: () => apiRequest<TargetSummary[]>('/targets'),
-  getTarget: (id: string) => apiRequest<TargetSummary>(`/targets/${encodeURIComponent(id)}`),
   createTarget: (body: CreateTargetInput) =>
     apiRequest<TargetSummary>('/targets', { method: 'POST', body }),
   updateTarget: (id: string, body: UpdateTargetInput) =>
@@ -210,8 +208,6 @@ export const api = {
     apiRequest<SyncResult>(`/sources/${encodeURIComponent(id)}/sync`, { method: 'POST' }),
   sourceTree: (id: string) =>
     apiRequest<ScriptTreeNode>(`/sources/${encodeURIComponent(id)}/tree`),
-  browseSource: (id: string, path: string) =>
-    apiRequest<BrowseResponse>(`/sources/${encodeURIComponent(id)}/browse`, { query: { path } }),
 
   listScripts: (filter: { sourceId?: string; q?: string } = {}) =>
     apiRequest<ScriptSummary[]>('/scripts', { query: filter }),
@@ -265,7 +261,6 @@ export const api = {
   runDnsUpdate: () => apiRequest<DnsUpdateResult>('/dns/update', { method: 'POST' }),
   listDnsChecks: (filter: { limit?: number; offset?: number } = {}) =>
     apiRequest<DnsCheckList>('/dns/checks', { query: filter }),
-  clearDnsChecks: () => apiRequest<void>('/dns/checks', { method: 'DELETE' }),
 
   // The application settings. Notifications live here rather than under /dns:
   // the credential belongs to the dashboard, and the IPv6 console is only its

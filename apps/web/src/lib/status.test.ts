@@ -3,7 +3,6 @@ import { executionStatusSchema, syncStatusSchema } from '@dashboard/shared';
 import {
   EXECUTION_STATUS_META,
   SYNC_STATUS_META,
-  TONE_BORDER,
   TONE_DOT,
   TONE_RAIL,
   TONE_TEXT,
@@ -45,9 +44,7 @@ describe('status metadata', () => {
     for (const tone of tones) {
       expect(TONE_DOT[tone], `no dot class for ${tone}`).toBeTruthy();
       expect(TONE_TEXT[tone], `no text class for ${tone}`).toBeTruthy();
-      expect(TONE_RAIL[tone], `no rail class for ${tone}`).toBeTruthy();
-      expect(TONE_BORDER[tone], `no border class for ${tone}`).toBeTruthy();
-    }
+      expect(TONE_RAIL[tone], `no rail class for ${tone}`).toBeTruthy();    }
   });
 
   it('does not report a finished run as still active', () => {

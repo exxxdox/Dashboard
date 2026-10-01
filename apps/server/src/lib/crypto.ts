@@ -8,7 +8,7 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const ALGORITHM = 'aes-256-gcm';
@@ -113,11 +113,9 @@ export function resolveSecretKey(dataDir: string, fromEnv?: string): SecretKeyRe
   const key = randomBytes(KEY_BYTES);
   mkdirSync(dirname(keyPath), { recursive: true });
   // 0600 before the bytes are written, so there is no window with looser access.
+  // This is the only place the file is created -- the branch above returns early
+  // when one already exists -- so the create mode is the file's mode; a chmod
+  // afterwards would set the same bits twice.
   writeFileSync(keyPath, key.toString('base64'), { mode: 0o600 });
-  try {
-    chmodSync(keyPath, 0o600);
-  } catch {
-    // Best effort: some mounted filesystems silently ignore chmod.
-  }
   return { key, source: 'generated', path: keyPath };
 }

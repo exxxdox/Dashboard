@@ -89,7 +89,6 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
       }
       execs.push(record);
 
-      const startedAt = Date.now();
       const script = scripts.find((candidate) => execOptions.command.includes(candidate.match));
 
       if (!script) {
@@ -98,8 +97,6 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
           signal: null,
           canceled: false,
           timedOut: false,
-          durationMs: Date.now() - startedAt,
-          remotePid: 4242,
           stdinError: null,
         };
       }
@@ -122,8 +119,6 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
               signal: canceled ? 'TERM' : null,
               canceled,
               timedOut,
-              durationMs: Date.now() - startedAt,
-              remotePid: 4242,
               stdinError: script.stdinFailWith ?? null,
             });
           };
@@ -149,8 +144,6 @@ export function createFakeTransport(options: FakeTransportOptions = {}): FakeTra
         signal: script.signal ?? null,
         canceled: false,
         timedOut: false,
-        durationMs: Date.now() - startedAt,
-        remotePid: 4242,
         stdinError: script.stdinFailWith ?? null,
       };
     },

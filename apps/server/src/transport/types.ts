@@ -49,12 +49,6 @@ export type ExecOutcome = {
   signal: string | null;
   canceled: boolean;
   timedOut: boolean;
-  durationMs: number;
-  /**
-   * Process group id published by the remote wrapper. Recorded so a stuck
-   * execution can be diagnosed after the fact.
-   */
-  remotePid: number | null;
   /**
    * Non-null when the stdin payload could not be delivered in full. Without it
    * a connection dropped mid-push is indistinguishable from a script that

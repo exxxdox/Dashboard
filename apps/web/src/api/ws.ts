@@ -153,12 +153,6 @@ export class ExecutionSocket {
     };
   }
 
-  /** Open the connection idempotently; a no-op while one already exists. */
-  connect(): void {
-    if (this.socket !== null) return;
-    return this.open();
-  }
-
   subscribe(executionId: string, handlers: MessageHandlers): () => void {
     const subscription: Subscription = { handlers };
     const existing = this.subscriptions.get(executionId);

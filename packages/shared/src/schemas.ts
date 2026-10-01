@@ -14,9 +14,6 @@ import {
   type ScriptParam,
 } from './script-meta.js';
 
-/** Timestamps are ISO 8601 UTC strings, e.g. "2026-09-27T12:34:56.789Z". */
-export const isoDateTime = z.string();
-
 export const scriptFormatSchema = z.enum(['sh', 'ps1']);
 export type ScriptFormat = z.infer<typeof scriptFormatSchema>;
 
@@ -171,7 +168,6 @@ export const runDraftRowSchema = z.object({
   value: z.string().max(MAX_ARGV_LENGTH),
   mode: z.enum(['env', 'argv']),
 });
-export type RunDraftRow = z.infer<typeof runDraftRowSchema>;
 
 /**
  * What a script's run form held, so the next visit can start from it.
@@ -555,9 +551,6 @@ export type DnsSchedulerView = {
   intervalMinutes: number;
   /** When the next scheduled check is due; null while the schedule is off. */
   nextRunAt: string | null;
-  lastRunAt: string | null;
-  lastOk: boolean | null;
-  lastFailureReason: DnsFailureReason | null;
 };
 
 export type DnsState = {
@@ -576,11 +569,6 @@ export type DnsState = {
   history: {
     summary: DnsCheckSummary;
     records: DnsCheck[];
-    total: number;
-  };
-  limits: {
-    historyPreviewSize: number;
-    historyMaxRecords: number;
   };
 };
 

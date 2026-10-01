@@ -198,11 +198,6 @@ export type CheckTargetOptions = {
    * never writes inside the user's own working directory.
    */
   stagingRoot: string;
-  /**
-   * Builds the transport for a target. Overridable so this function can be
-   * exercised without SSH; the default decrypts the stored credential.
-   */
-  transportFactory?: (row: TargetRow, box: SecretBox) => Transport;
 };
 
 /**
@@ -223,8 +218,7 @@ export async function checkTarget(
   options: CheckTargetOptions,
 ): Promise<TargetCheckResult> {
   const row = getTargetRow(db, id);
-  const buildTransport = options.transportFactory ?? createTransportForTarget;
-  const transport = buildTransport(row, box);
+  const transport = createTransportForTarget(row, box);
 
   const record = (result: TargetCheckResult): TargetCheckResult => {
     db.prepare(
