@@ -47,6 +47,16 @@ Any `.sh` / `.ps1` file in source picked up (run with `bash` / `pwsh`; `pwsh` mu
 
 Declared params arrive as **environment variables**. Values header not declare can be added in run form, one row at a time: `env` (env var, name must be shell identifier) or `argv` (positional args `$1`, `$2` …, in row order, name only a label). Each script form remember last typed values.
 
+## Model Relay (MCP)
+
+Model Relay gives agents an Ollama image-understanding tool. Add Ollama endpoints, refresh their model lists, then configure models and priority fallback routes under Capabilities. Test endpoints or run a real capability test using the built-in sample, inspect each route attempt, and copy the MCP client configuration. JPEG, PNG and WebP Base64 images are supported; clients cannot choose upstream URLs or models.
+
+Settings let you view/rotate the MCP API key, adjust image size and concurrency limits, and restrict MCP network access. Management uses the dashboard sign-in; MCP uses its own Bearer key. Configure dashboard credentials before exposing management. Connect clients to `http://<host>:<DASHBOARD_PORT>/mcp`, replacing the old standalone port. Credentials are never printed to logs.
+
+Configuration stays in `DATA_DIR/model-ext-mcp.sqlite`. To migrate an existing deployment, stop the old service, back up its data, and move a consistent database snapshot into this directory without replacing dashboard's own database or key. The old `/api/v1` management API moves to `/api/model-relay` and uses dashboard sessions. Local development requires Node.js 24 or later.
+
+With MCP network access disabled, only TCP peers on loopback or local interface subnets are accepted; forwarded headers are ignored. Default host networking includes the host LAN in those subnets. A local reverse proxy counts as local, so restrict the proxy or firewall as needed.
+
 ## IPv6 DNS console
 
 The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare or Alibaba Cloud.

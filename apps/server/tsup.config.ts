@@ -3,8 +3,10 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm'],
-  target: 'node22',
+  target: 'node24',
   platform: 'node',
+  // node:sqlite is a prefix-only builtin; stripping node: makes the production bundle import an npm package.
+  removeNodeProtocol: false,
   sourcemap: true,
   clean: true,
   // Native addons and worker-thread based loggers cannot be bundled: keep them

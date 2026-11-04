@@ -42,6 +42,7 @@ apps/server/src
   services/         targets, sources+git, scan, executions — all DB logic
   services/dns/     the IPv6 console: settings, checks, providers, probe,
                     scheduler, and the service that is the only orchestration point
+  services/model-relay/  MCP image capabilities, Ollama routing, independent compatible SQLite
   services/notifications/  the app-wide notification settings row, the Gotify client,
                     and the one way to send a message
   routes/           targets, sources+scripts+overview, executions+websocket, dns,
@@ -49,6 +50,7 @@ apps/server/src
   ws/hub.ts         in-process pub/sub for live execution events
 apps/web/src
   api/  components/  pages/  lib/
+  model-relay/       the migrated capability console; scoped styles, shared session/locale
   api/query-client.ts  the cache, and the mutation feedback that hangs off it
   lib/i18n/         the English/Chinese dictionary, one file per area
   lib/toast.ts      the feedback stack: lifetimes, not rendering
@@ -124,6 +126,8 @@ Two consequence worth knowing before touch this: only entry script uploaded (scr
 **Server name message; client choose words.** `AppError` carry optional `i18n: { key, params }` beside English `message`, and `app.ts` put it in error body. English = what log record + what client with no wording of own show; key = what client that has one look up. Coverage deliberately partial: errors person actually hit have keys (`NotFoundError` derive own from entity, `validate()` build one naming missing credential fields by identifier, auth + notifier refusals carry theirs), rest fall through to server sentence. Client-side key for message nothing send = dead code, so adding one = two-sided change. `params` values that are names rather than values = identifiers -- DNS problem send `['cloudflareZoneId', …]`, not English labels -- and client resolve each through `error.field.<id>`; this one convention interpolation in `lib/i18n/index.tsx` know about.
 
 **Web client two language live in one dictionary per area.** `lib/i18n/areas/*.ts` each export `{ en, zh }` with `en` literal + `zh` a `Record<keyof typeof en, string>`, = whole enforcement: key added to one language not other fail typecheck. `MessageKey` = union of every area, so misspelled key = compile error rather than screen with `dns.titel` printed on it. Locale remembered in `localStorage`, defaults from `navigator.language`, mirrors to `document.documentElement.lang`. Dates + relative times take it too (`formatDateTime(iso, locale)`, `formatRelative(iso, t)`) because order of date's fields belong to language -- why `lib/format.ts` take translator rather than reaching for one. Language *endonyms* = deliberate exception, stay literal: someone who cannot read Chinese still recognise 简体中文.
+
+**Model Relay shares the listener and sign-in, keeps its protocol boundary.** `routes/model-relay.ts` owns `/api/model-relay` (dashboard session) and `/mcp` (independent Bearer key + socket-peer network check). Domain services remain under `services/model-relay`; `DATA_DIR/model-ext-mcp.sqlite` preserves the standalone data format. Open lazily and close with Fastify, so unrelated requests never create it. Do not log credentials or expose the old admin token. Node 24 is required for `node:sqlite`; tsup must keep `node:` prefixes because SQLite is a prefix-only builtin. Image body limits belong only to `/mcp`, not the dashboard's other routes. The feature's UI lives inside the main shell and uses its locale, toast and native modal.
 
 ## Conventions
 

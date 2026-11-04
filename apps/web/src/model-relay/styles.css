@@ -1,0 +1,348 @@
+/* Keep the migrated console styles inside its feature boundary. */
+.model-relay {
+/* Reuse dashboard tokens so this feature follows the shell's theme. */
+& {
+  --ink: var(--text);
+  --line: var(--border);
+  --inset: var(--surface-2);
+  --accent-hover: color-mix(in srgb, var(--accent) 80%, var(--surface));
+  --accent-text: var(--accent);
+  --success: var(--ok);
+  --red: var(--danger);
+  --warning: var(--warn);
+  --brand-muted: var(--accent);
+}
+
+* { box-sizing: border-box; }
+& { min-width: 0; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; white-space: nowrap; flex-shrink: 0; touch-action: manipulation; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input, textarea, select { width: 100%; border: 1px solid var(--line); background: var(--inset); padding: 11px 14px; border-radius: 9px; color: var(--ink); }
+textarea { min-height: 108px; resize: vertical; line-height: 1.5; }
+button { border: 1px solid transparent; border-radius: 9px; padding: 10px 17px; color: var(--accent-ink); background: var(--accent); font-weight: 650; line-height: 1.5; box-shadow: 0 2px 3px rgba(0, 0, 0, .08); }
+button:hover:not(:disabled) { background: var(--accent-hover); box-shadow: 0 0 22px var(--accent-soft); }
+button:disabled { opacity: .55; cursor: wait; }
+button.secondary, .text-button, .row-actions button { color: var(--ink); background: var(--surface); border: 1px solid var(--line); }
+button.secondary:hover:not(:disabled), .text-button:hover:not(:disabled), .row-actions button:hover:not(:disabled) { color: var(--ink); border-color: var(--border-strong); background: var(--accent-soft); }
+
+.text-button { border: 0; padding-inline: 8px; white-space: nowrap; }
+.health { color: var(--warning); background: var(--inset); padding: 6px 10px; border-radius: 20px; font-size: 17px; font-weight: 650; white-space: nowrap; }
+.health.ready { color: var(--success); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+
+/* 导航使用高亮描边与选中背景，让当前位置在密集的配置页面中更容易辨认。 */
+.page-nav { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; }
+.page-nav a { padding: 10px 17px; color: var(--ink); text-decoration: none; font-size: 20px; font-weight: 650; border-radius: 9px; border: 1px solid transparent; white-space: nowrap; }
+.page-nav a:hover { color: var(--accent-text); background: var(--accent-soft); }
+.page-nav a.active { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent-line); }
+
+/* 页面头：拆页后每个页面自带标题与说明，替代原先单页的大标题区。 */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+.page-head h1 { margin: 0; font-size: clamp(28px, 3vw, 36px); line-height: 1.25; letter-spacing: -.035em; }
+.page-head p { color: var(--muted); max-width: none; margin: 10px 0 0; font-size: 18px; line-height: 1.6; }
+.page-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 28px; }
+.stat-card { padding: 22px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.stat-card span { color: var(--muted); font-size: 17px; }
+.stat-card strong { display: block; margin: 8px 0 6px; font-size: 32px; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.stat-card p { margin: 0; color: var(--muted); font-size: 16px; }
+.stat-card.on { box-shadow: inset 0 3px 0 var(--success); }
+.stat-card.off { box-shadow: inset 0 3px 0 var(--warning); }
+
+.route-rail { margin: 22px 0 32px; padding: 22px; background: var(--inset); color: var(--ink); display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr; align-items: center; border-radius: 14px; }
+.route-rail > div { padding: 10px 14px; }
+.route-rail span { display: block; color: var(--ink); font-size: 17px; margin-bottom: 5px; }
+.route-rail strong { font-size: 20px; font-weight: 650; white-space: nowrap; }
+.route-rail i { height: 1px; background: var(--border-strong); position: relative; }
+.route-rail i::after { content: ""; position: absolute; right: 0; top: -3px; border-left: 6px solid var(--border-strong); border-top: 3px solid transparent; border-bottom: 3px solid transparent; }
+
+/* 链路未就绪时的下一步提示，只在控制台出现。 */
+.next-step { display: flex; align-items: center; justify-content: space-between; gap: 22px; margin-top: 30px; padding: 20px 22px; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--accent-text); border-radius: 14px; }
+.next-step h2 { margin: 0 0 5px; font-size: 19px; }
+.next-step p { margin: 0; color: var(--ink); }
+.next-step button { flex: none; }
+
+.mcp-body { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.mcp-endpoint { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mcp-endpoint span { color: var(--muted); font-size: 17px; }
+.mcp-endpoint code { overflow-wrap: anywhere; }
+.mcp-json { margin-top: 18px; border-top: 1px solid var(--line); }
+.mcp-json summary { cursor: pointer; padding: 14px 0; color: var(--ink); font-weight: 650; }
+.mcp-json summary:hover { color: var(--accent); }
+.mcp-json summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.mcp-json summary span { float: right; color: var(--accent-text); }
+.mcp-json .mcp-collapse, .mcp-json[open] .mcp-expand { display: none; }
+.mcp-json[open] .mcp-collapse { display: inline; }
+.mcp-json-actions { display: flex; justify-content: flex-end; }
+.mcp-code { margin: 16px 0 0; padding: 20px; overflow-x: auto; background: var(--inset); border-radius: 10px; }
+.mcp-code code { display: block; width: max-content; min-width: 100%; padding: 0; color: var(--ink); background: transparent; font-size: 17px; line-height: 1.65; }
+.mcp-hint { margin: 12px 0 0; color: var(--muted); font-size: 16px; }
+.mcp-body .empty { margin: 0; padding: 22px; border: 1px dashed var(--line); border-radius: 6px; }
+
+.config-section { margin-top: 32px; }
+.credential-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.credential { padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.credential h3 { margin: 0; font-size: 19px; }
+.credential p { margin: 5px 0 0; color: var(--muted); font-size: 17px; }
+.credential-value { margin: 18px 0 8px; overflow-x: auto; }
+.credential-value code { display: block; width: max-content; min-width: 100%; border: 1px solid var(--line); padding: 14px; border-radius: 8px; background: var(--inset); }
+.credential .credential-time { font-size: 16px; }
+.credential-actions { display: flex; gap: 7px; margin-top: 16px; }
+.credential-actions button { padding: 7px 11px; font-size: 17px; }
+.credential-actions .rotate { margin-left: auto; color: var(--ink); background: var(--inset); }
+.credential-actions .rotate:hover { color: var(--accent-ink); background: var(--accent); }
+
+.runtime-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 18px; align-items: end; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+/* 网络开关与两个数值字段同属一次保存，因此占满整行放在最前。 */
+.runtime-access { grid-column: 1 / -1; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.runtime-access .check { margin: 0 0 6px; font-weight: 650; }
+.runtime-access small { display: block; margin-top: 5px; color: var(--muted); line-height: 1.5; max-width: 900px; }
+.runtime-form .field { margin: 0; }
+.runtime-form small { display: block; min-height: 34px; margin-top: 7px; color: var(--muted); line-height: 1.4; }
+.runtime-save { min-width: 150px; }
+.runtime-save button { width: 100%; margin-bottom: 34px; }
+.runtime-save .form-error { margin: 0 0 8px; }
+
+.section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px 24px; margin-bottom: 16px; }
+.section-heading h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; line-height: 1.4; }
+.section-heading p { margin: 6px 0 0; color: var(--muted); font-size: 17px; line-height: 1.7; }
+.section-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); border-radius: 14px; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+th, td { padding: 17px 20px; text-align: left; border-bottom: 1px solid var(--line); font-size: 18px; }
+th { color: var(--ink); font-weight: 650; background: var(--inset); white-space: nowrap; font-size: 16px; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--inset); box-shadow: inset 3px 0 0 var(--accent); }
+td.strong { font-weight: 680; }
+td:last-child, th:last-child { text-align: right; }
+code { color: var(--info); background: var(--surface-3); border-radius: 3px; padding: 3px 6px; font-family: var(--stack-mono); }
+.status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+.status b { border: 1px solid var(--accent); width: 7px; height: 7px; border-radius: 50%; background: var(--inset); }
+.status.on { color: var(--success); }
+.status.on b { background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 13%, transparent); }
+.row-actions { display: inline-flex; gap: 6px; }
+.row-actions button { padding: 6px 12px; font-size: 17px; }
+.row-actions button.danger { color: var(--red); }
+.connection { font-size: 17px; color: var(--muted); }
+.connection.testing { color: var(--accent-text); }
+.connection.success { color: var(--success); }
+.connection.error { color: var(--red); }
+.empty { padding: 34px; text-align: center !important; color: var(--muted); }
+.discovered-models { margin-top: 12px; padding: 18px; background: var(--inset); border: 1px solid var(--line); border-radius: 14px; }
+.discovered-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.discovered-heading h3 { margin: 0; font-size: 20px; }
+.discovered-heading span { color: var(--muted); font-size: 17px; }
+.discovered-empty { margin: 16px 0 0; color: var(--muted); }
+.model-chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.model-chip { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.model-chip > div { min-width: 0; }
+.model-chip strong, .model-chip span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-chip span { margin-top: 3px; color: var(--muted); font-size: 16px; }
+.model-chip button { flex: none; padding: 7px 10px; font-size: 16px; }
+.model-chip .danger-text { color: var(--red); background: transparent; border: 1px solid var(--line); }
+.model-chip .danger-text:hover { color: var(--red); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+
+.modal { width: min(560px, 100%); max-height: calc(100vh - 44px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 30px 90px rgba(0, 0, 0, .22); }
+.modal-heading { display: flex; justify-content: space-between; align-items: start; padding: 25px 28px 20px; border-bottom: 1px solid var(--line); }
+.modal-heading p { margin: 0 0 2px; color: var(--muted); font-size: 17px; }
+.modal-heading h2 { margin: 0; }
+.modal-heading button { padding: 0 6px; color: var(--ink); background: transparent; font-size: 28px; }
+.modal-heading button:hover:not(:disabled) { color: var(--ink); background: var(--inset); }
+.modal form { padding: 25px 28px 28px; }
+/* 能力编辑同时展示说明、默认值和参数表，需要更宽的阅读空间；窄屏仍限制在可用宽度内。 */
+.modal.capability-editor { width: min(920px, 100%); }
+/* 测试弹窗要放下逐条尝试与请求体，比配置弹窗宽。它没有 form，所以自带内边距。 */
+.modal.wide { width: min(760px, 100%); }
+.modal-body { padding: 20px 28px 0; }
+.modal.wide .modal-actions { padding: 0 28px 28px; }
+.test-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.test-toolbar .secondary { margin-left: auto; }
+.test-summary { font-size: 17px; color: var(--muted); }
+.test-summary.ok { color: var(--success); font-weight: 650; }
+.test-section { margin: 0 0 20px; }
+.test-section h3 { margin: 0 0 10px; font-size: 18px; }
+.test-section > summary { cursor: pointer; font-size: 18px; font-weight: 650; margin-bottom: 10px; }
+.attempt { margin-bottom: 12px; padding: 14px; border: 1px solid var(--line); border-left: 3px solid var(--red); border-radius: 6px; }
+.attempt.ok { border-left-color: var(--success); }
+.attempt header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; font-size: 17px; color: var(--muted); }
+.attempt header strong { color: var(--ink); }
+.attempt-label { margin: 12px 0 6px; color: var(--muted); font-size: 16px; }
+.attempt-body { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; background: var(--inset); border-radius: 6px; font-size: 16px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.field { display: block; margin-bottom: 18px; }
+.field > span { display: block; margin-bottom: 7px; font-size: 18px; font-weight: 650; }
+.check { display: flex; align-items: center; gap: 9px; margin: 18px 0; font-size: 18px; }
+.check input { width: 17px; height: 17px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 24px; }
+.field-hint { margin: -10px 0 18px; color: var(--muted); font-size: 16px; line-height: 1.55; }
+
+/* 编辑器里的只读定义区：与可编辑字段用分隔线区分，避免看起来能改。 */
+.contract { margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--line); }
+.contract h3 { margin: 0 0 12px; font-size: 19px; }
+.contract-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 0 0 12px; }
+.contract-facts dt { color: var(--muted); font-size: 16px; margin-bottom: 4px; }
+.contract-facts dd { margin: 0; }
+.contract-note { margin: 0 0 14px; color: var(--muted); font-size: 16px; line-height: 1.6; }
+/* 代码基线区：默认值只用于对照与恢复，从「不可编辑的调用说明」里再退一层。 */
+.contract-defaults { margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; }
+.contract-defaults-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.contract-defaults-head h4 { margin: 0; font-size: 17px; }
+.contract-defaults .contract-note { margin: 0; }
+.param-table { min-width: 0; border: 1px solid var(--line); border-radius: 6px; }
+.param-table th, .param-table td { padding: 9px 11px; font-size: 16px; }
+.param-table td:last-child, .param-table th:last-child { text-align: left; }
+.form-error { border: 1px solid var(--danger); color: var(--red); background: color-mix(in srgb, var(--danger) 12%, transparent); padding: 10px 12px; border-left: 3px solid var(--red); }
+
+@media (max-width: 980px) {
+  .page-nav { order: 3; flex-basis: 100%; margin: 0; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .health { display: none; }
+  .page-actions { justify-content: flex-start; }
+  .route-rail { grid-template-columns: 1fr; gap: 0; }
+  .route-rail i { width: 1px; height: 20px; margin-left: 20px; }
+  .route-rail i::after { right: -3px; top: auto; bottom: 0; border-top: 6px solid var(--border-strong); border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 0; }
+  .next-step { flex-direction: column; align-items: stretch; }
+  .section-heading button { align-self: flex-start; }
+  .section-actions { justify-content: flex-start; }
+  .credential-grid { grid-template-columns: 1fr; }
+  .runtime-form { grid-template-columns: 1fr; }
+  .runtime-save button { margin-bottom: 0; }
+  .model-chips { grid-template-columns: 1fr; }
+}
+
+/* 统一交互反馈，只改变视觉状态，保留按钮原有的操作与禁用行为。 */
+button, a, input, textarea, select, .stat-card, .credential, .model-chip, tbody tr, .test-section > summary {
+  transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+button:active:not(:disabled) { box-shadow: inset 0 2px 4px rgba(0, 0, 0, .16); }
+button:disabled { box-shadow: none; }
+input:hover, textarea:hover, select:hover { border-color: var(--line); }
+input:focus, textarea:focus, select:focus { background: var(--surface); border-color: var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); flex-shrink: 0; cursor: pointer; }
+.stat-card, .credential, .mcp-body, .runtime-form, .table-wrap { box-shadow: 0 3px 12px rgba(0, 0, 0, .035); }
+.stat-card:hover, .credential:hover, .model-chip:hover { border-color: var(--line); box-shadow: 0 5px 18px rgba(0, 0, 0, .075); }
+.stat-card.on:hover { box-shadow: inset 0 3px 0 var(--accent), 0 5px 18px rgba(0, 0, 0, .075); }
+.stat-card.off:hover { box-shadow: inset 0 3px 0 var(--warning), 0 5px 18px rgba(0, 0, 0, .075); }
+.health { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); }
+.health::before { content: ""; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
+.health.ready { border-color: var(--line); }
+
+/* 短标签保持完整，让说明优先使用剩余宽度，避免按钮把中文挤成竖排。 */
+.page-head > div:first-child { flex: 1; min-width: 0; }
+.page-actions, .section-actions { flex-shrink: 0; }
+.section-heading > div:first-child { flex: 1 1 600px; min-width: 0; }
+.section-actions { margin-left: auto; }
+.stat-card span, .stat-card strong, .status, .connection { white-space: nowrap; }
+.stat-card p { line-height: 1.6; }
+.status { padding: 5px 9px; background: var(--inset); border-radius: 6px; font-size: 16px; }
+.status.on { background: var(--inset); }
+.status b { flex-shrink: 0; }
+td.strong, td:has(> code), td:has(> .row-actions), td:has(> .status) { white-space: nowrap; }
+td:last-child:has(.row-actions) { width: 1%; }
+td { line-height: 1.65; }
+td code { white-space: nowrap; }
+.row-actions button.danger:hover { color: var(--red); background: color-mix(in srgb, var(--danger) 12%, transparent); border-color: var(--danger); }
+.mcp-hint, .credential p, .next-step p { line-height: 1.7; }
+.mcp-endpoint code { display: block; max-width: 100%; overflow-x: auto; white-space: nowrap; }
+.runtime-form small { min-height: 0; }
+/* 从字段标题高度对齐保存按钮，避免说明换行后依赖固定底部留白而错位。 */
+.runtime-save { align-self: start; padding-top: 28px; }
+.runtime-save button { margin-bottom: 0; }
+.test-section > summary { padding: 10px 12px; background: var(--inset); border-radius: 8px; }
+.test-section > summary:hover { background: var(--accent); color: var(--accent-ink); }
+.test-toolbar, .attempt header, .contract-defaults-head { flex-wrap: wrap; }
+.test-toolbar .status { flex-shrink: 0; }
+.contract-facts dd { min-width: 0; overflow-wrap: anywhere; }
+.param-table td { overflow-wrap: anywhere; }
+
+/* 中等宽度先调整空间分配，不通过裁切说明或缩小按钮文字解决拥挤。 */
+@media (min-width: 981px) and (max-width: 1180px) {
+  .page-nav a { padding-inline: 12px; }
+}
+@media (min-width: 761px) and (max-width: 980px) {
+  .runtime-form { grid-template-columns: 1fr 1fr; }
+  .runtime-save { grid-column: 1 / -1; justify-self: end; padding-top: 0; }
+  .route-rail { grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr; padding: 16px 10px; }
+  .route-rail > div { padding-inline: 8px; }
+  .route-rail strong { font-size: 19px; }
+}
+@media (max-width: 760px) {
+  .page-head { gap: 18px; align-items: stretch; }
+  .section-heading > div:first-child { flex-basis: auto; }
+  .section-actions { margin-left: 0; }
+  .runtime-save { padding-top: 0; }
+  .health { display: none; }
+  .stat-card { padding: 18px; }
+}
+@media (max-width: 420px) {
+  /* 大字号下让四个导航入口完整显示，避免最后一项在窄屏被截断。 */
+  .page-nav { flex-wrap: wrap; overflow-x: visible; }
+  .page-nav a { flex: 1 1 calc(50% - 6px); padding-inline: 12px; text-align: center; }
+  .stat-grid { grid-template-columns: 1fr; gap: 10px; }
+  .stat-card { padding: 16px 12px; }
+  .stat-card strong { font-size: 26px; }
+  .modal { max-height: calc(100dvh - 20px); border-radius: 14px; }
+  .modal-heading { padding: 20px; }
+  .modal form { padding: 20px; }
+  .modal-body { padding: 20px 20px 0; }
+  .modal.wide .modal-actions { padding: 0 20px 20px; }
+}
+/* 局部光效回应 hover 与聚焦，正文和分隔线保持低饱和以便长时间阅读。 */
+button:hover:not(:disabled) { transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(0); }
+button.secondary:focus-visible, .row-actions button:focus-visible,
+button.secondary:hover:not(:disabled), .row-actions button:hover:not(:disabled) { box-shadow: 0 0 16px var(--accent-soft); }
+.page-nav a:hover, .page-nav a:focus-visible { box-shadow: inset 0 -2px 0 var(--accent), 0 0 18px var(--accent-soft); }
+.page-nav a.active { box-shadow: inset 0 -2px 0 var(--accent); }
+input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 20px var(--accent-soft); }
+.stat-card:hover, .credential:hover, .model-chip:hover { box-shadow: 0 0 24px var(--accent-soft); }
+.stat-card.on:hover { box-shadow: inset 0 3px 0 var(--success), 0 0 24px var(--accent-soft); }
+.stat-card.off:hover { box-shadow: inset 0 3px 0 var(--warning), 0 0 24px var(--accent-soft); }
+.table-wrap:focus-within, .credential:focus-within, .mcp-body:focus-within { border-color: var(--line); }
+.route-rail { border: 1px solid var(--border); background: var(--surface-2); }
+.check input { padding: 0; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+  button:hover:not(:disabled) { transform: none; }
+}
+
+/* 保持面板挂载保留草稿，hidden 必须优先于布局样式。 */
+.capability-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.capability-editor [hidden] { display: none; }
+.editor-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.editor-tabs button { background: var(--inset); color: var(--muted); border: 1px solid var(--line); }
+.editor-tabs button:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-text); }
+.editor-tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.editor-tabs button[aria-selected="true"]:hover:not(:disabled) { background: var(--accent-hover); color: var(--accent-ink); }
+.route-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.route-toolbar h3, .route-toolbar p { margin: 0; }
+.route-toolbar p { flex: 1; min-width: 180px; }
+.route-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.route-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.route-draft { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--inset); }
+@media (max-width: 720px) { .route-list { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 420px) { .editor-tabs button { flex: 1 1 40%; padding: 10px 6px; } .route-draft { padding: 12px; } }
+
+/* 独立说明没有前置输入框，使用正常边距而不继承字段提示的负边距。 */
+.capability-default-hint, .route-task { margin: 0 0 18px; }
+/* 保持开关宽度、位置和文案稳定；加载反馈用 aria-busy，避免通用按钮动效引起抖动。 */
+.capability-switch { display: inline-flex; align-items: center; gap: 10px; background: transparent; color: var(--muted); border: 0; box-shadow: none; white-space: nowrap; padding: 10px 0; width: 86px; justify-content: flex-start; }
+.capability-switch:hover:not(:disabled), .capability-switch:active:not(:disabled) { background: transparent; box-shadow: none; transform: none; }
+.capability-switch:disabled { opacity: 1; }
+.switch-label { width: 36px; }
+.capability-switch[aria-checked="true"] { color: var(--success); }
+.switch-track { display: block; width: 40px; padding: 3px; border-radius: 16px; background: var(--muted); }
+.switch-track span { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); transition: transform .15s; }
+.capability-switch[aria-checked="true"] .switch-track { background: var(--success); }
+.capability-switch[aria-checked="true"] .switch-track span { transform: translateX(18px); }
+@media (prefers-reduced-motion: reduce) { .switch-track span { transition: none; } }
+
+/* The shared native dialog owns the frame, backdrop and scrolling. */
+.modal { width: 100%; max-height: none; border: 0; box-shadow: none; border-radius: 0; }
+}

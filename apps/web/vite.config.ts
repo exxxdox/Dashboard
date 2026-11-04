@@ -17,6 +17,8 @@ export default defineConfig({
     // In dev the API runs on its own port; in the container the same origin
     // serves both, so this proxy only exists for `pnpm dev`.
     proxy: {
+      // MCP clients can use the same origin as the console during development.
+      '/mcp': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/api': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,

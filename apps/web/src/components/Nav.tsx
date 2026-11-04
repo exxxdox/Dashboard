@@ -1,4 +1,4 @@
-import { Activity, FileCode, FolderTree, Globe, Server, Settings, Terminal } from 'lucide-react';
+import { Activity, BrainCircuit, FileCode, FolderTree, Globe, Server, Settings, Terminal } from 'lucide-react';
 
 import { cn } from '../lib/cn';
 import { href, type Route } from '../lib/router';
@@ -21,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { route: 'sources', label: 'nav.sources', path: '/sources', icon: FolderTree },
   // Appended rather than inserted: nothing else on the rail moves for it.
   { route: 'dns', label: 'nav.dns', path: '/dns', icon: Globe },
+  { route: 'modelRelay', label: 'nav.modelRelay', path: '/model-relay', icon: BrainCircuit },
   { route: 'settings', label: 'nav.settings', path: '/settings', icon: Settings },
 ];
 

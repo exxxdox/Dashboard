@@ -17,6 +17,7 @@ import { SCHEMA_VERSION } from './db/schema.js';
 import { AppError } from './lib/errors.js';
 import { isSecureRequest, registerAuthRoutes, setSessionCookie } from './routes/auth.js';
 import { readCookie, SESSION_COOKIE } from './lib/auth.js';
+import { registerModelRelayRoutes } from './routes/model-relay.js';
 import { registerDnsRoutes } from './routes/dns.js';
 import { registerExecutionRoutes } from './routes/executions.js';
 import { registerSettingsRoutes } from './routes/settings.js';
@@ -174,6 +175,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerExecutionRoutes(app, ctx);
   registerDnsRoutes(app, ctx);
   registerSettingsRoutes(app, ctx);
+  registerModelRelayRoutes(app, ctx);
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     // Request validation failures are the user's input, not a server fault.

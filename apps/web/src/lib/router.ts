@@ -18,6 +18,7 @@ export type Route =
   | { name: 'dns'; search: URLSearchParams }
   // Preferences for the whole dashboard rather than for one feature.
   | { name: 'settings' }
+  | { name: 'modelRelay' }
   | { name: 'notFound'; path: string };
 
 const DEFAULT_HASH = '#/';
@@ -42,6 +43,9 @@ export function parseRoute(hash: string): Route {
       return { name: 'sources' };
     case 'dns':
       return { name: 'dns', search };
+    // Relay subpages share one mounted workspace so pending edits survive navigation.
+    case 'model-relay':
+      return { name: 'modelRelay' };
     case 'settings':
       return { name: 'settings' };
     default:

@@ -47,6 +47,16 @@ docker compose up -d --build
 
 声明参数以**环境变量**传入。脚本未声明的值可临时加：运行表单每行选 `env`（环境变量，名须是 shell 标识符）或 `argv`（位置参数 `$1 $2`，按行序，名只是标签）。每个脚本表单记住上次填的内容。
 
+## 模型能力（MCP）
+
+「模型能力」为 Agent 提供 Ollama 图像理解工具。添加 Ollama 端点、刷新模型列表后，在能力设置中配置模型和优先级回退路由。可测试端点、用内置样例真实测试能力、查看每次路由尝试，并复制 MCP 客户端配置。支持 JPEG、PNG、WebP Base64 图片，客户端不能指定上游模型或 URL。
+
+设置页可查看/轮转 MCP API Key，调整单张图片大小、调用并发和 MCP 网络访问范围。管理页面共用 dashboard 登录，MCP 使用独立 Bearer Key；请配置 dashboard 登录凭据。MCP 地址为 `http://<宿主地址>:<DASHBOARD_PORT>/mcp`，不再使用原独立服务的端口。服务不会在日志中打印密钥。
+
+配置保存在 `DATA_DIR/model-ext-mcp.sqlite`。迁移旧部署时先停止旧服务并备份数据，将原数据库的一致快照移入同一目录，保留 dashboard 自身数据库与密钥。原 `/api/v1` 管理 API 改为 `/api/model-relay` 并使用 dashboard 会话。Node.js 本地运行需 24 或以上。
+
+关闭 MCP 网络访问时，只放行 TCP 对端属于本机或本机网段的请求，不信任转发头。默认 host 网络下，这包含宿主机局域网；同机反向代理视为本机，请按实际需求限制代理或防火墙。
+
 ## IPv6 DNS 控制台
 
 「DNS」页把一条 AAAA 记录保持指向本机的公网 IPv6，服务商支持 Cloudflare 与阿里云。

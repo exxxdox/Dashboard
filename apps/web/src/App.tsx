@@ -13,6 +13,7 @@ import { RunDetailPage } from './pages/RunDetailPage';
 import { TargetsPage } from './pages/TargetsPage';
 import { SourcesPage } from './pages/SourcesPage';
 import { DnsPage } from './pages/DnsPage';
+import { ModelRelayPage } from './model-relay/ModelRelayPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignInPage } from './pages/SignInPage';
 import { useAuthStatus } from './api/queries';
@@ -91,6 +92,8 @@ function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
       return <SourcesPage />;
     case 'dns':
       return <DnsPage search={route.search} />;
+    case 'modelRelay':
+      return <ModelRelayPage />;
     case 'settings':
       return <SettingsPage />;
     case 'notFound':

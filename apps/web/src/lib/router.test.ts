@@ -15,6 +15,12 @@ describe('parseRoute', () => {
     expect(parseRoute('#/sources')).toEqual({ name: 'sources' });
   });
 
+  it('keeps all model relay pages inside the dashboard shell', () => {
+    for (const path of ['', '/ollama', '/capabilities', '/settings']) {
+      expect(parseRoute(`#/model-relay${path}`)).toEqual({ name: 'modelRelay' });
+    }
+  });
+
   it('carries the id of a detail route', () => {
     const scripts = parseRoute('#/scripts/sc-1');
     expect(scripts).toMatchObject({ name: 'scripts', scriptId: 'sc-1' });
