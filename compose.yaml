@@ -18,7 +18,7 @@ services:
         ALPINE_MIRROR: ${ALPINE_MIRROR:-dl-cdn.alpinelinux.org}
         NPM_REGISTRY: ${NPM_REGISTRY:-}
         WITH_GIT: ${WITH_GIT:-true}
-    image: exxxdox/pri:dashboard
+    image: exxxdox/dashboard:latest
     container_name: dashboard
     network_mode: host
     extra_hosts:
