@@ -331,6 +331,7 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px var(--accent-s
 
 /* 独立说明没有前置输入框，使用正常边距而不继承字段提示的负边距。 */
 .capability-default-hint, .route-task { margin: 0 0 18px; }
+.route-note { margin: 0 0 12px; }
 /* 保持开关宽度、位置和文案稳定；加载反馈用 aria-busy，避免通用按钮动效引起抖动。 */
 .capability-switch { display: inline-flex; align-items: center; gap: 10px; background: transparent; color: var(--muted); border: 0; box-shadow: none; white-space: nowrap; padding: 10px 0; width: 86px; justify-content: flex-start; }
 .capability-switch:hover:not(:disabled), .capability-switch:active:not(:disabled) { background: transparent; box-shadow: none; transform: none; }

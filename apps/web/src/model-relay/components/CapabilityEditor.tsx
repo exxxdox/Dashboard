@@ -102,8 +102,9 @@ export function CapabilityEditor({ editor, capabilities, endpoints, deployments,
             <div role="tabpanel" id="capability-panel-2" aria-labelledby="capability-tab-2" data-tab="2" hidden={tab !== 2}>
               <div className="route-toolbar"><p className="field-hint">{relayText("此能力使用 Ollama。选择端点与模型，多条路由按优先级从小到大依次尝试。")}</p><button type="button" className="secondary" disabled={refreshingModels} onClick={() => void onRefreshModels()}>{refreshingModels ? relayText("刷新中…") : relayText("刷新模型列表")}</button></div>
               <p className="field-hint route-task">{relayText("模型任务：")}{definition?.defaultPrompt ?? relayText("暂无可用的能力定义")}</p>
-              {availableEndpoints.length === 0 && <p className="form-error">{relayText("请先在「外部能力」添加 Ollama 端点。")}</p>}
-              {routeDrafts.length === 0 && <p className="field-hint">{relayText("暂无路由。添加后选择模型即可使用外部能力。")}</p>}
+              {/* 空状态说明前面没有输入框，必须用正常边距，否则 field-hint 的负边距会压到提示框上。 */}
+              {availableEndpoints.length === 0 && <p className="form-error route-note">{relayText("请先在「外部能力」添加 Ollama 端点。")}</p>}
+              {routeDrafts.length === 0 && <p className="field-hint route-note">{relayText("暂无路由。添加后选择模型即可使用外部能力。")}</p>}
               {/* 窄卡片并排展示，端点与模型占整行，短数值并排减少纵向滚动。 */}
               <div className="route-list">{routeDrafts.map((route, index) => {
                 const prefix = `route-${route.draftKey}-`;
