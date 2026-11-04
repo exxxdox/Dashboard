@@ -21,7 +21,7 @@ Open `http://<host address>:50014` (or what `DASHBOARD_PORT` say in `.env`). The
 
 ## docker compose
 
-Run it on **host networking** (not published ports), and the host needs **working public IPv6 egress** -- the DNS check must leave through the host's own IPv6; a bridge network reports a different address. Everything else is in the header comments of `compose.yaml`.
+Run it on **host networking** (not published ports), and the host needs a **public IPv6 address**. Local detection reads the host interfaces; ipify detection also requires public IPv6 egress. A bridge network exposes the container's own interfaces instead. Everything else is in the header comments of `compose.yaml`.
 
 ## Environment variables
 
@@ -51,12 +51,12 @@ Declared params arrive as **environment variables**. Values header not declare c
 
 The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare or Alibaba Cloud.
 
-- Open Settings from the page header to configure the provider, credentials, check interval and Gotify notifications in a dialog. Credentials and notifications can be collapsed.
+- Open Settings from the page header to configure the provider, credentials, IPv6 detection source, check interval and Gotify notifications in a dialog. Credentials and notifications can be collapsed.
 - Use the header actions to detect public IPv6, query the record and check/update manually. Results remain visible until the next action or leaving the page.
 - The status card shows addresses, the DNS record, the next scheduled check and the last scheduled result. Choose View all in the history preview to open statistics and paginated details.
 - Status columns adapt to screen width. The page supports English and Chinese.
 
-Probes run from the dashboard host and require public IPv6 egress. If using Fake-IP DNS such as Clash/Mihomo, configure `api6.ipify.org` to resolve to real addresses and connect directly. The last scheduled result resets on service restart; check history is retained.
+Choose ipify (the default) or local interfaces as the IPv6 source. Once saved, address detection, manual updates and scheduled updates all use that source. ipify requires public IPv6 egress; with Fake-IP DNS such as Clash/Mihomo, configure `api6.ipify.org` to resolve to real addresses and connect directly. Local detection reads stable public IPv6 addresses from Linux interfaces and excludes private, temporary, deprecated and unready addresses. Optionally specify an interface name such as `enp1s0`; leave it blank for automatic detection. It stops updates when there are no candidates or multiple candidates, without switching sources. Containers need host networking to read host interface addresses. Local detection needs no ipify connection, but DNS updates still require access to the provider API. The last scheduled result resets on service restart; check history is retained.
 
 DNS and Settings share the same Gotify configuration. Test messages can use unsaved form values.
 

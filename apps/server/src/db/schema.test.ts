@@ -224,6 +224,33 @@ describe('v6 migration', () => {
   });
 });
 
+describe('v7 migration', () => {
+  test('preserves old DNS settings and defaults existing rows to ipify', () => {
+    const db = versionFiveDatabase();
+    try {
+      const v6 = MIGRATIONS[5];
+      if (!v6) throw new Error('expected v6 migration');
+      v6(db);
+      db.pragma('user_version = 6');
+      const before = db.prepare<[], Record<string, unknown>>('SELECT * FROM dns_settings').get();
+
+      migrate(db);
+
+      expect(db.prepare('SELECT * FROM dns_settings').get()).toEqual({
+        ...before,
+        ipv6_source: 'ipify',
+        local_ipv6_interface: '',
+      });
+      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+      expect(() => db.prepare("UPDATE dns_settings SET ipv6_source = 'unknown'").run()).toThrow(/CHECK/);
+      expect(() => db.prepare("UPDATE dns_settings SET ipv6_source = 'local'").run()).not.toThrow();
+      expect(() => migrate(db)).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+});
+
 describe('v2 migration', () => {
   test('backfills the working directory from the old host path', () => {
     const db = versionOneDatabase();

@@ -45,6 +45,7 @@ type Harness = {
   service: DnsService;
   provider: { getRecord: ReturnType<typeof vi.fn>; setIpv6: ReturnType<typeof vi.fn> };
   detect: ReturnType<typeof vi.fn>;
+  detectLocal: ReturnType<typeof vi.fn>;
   sendNotification: ReturnType<typeof vi.fn>;
   save: () => void;
 };
@@ -65,6 +66,7 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     setIpv6: vi.fn(overrides.provider?.setIpv6 ?? (async (): Promise<'unchanged'> => 'unchanged')),
   };
   const detect = vi.fn(async (): Promise<string> => '2606:4700::1');
+  const detectLocal = vi.fn(async (): Promise<string> => '2001:4860::8888');
   const sendNotification = vi.fn(async (): Promise<boolean> => true);
 
   const service = createDnsService({
@@ -73,6 +75,7 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     logger,
     createProvider: () => ({ name: 'cloudflare', ...provider }) as unknown as DnsProvider,
     detectIpv6: detect,
+    detectLocalIpv6: detectLocal,
     sendNotification: sendNotification as unknown as (
       notification: unknown,
     ) => Promise<boolean>,
@@ -84,6 +87,7 @@ function setup(overrides: { provider?: ProviderOverrides } = {}): Harness {
     service,
     provider,
     detect,
+    detectLocal,
     sendNotification,
     save: () => {
       saveSettings(db, box, CLOUDFLARE);
@@ -434,3 +438,81 @@ describe('detect and queryRecord', () => {
 // The notification tests used to live here. They moved to
 // `services/notifications/service.test.ts` with the code they cover: the
 // credential they exercise is an application setting now, not a DNS one.
+
+
+describe('IPv6 detection source', () => {
+  test.each(['manual', 'scheduled'] as const)('%s updates use the saved local source', async source => {
+    const h = setup();
+    try {
+      h.save();
+      h.service.saveSettings({ ipv6Source: 'local' });
+      const result = await h.service.update(source);
+      expect(result).toMatchObject({ ipv6: '2001:4860::8888', action: 'unchanged' });
+      expect(h.detectLocal).toHaveBeenCalledOnce();
+      expect(h.detect).not.toHaveBeenCalled();
+      expect(h.provider.setIpv6).toHaveBeenCalledWith('2001:4860::8888', EXISTING, undefined);
+    } finally { h.db.close(); }
+  });
+
+  test('standalone detection follows the saved source and switching clears the cached address', async () => {
+    const h = setup();
+    try {
+      h.save();
+      expect((await h.service.detect()).ipv6).toBe('2606:4700::1');
+      h.service.saveSettings({ ipv6Source: 'local' });
+      expect(h.service.state().ipv6).toBeNull();
+      expect(h.service.state().ipv6CheckedAt).toBeNull();
+      expect((await h.service.detect()).ipv6).toBe('2001:4860::8888');
+      h.service.saveSettings({ intervalMinutes: 20 });
+      expect(h.service.state().ipv6).toBe('2001:4860::8888');
+      h.service.saveSettings({ ipv6Source: 'ipify' });
+      expect((await h.service.detect()).ipv6).toBe('2606:4700::1');
+    } finally { h.db.close(); }
+  });
+
+  test('does not fall back to ipify or query/write DNS when local detection fails', async () => {
+    const h = setup();
+    try {
+      h.save();
+      h.service.saveSettings({ ipv6Source: 'local' });
+      h.detectLocal.mockRejectedValue(new DnsFailureError('No local address', 'ipv6_not_global'));
+      expect(await h.service.update('scheduled')).toMatchObject({ action: 'failed', failureReason: 'ipv6_not_global' });
+      expect(h.detect).not.toHaveBeenCalled();
+      expect(h.provider.getRecord).not.toHaveBeenCalled();
+      expect(h.provider.setIpv6).not.toHaveBeenCalled();
+    } finally { h.db.close(); }
+  });
+});
+
+
+test.each(['detect', 'update'] as const)('an in-flight %s cannot restore the previous source cache', async operation => {
+  const h = setup();
+  try {
+    h.save();
+    let finish!: (address: string) => void;
+    h.detect.mockReturnValueOnce(new Promise<string>(resolve => { finish = resolve; }));
+    const pending = operation === 'detect' ? h.service.detect() : h.service.update('manual');
+    await flush();
+    expect(h.detect).toHaveBeenCalledOnce();
+    h.service.saveSettings({ ipv6Source: 'local' });
+    await h.service.detect();
+    finish('2606:4700::1');
+    await pending;
+    expect(h.service.state().ipv6).toBe('2001:4860::8888');
+  } finally { h.db.close(); }
+});
+
+
+test('forwards the saved interface to local detection and clears its cache when it changes', async () => {
+  const h = setup();
+  try {
+    h.save();
+    h.service.saveSettings({ ipv6Source: 'local', localIpv6Interface: 'enp1s0' });
+    await h.service.detect();
+    expect(h.detectLocal).toHaveBeenLastCalledWith('enp1s0', undefined);
+    h.service.saveSettings({ localIpv6Interface: 'wlp2s0' });
+    expect(h.service.state().ipv6).toBeNull();
+    await h.service.update('scheduled');
+    expect(h.detectLocal).toHaveBeenLastCalledWith('wlp2s0', undefined);
+  } finally { h.db.close(); }
+});

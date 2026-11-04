@@ -47,6 +47,21 @@ describe('reading settings that were never saved', () => {
 });
 
 describe('saving settings', () => {
+  test('defaults to ipify and preserves a saved local source across partial updates', () => {
+    const { db, box } = setup();
+    try {
+      expect(saveSettings(db, box, FULL_CLOUDFLARE).ipv6Source).toBe('ipify');
+      expect(saveSettings(db, box, { ipv6Source: 'local' }).ipv6Source).toBe('local');
+      expect(readSettingsRow(db)?.ipv6_source).toBe('local');
+      expect(resolveSettings(db, box)?.ipv6Source).toBe('local');
+      saveSettings(db, box, { intervalMinutes: 20 });
+      expect(getSettingsView(db)?.ipv6Source).toBe('local');
+      expect(resolveSettings(db, box)?.cloudflareToken).toBe('cf-token');
+    } finally {
+      db.close();
+    }
+  });
+
   test('stores the credentials encrypted and returns none of them', () => {
     const { db, box } = setup();
     try {
@@ -67,6 +82,24 @@ describe('saving settings', () => {
       // credential could be hiding under.
       expect(Object.keys(view)).not.toContain('cloudflareToken');
       expect(Object.keys(view)).not.toContain('alibabaAccessKeySecret');
+    } finally {
+      db.close();
+    }
+  });
+
+  test('stores the local interface, keeps it on partial updates and allows clearing it', () => {
+    const { db, box } = setup();
+    try {
+      expect(saveSettings(db, box, FULL_CLOUDFLARE).localIpv6Interface).toBe('');
+      expect(saveSettings(db, box, {
+        ipv6Source: 'local', localIpv6Interface: ' enp1s0 ',
+      }).localIpv6Interface).toBe('enp1s0');
+      expect(readSettingsRow(db)?.local_ipv6_interface).toBe('enp1s0');
+      expect(resolveSettings(db, box)?.localIpv6Interface).toBe('enp1s0');
+      saveSettings(db, box, { intervalMinutes: 15 });
+      expect(getSettingsView(db)?.localIpv6Interface).toBe('enp1s0');
+      expect(saveSettings(db, box, { localIpv6Interface: '' }).localIpv6Interface).toBe('');
+      expect(resolveSettings(db, box)?.localIpv6Interface).toBe('');
     } finally {
       db.close();
     }

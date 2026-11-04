@@ -56,7 +56,7 @@ import {
   type DnsCheckFilter,
 } from './checks.js';
 import { createCloudflareProvider } from './cloudflare.js';
-import { detectPublicIpv6 } from './ipv6.js';
+import { detectLocalIpv6, detectPublicIpv6 } from './ipv6.js';
 import {
   getSettingsView,
   resolveSettings,
@@ -77,6 +77,7 @@ export type DnsServiceDeps = {
    */
   createProvider?: (settings: ResolvedDnsSettings) => DnsProvider;
   detectIpv6?: (signal?: AbortSignal) => Promise<string>;
+  detectLocalIpv6?: (interfaceName: string, signal?: AbortSignal) => Promise<string>;
   /**
    * How to reach a person. Required rather than defaulted: where a message goes
    * is a dashboard-wide setting, and a console that quietly sent nothing would
@@ -135,7 +136,12 @@ export function toUpstreamError(error: unknown): AppError {
 export function createDnsService(deps: DnsServiceDeps): DnsService {
   const { db, box, logger } = deps;
   const createProvider = deps.createProvider ?? defaultProvider;
-  const detectIpv6 = deps.detectIpv6 ?? detectPublicIpv6;
+  // Both update entry points and the probe select the same saved source, without silent fallback.
+  function detectIpv6(source: DnsSettingsView['ipv6Source'], interfaceName: string, signal?: AbortSignal): Promise<string> {
+    return source === 'local'
+      ? (deps.detectLocalIpv6 ?? detectLocalIpv6)(interfaceName, signal)
+      : (deps.detectIpv6 ?? detectPublicIpv6)(signal);
+  }
   const { sendNotification } = deps;
 
   // The lock the Python version kept at module level, now that two paths -- the
@@ -146,6 +152,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
   // lost on restart, and never a substitute for the durable settings and history.
   let lastIpv6: string | null = null;
   let lastIpv6At: string | null = null;
+  let detectionGeneration = 0;
   let lastRecord: DnsRecord | null = null;
   let lastRecordAt: string | null = null;
 
@@ -166,10 +173,13 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     }
 
     let ipv6: string;
+    const generation = detectionGeneration;
     try {
-      ipv6 = await detectIpv6(signal);
-      lastIpv6 = ipv6;
-      lastIpv6At = nowIso();
+      ipv6 = await detectIpv6(settings.ipv6Source, settings.localIpv6Interface, signal);
+      if (generation === detectionGeneration) {
+        lastIpv6 = ipv6;
+        lastIpv6At = nowIso();
+      }
     } catch (error) {
       return remember(source, failFrom(error, settings.provider, ''));
     }
@@ -288,10 +298,15 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     async detect(signal) {
       // A refusal from the probe is left to the route: it answers 502 with the
       // reason, and there is no history row for a probe on its own.
-      const ipv6 = await detectIpv6(signal);
-      lastIpv6 = ipv6;
-      lastIpv6At = nowIso();
-      return { ipv6, detectedAt: lastIpv6At };
+      const generation = detectionGeneration;
+      const settings = getSettingsView(db);
+      const ipv6 = await detectIpv6(settings?.ipv6Source ?? 'ipify', settings?.localIpv6Interface ?? '', signal);
+      const detectedAt = nowIso();
+      if (generation === detectionGeneration) {
+        lastIpv6 = ipv6;
+        lastIpv6At = detectedAt;
+      }
+      return { ipv6, detectedAt };
     },
 
     async queryRecord(signal) {
@@ -352,7 +367,18 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     },
 
     saveSettings(input) {
+      const previous = getSettingsView(db);
       const view = writeSettings(db, box, input);
+      // A cached address from the previous source is no longer the configured observation.
+      if (
+        view.ipv6Source !== (previous?.ipv6Source ?? 'ipify') ||
+        view.localIpv6Interface !== (previous?.localIpv6Interface ?? '')
+      ) {
+        // In-flight probes from the old source must not repopulate the cleared cache.
+        detectionGeneration += 1;
+        lastIpv6 = null;
+        lastIpv6At = null;
+      }
       deps.configureSchedule?.({
         scheduleEnabled: view.scheduleEnabled,
         intervalMinutes: view.intervalMinutes,

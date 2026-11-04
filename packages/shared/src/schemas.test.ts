@@ -212,3 +212,21 @@ describe('updateAppSettingsSchema', () => {
     expect(updateAppSettingsSchema.parse({})).toEqual({});
   });
 });
+
+
+describe('DNS IPv6 source selection', () => {
+  test.each(['ipify', 'local'])('accepts %s', ipv6Source => {
+    expect(updateDnsSettingsSchema.parse({ ipv6Source })).toEqual({ ipv6Source });
+  });
+  test('rejects unsupported sources and preserves partial updates', () => {
+    expect(updateDnsSettingsSchema.safeParse({ ipv6Source: 'auto' }).success).toBe(false);
+    expect(updateDnsSettingsSchema.parse({})).toEqual({});
+  });
+});
+
+
+test('validates and trims the optional local IPv6 interface name', () => {
+  expect(updateDnsSettingsSchema.parse({ localIpv6Interface: ' enp1s0 ' })).toEqual({ localIpv6Interface: 'enp1s0' });
+  expect(updateDnsSettingsSchema.parse({ localIpv6Interface: '' })).toEqual({ localIpv6Interface: '' });
+  expect(updateDnsSettingsSchema.safeParse({ localIpv6Interface: 'x'.repeat(16) }).success).toBe(false);
+});

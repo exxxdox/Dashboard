@@ -24,6 +24,8 @@ import { useI18n } from '../lib/i18n';
 
 type FormState = {
   provider: DnsProviderName;
+  ipv6Source: DnsSettingsView['ipv6Source'];
+  localIpv6Interface: string;
   scheduleEnabled: boolean;
   intervalMinutes: string;
   cloudflareZoneId: string;
@@ -36,6 +38,8 @@ type FormState = {
 
 const EMPTY: FormState = {
   provider: 'cloudflare',
+  ipv6Source: 'ipify',
+  localIpv6Interface: '',
   scheduleEnabled: false,
   intervalMinutes: '10',
   cloudflareZoneId: '',
@@ -52,6 +56,8 @@ function toFormState(settings: DnsSettingsView | null): FormState {
   return {
     ...EMPTY,
     provider: settings.provider,
+    ipv6Source: settings.ipv6Source,
+    localIpv6Interface: settings.localIpv6Interface,
     scheduleEnabled: settings.scheduleEnabled,
     intervalMinutes: String(settings.intervalMinutes),
     cloudflareZoneId: settings.cloudflareZoneId,
@@ -77,6 +83,8 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
   function buildUpdate(extra: UpdateDnsSettingsInput = {}): UpdateDnsSettingsInput {
     const input: UpdateDnsSettingsInput = {
       provider: state.provider,
+      ipv6Source: state.ipv6Source,
+      localIpv6Interface: state.localIpv6Interface,
       scheduleEnabled: state.scheduleEnabled,
       intervalMinutes: Number(state.intervalMinutes),
       cloudflareZoneId: state.cloudflareZoneId,
@@ -127,6 +135,38 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
           </Select>
         )}
       </Field>
+
+      {/* Use one saved source so manual checks and scheduled updates cannot diverge. */}
+      <Field label={t('dns.form.ipv6Source')} hint={t('dns.form.ipv6SourceHint')}>
+        {({ id, describedBy }) => (
+          <Select
+            id={id}
+            aria-describedby={describedBy}
+            value={state.ipv6Source}
+            onChange={(event) => patch({ ipv6Source: event.target.value as FormState['ipv6Source'] })}
+          >
+            <option value="ipify">{t('dns.form.ipv6SourceIpify')}</option>
+            <option value="local">{t('dns.form.ipv6SourceLocal')}</option>
+          </Select>
+        )}
+      </Field>
+
+      {/* A host with multiple uplinks needs an explicit interface to avoid publishing the wrong address. */}
+      {state.ipv6Source === 'local' && (
+        <Field label={t('dns.form.localIpv6Interface')} hint={t('dns.form.localIpv6InterfaceHint')}>
+          {({ id, describedBy }) => (
+            <TextInput
+              id={id}
+              aria-describedby={describedBy}
+              className="mono"
+              value={state.localIpv6Interface}
+              placeholder="enp1s0"
+              maxLength={15}
+              onChange={(event) => patch({ localIpv6Interface: event.target.value })}
+            />
+          )}
+        </Field>
+      )}
 
       {/* Native details keeps credentials available to keyboard and screen-reader users. */}
       <details>

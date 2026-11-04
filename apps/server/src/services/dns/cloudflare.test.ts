@@ -32,6 +32,8 @@ function stubFetch(...answers: { status?: number; payload?: unknown }[]): Record
 function settings(overrides: Partial<ResolvedDnsSettings> = {}): ResolvedDnsSettings {
   return {
     provider: 'cloudflare',
+    ipv6Source: 'ipify',
+    localIpv6Interface: '',
     scheduleEnabled: false,
     intervalMinutes: 10,
     cloudflareToken: 'token',

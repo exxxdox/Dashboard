@@ -52,6 +52,8 @@ vi.mock('@alicloud/openapi-client', () => ({
 function settings(overrides: Partial<ResolvedDnsSettings> = {}): ResolvedDnsSettings {
   return {
     provider: 'alibaba',
+    ipv6Source: 'ipify',
+    localIpv6Interface: '',
     scheduleEnabled: false,
     intervalMinutes: 10,
     cloudflareToken: '',
