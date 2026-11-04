@@ -1,5 +1,7 @@
 # Dashboard — contributor notes
 
+`CLAUDE.md` and `AGENTS.md` = same document, kept identical. Claude Code read the first, other agents read the second. Edit both in same commit; never replace one with pointer to the other.
+
 Self-host dashboard. Run shell/PowerShell script on remote Linux host over SSH. Live + history execution output. Keep AAAA record point at host public IPv6.
 
 ## Commands
@@ -132,6 +134,7 @@ Two consequence worth knowing before touch this: only entry script uploaded (scr
 ## Conventions
 
 - TypeScript strict, `types` over `interfaces`, no `any`.
+- Agents working in this repo commit directly to `main`; do not open a feature branch per change.
 - Comments explain *why*, never *what*. Comment restating next line → delete.
 - Errors user should see carry HTTP status: throw `AppError` subclasses from `lib/errors.ts`. Handler in `app.ts` = only place building error response. Plain errors thrown by `packages/shared` validators must re-wrap at service boundary, else user typo become 500.
 - Validate at boundaries with zod: request bodies + query strings in routes, environment in `config.ts`.
