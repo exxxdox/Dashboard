@@ -199,8 +199,16 @@ function pump(
     let pidResolved = false;
     let timer: NodeJS.Timeout | null = null;
 
+    const emit: ExecOptions['onChunk'] = (chunk) => {
+      try {
+        options.onChunk(chunk);
+      } catch {
+        // A failed output consumer must not interrupt SSH reads or prevent the run from settling.
+      }
+    };
+
     const emitStderr = (data: string): void => {
-      if (data !== '') options.onChunk({ stream: 'stderr', data });
+      if (data !== '') emit({ stream: 'stderr', data });
     };
 
     const cleanup = (): void => {
@@ -213,7 +221,7 @@ function pump(
       settled = true;
       cleanup();
       const stdoutTail = stdoutDecoder.end();
-      if (stdoutTail !== '') options.onChunk({ stream: 'stdout', data: stdoutTail });
+      if (stdoutTail !== '') emit({ stream: 'stdout', data: stdoutTail });
       emitStderr(stderrBuffer + stderrDecoder.end());
       stderrBuffer = '';
       resolve(result);
@@ -227,7 +235,7 @@ function pump(
     channel.on('data', (buffer: Buffer) => {
       if (settled) return;
       const data = stdoutDecoder.write(buffer);
-      if (data !== '') options.onChunk({ stream: 'stdout', data });
+      if (data !== '') emit({ stream: 'stdout', data });
     });
 
     channel.stderr.on('data', (buffer: Buffer) => {
