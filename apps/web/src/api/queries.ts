@@ -402,6 +402,14 @@ function useDnsAction<TResult>(
   });
 }
 
+export function useDnsInterfaces(enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.dnsInterfaces(),
+    queryFn: api.dnsInterfaces,
+    enabled,
+  });
+}
+
 export function useDnsState() {
   return useQuery({
     queryKey: queryKeys.dns(),

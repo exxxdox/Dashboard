@@ -16,6 +16,7 @@
  *   shape `TargetCheckResult.reachable: false` already uses.
  */
 
+import { networkInterfaces } from 'node:os';
 import type { FastifyInstance } from 'fastify';
 import { updateDnsSettingsSchema } from '@dashboard/shared';
 import { z } from 'zod';
@@ -32,6 +33,9 @@ export function registerDnsRoutes(app: FastifyInstance, ctx: AppContext): void {
   const { dns } = ctx;
 
   app.get('/api/dns', () => dns.state());
+
+  // Enumerate where local IPv6 is detected, rather than the browser's machine.
+  app.get('/api/dns/interfaces', () => Object.keys(networkInterfaces()).sort());
 
   app.patch('/api/dns/settings', (request) =>
     dns.saveSettings(updateDnsSettingsSchema.parse(request.body)),

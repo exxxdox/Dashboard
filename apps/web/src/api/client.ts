@@ -253,6 +253,7 @@ export const api = {
 
   // The IPv6 DNS console. `state` is the whole page in one response, so the
   // actions below only have to invalidate it.
+  dnsInterfaces: () => apiRequest<string[]>('/dns/interfaces'),
   dnsState: () => apiRequest<DnsState>('/dns'),
   saveDnsSettings: (body: UpdateDnsSettingsInput) =>
     apiRequest<DnsSettingsView>('/dns/settings', { method: 'PATCH', body }),

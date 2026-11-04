@@ -23,8 +23,9 @@ export const queryKeys = {
   settings: () => ['settings'] as const,
 
   // One key for the whole DNS page: its state payload already carries the
-  // settings, the probe results and a preview of the history, so there is
-  // nothing to fetch in parallel with it.
+  // settings, the probe results and a preview of the history. Interface names
+  // are fetched separately only when editing the local IPv6 source.
+  dnsInterfaces: () => ['dns', 'interfaces'] as const,
   dns: () => ['dns'] as const,
   dnsChecks: (filter: { limit: number; offset: number }) => ['dns', 'checks', filter] as const,
 };

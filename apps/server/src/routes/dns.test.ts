@@ -8,6 +8,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { networkInterfaces } from 'node:os';
 import type { DnsRecord } from '@dashboard/shared';
 import { describe, expect, test } from 'vitest';
 
@@ -45,6 +46,7 @@ const CLOUDFLARE = {
 /** Every DNS path the guard has to cover. */
 const PROTECTED = [
   { method: 'GET' as const, url: '/api/dns' },
+  { method: 'GET' as const, url: '/api/dns/interfaces' },
   { method: 'PATCH' as const, url: '/api/dns/settings', payload: {} },
   { method: 'POST' as const, url: '/api/dns/ipv6' },
   { method: 'POST' as const, url: '/api/dns/record' },
@@ -162,6 +164,21 @@ describe('GET /api/dns', () => {
       await h.close();
     }
   });
+});
+
+test('GET /api/dns/interfaces lists the server interfaces in name order', async () => {
+  const h = await harness();
+  try {
+    const response = await h.app.inject({
+      method: 'GET',
+      url: '/api/dns/interfaces',
+      headers: { cookie: h.cookie() },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(Object.keys(networkInterfaces()).sort());
+  } finally {
+    await h.close();
+  }
 });
 
 describe('PATCH /api/dns/settings', () => {

@@ -30,5 +30,5 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          # Keep the deployment image reference stable across version tags.
-          tags: exxxdox/pri:dashboard
+          # Publish under the same Docker Hub account used to authenticate.
+          tags: ${{ vars.DOCKERHUB_USERNAME }}/dashboard:latest

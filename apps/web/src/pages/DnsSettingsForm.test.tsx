@@ -2,8 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { DnsSettingsView } from '@dashboard/shared';
 import { expect, test, vi } from 'vitest';
 import { DnsSettingsForm } from './DnsSettingsForm';
+import { Select } from '../components/Form';
 
-const hooks = vi.hoisted(() => ({ direct: false, state: null as unknown, mutate: vi.fn() }));
+const hooks = vi.hoisted(() => ({ direct: false, state: null as unknown, mutate: vi.fn(), interfaces: ['enp1s0', 'eth0'], interfaceError: false }));
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>();
   return {
@@ -18,7 +19,7 @@ vi.mock('react', async (importOriginal) => {
     },
   };
 });
-vi.mock('../api/queries', () => ({ useSaveDnsSettings: () => ({ isPending: false, mutate: hooks.mutate }) }));
+vi.mock('../api/queries', () => ({ useSaveDnsSettings: () => ({ isPending: false, mutate: hooks.mutate }), useDnsInterfaces: () => ({ data: hooks.interfaces, isPending: false, isError: hooks.interfaceError, error: new Error('unavailable'), refetch: vi.fn() }) }));
 vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string) => key }), useT: () => (key: string) => key }));
 
 const settings: DnsSettingsView = {
@@ -34,7 +35,9 @@ test('restores the saved local IPv6 source', () => {
   expect(html).toContain('<option value="local" selected="">');
   expect(html).toContain('dns.form.ipv6SourceHint');
   expect(html).toContain('dns.form.localIpv6Interface');
-  expect(html).toContain('value="enp1s0"');
+  expect(html).toContain('<option value="enp1s0" selected="">');
+  expect(html).toContain('<option value="eth0">eth0</option>');
+  expect(html).toContain('dns.form.localIpv6InterfaceAuto');
 });
 
 test('defaults new DNS settings to ipify', () => {
@@ -44,7 +47,7 @@ test('defaults new DNS settings to ipify', () => {
 });
 
 // Follow the select change through React state to the submitted API payload.
-test('saves the selected local source for manual and scheduled updates', () => {
+test.each(['enp1s0', ''])('saves the selected interface (%s) for manual and scheduled updates', (interfaceName) => {
   hooks.direct = true;
   hooks.state = null;
   hooks.mutate.mockClear();
@@ -60,14 +63,30 @@ test('saves the selected local source for manual and scheduled updates', () => {
       (child: { props?: { label?: string } }) => child?.props?.label === 'dns.form.localIpv6Interface',
     );
     const input = interfaceField.props.children({ id: 'interface', describedBy: undefined });
-    input.props.onChange({ target: { value: 'enp1s0' } });
+    expect(input.type).toBe(Select);
+    input.props.onChange({ target: { value: interfaceName } });
     const ready = DnsSettingsForm({ settings: null });
     ready.props.onSubmit({ preventDefault: vi.fn() });
     expect(hooks.mutate).toHaveBeenCalledWith(
-      expect.objectContaining({ ipv6Source: 'local', localIpv6Interface: 'enp1s0' }), expect.any(Object),
+      expect.objectContaining({ ipv6Source: 'local', localIpv6Interface: interfaceName }), expect.any(Object),
     );
   } finally {
     hooks.direct = false;
     hooks.state = null;
+  }
+});
+
+test('preserves a saved interface missing from the current host', () => {
+  const html = renderToStaticMarkup(<DnsSettingsForm settings={{ ...settings, localIpv6Interface: 'old0' }} />);
+  expect(html).toContain('<option value="old0" selected="">old0</option>');
+});
+
+test('shows an interface loading error with retry', () => {
+  hooks.interfaceError = true;
+  try {
+    const html = renderToStaticMarkup(<DnsSettingsForm settings={settings} />);
+    expect(html).toContain('unavailable');
+  } finally {
+    hooks.interfaceError = false;
   }
 });

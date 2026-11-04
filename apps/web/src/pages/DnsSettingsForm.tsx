@@ -17,8 +17,10 @@ import { Save } from 'lucide-react';
 
 import { Button } from '../components/Button';
 import { Field, Select, Switch, TextInput } from '../components/Form';
+import { ErrorBanner } from '../components/Feedback';
+import { errorMessage } from '../api/client';
 import { SecretField } from '../components/SecretField';
-import { useSaveDnsSettings } from '../api/queries';
+import { useDnsInterfaces, useSaveDnsSettings } from '../api/queries';
 import { providerLabel } from '../lib/dns';
 import { useI18n } from '../lib/i18n';
 
@@ -72,6 +74,10 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
   const { t } = i18n;
   const save = useSaveDnsSettings();
   const [state, setState] = useState<FormState>(() => toFormState(settings));
+
+  const interfaces = useDnsInterfaces(state.ipv6Source === 'local');
+  // Keep disconnected saved interfaces selectable so loading the list cannot silently change settings.
+  const interfaceNames = [...new Set([state.localIpv6Interface, ...(interfaces.data ?? [])])].filter(Boolean);
 
   const isCloudflare = state.provider === 'cloudflare';
 
@@ -155,17 +161,23 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
       {state.ipv6Source === 'local' && (
         <Field label={t('dns.form.localIpv6Interface')} hint={t('dns.form.localIpv6InterfaceHint')}>
           {({ id, describedBy }) => (
-            <TextInput
+            <Select
               id={id}
               aria-describedby={describedBy}
               className="mono"
               value={state.localIpv6Interface}
-              placeholder="enp1s0"
-              maxLength={15}
+              disabled={interfaces.isPending}
               onChange={(event) => patch({ localIpv6Interface: event.target.value })}
-            />
+            >
+              <option value="">{interfaces.isPending ? t('common.loading') : t('dns.form.localIpv6InterfaceAuto')}</option>
+              {interfaceNames.map((name) => <option key={name} value={name}>{name}</option>)}
+            </Select>
           )}
         </Field>
+      )}
+
+      {state.ipv6Source === 'local' && interfaces.isError && (
+        <ErrorBanner message={errorMessage(interfaces.error, i18n)} onRetry={() => void interfaces.refetch()} />
       )}
 
       {/* Native details keeps credentials available to keyboard and screen-reader users. */}
