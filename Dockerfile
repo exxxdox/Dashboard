@@ -160,10 +160,11 @@ WORKDIR /app
 # paths the official one does.
 ARG ALPINE_MIRROR=dl-cdn.alpinelinux.org
 ARG WITH_GIT=true
+# Keep Bash and curl available for interactive sessions and network diagnostics after rebuilds.
 RUN if [ "$ALPINE_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
       sed -i "s|dl-cdn.alpinelinux.org|$ALPINE_MIRROR|g" /etc/apk/repositories; \
     fi \
- && apk add --no-cache nodejs ca-certificates setpriv \
+ && apk add --no-cache nodejs ca-certificates setpriv bash curl \
  && if [ "$WITH_GIT" = "true" ]; then \
       apk add --no-cache git \
       && rm -f /usr/libexec/git-core/git-http-push \
