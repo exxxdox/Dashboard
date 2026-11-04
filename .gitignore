@@ -2,6 +2,8 @@ node_modules/
 dist/
 build/
 coverage/
+/tmp/
+/docs/
 *.tsbuildinfo
 
 # Runtime state: SQLite database, generated key, local smoke-test scratch.
