@@ -12,7 +12,7 @@ import { errorMessage } from '../api/client';
 import { useDnsChecks, useDnsState } from '../api/queries';
 import { failureText, resultLabel, sourceLabel } from '../lib/dns';
 import { formatDateTime, formatRelative } from '../lib/format';
-import { navigate } from '../lib/router';
+import { href, navigate } from '../lib/router';
 import { useI18n } from '../lib/i18n';
 
 const PAGE_SIZE = 25;
@@ -22,7 +22,7 @@ const PAGE_SIZE = 25;
  * out of line with its heading.
  */
 const GRID_COLUMNS =
-  'grid-cols-[13.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[13.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]';
+  'min-w-[900px] grid-cols-[13.5rem_6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]';
 
 function readPage(search: URLSearchParams): number {
   const raw = Number(search.get('page'));
@@ -84,7 +84,7 @@ export function DnsHistoryTable({ search }: { search: URLSearchParams }) {
               <span className="label">{t('dns.history.column.result')}</span>
               <span className="label">{t('dns.history.column.address')}</span>
               <span className="label">{t('dns.history.column.previous')}</span>
-              <span className="label hidden xl:block">{t('dns.history.column.why')}</span>
+              <span className="label">{t('dns.history.column.why')}</span>
             </div>
 
             {checks.data.items.map((check) => (
@@ -113,7 +113,7 @@ export function DnsHistoryTable({ search }: { search: URLSearchParams }) {
                 <span className="mono text-faint text-meta break-all">
                   {check.previousValue ?? t('common.dash')}
                 </span>
-                <span className="text-faint text-meta hidden truncate xl:block">
+                <span className="text-faint text-meta break-words">
                   {check.failureReason === null
                     ? t('common.dash')
                     : failureText(t, check.failureReason)}
@@ -135,14 +135,14 @@ export function DnsHistoryTable({ search }: { search: URLSearchParams }) {
                 <Button
                   size="sm"
                   disabled={page <= 1}
-                  onClick={() => navigate(`/dns?page=${page - 1}`)}
+                  onClick={() => navigate(href('/dns', { ...Object.fromEntries(search), page: page - 1 }))}
                 >
                   {t('dns.history.newer')}
                 </Button>
                 <Button
                   size="sm"
                   disabled={offset + PAGE_SIZE >= checks.data.total}
-                  onClick={() => navigate(`/dns?page=${page + 1}`)}
+                  onClick={() => navigate(href('/dns', { ...Object.fromEntries(search), page: page + 1 }))}
                 >
                   {t('dns.history.older')}
                 </Button>

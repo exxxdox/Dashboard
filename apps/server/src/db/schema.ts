@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 6;
+const TARGET_VERSION = 7;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -257,6 +257,13 @@ export const MIGRATIONS: Migration[] = [
 
     db.exec('ALTER TABLE dns_settings DROP COLUMN gotify_address');
     db.exec('ALTER TABLE dns_settings DROP COLUMN gotify_token_encrypted');
+  },
+  // v7 -- keep existing installations on ipify until an operator selects local detection.
+  (db) => {
+    db.exec(`ALTER TABLE dns_settings ADD COLUMN ipv6_source TEXT NOT NULL
+      DEFAULT 'ipify' CHECK (ipv6_source IN ('ipify', 'local'))`);
+    // Multi-interface hosts need an explicit choice instead of an arbitrary address.
+    db.exec("ALTER TABLE dns_settings ADD COLUMN local_ipv6_interface TEXT NOT NULL DEFAULT ''");
   },
 ];
 

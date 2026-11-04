@@ -13,7 +13,7 @@
  *   rather than being recorded as a run that failed.
  */
 
-import type { DnsAction, DnsFailureReason, DnsProviderName, DnsRecord } from '@dashboard/shared';
+import type { DnsAction, DnsFailureReason, DnsIpv6Source, DnsProviderName, DnsRecord } from '@dashboard/shared';
 
 /** A run that ended for a reason the operator can do something about. */
 export class DnsFailureError extends Error {
@@ -52,6 +52,8 @@ export type DnsProvider = {
  */
 export type ResolvedDnsSettings = {
   provider: DnsProviderName;
+  ipv6Source: DnsIpv6Source;
+  localIpv6Interface: string;
   scheduleEnabled: boolean;
   intervalMinutes: number;
   cloudflareToken: string;

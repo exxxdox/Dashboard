@@ -218,6 +218,9 @@ export type ExecutionStream = z.infer<typeof executionStreamSchema>;
 export const dnsProviderSchema = z.enum(['cloudflare', 'alibaba']);
 export type DnsProviderName = z.infer<typeof dnsProviderSchema>;
 
+export const dnsIpv6SourceSchema = z.enum(['ipify', 'local']);
+export type DnsIpv6Source = z.infer<typeof dnsIpv6SourceSchema>;
+
 export const dnsActionSchema = z.enum(['created', 'updated', 'unchanged', 'failed']);
 export type DnsAction = z.infer<typeof dnsActionSchema>;
 
@@ -257,6 +260,8 @@ export const MAX_DNS_INTERVAL_MINUTES = 10_080;
  */
 export const updateDnsSettingsSchema = z.object({
   provider: dnsProviderSchema.optional(),
+  ipv6Source: dnsIpv6SourceSchema.optional(),
+  localIpv6Interface: z.string().trim().max(15).optional(),
   scheduleEnabled: z.boolean().optional(),
   intervalMinutes: z
     .number()
@@ -455,6 +460,8 @@ export const MAX_DNS_CHECKS = 500;
  */
 export type DnsSettingsView = {
   provider: DnsProviderName;
+  ipv6Source: DnsIpv6Source;
+  localIpv6Interface: string;
   scheduleEnabled: boolean;
   intervalMinutes: number;
   cloudflareZoneId: string;
@@ -551,6 +558,11 @@ export type DnsSchedulerView = {
   intervalMinutes: number;
   /** When the next scheduled check is due; null while the schedule is off. */
   nextRunAt: string | null;
+  /** Last completed scheduled check in this process; null until one finishes. */
+  lastRunAt: string | null;
+  lastOk: boolean | null;
+  /** Null for success or an unexpected internal error, distinguished by lastOk. */
+  lastFailureReason: DnsFailureReason | null;
 };
 
 export type DnsState = {

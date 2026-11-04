@@ -16,9 +16,9 @@ services:
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
         ALPINE_MIRROR: ${ALPINE_MIRROR:-dl-cdn.alpinelinux.org}
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
+        NPM_REGISTRY: ${NPM_REGISTRY:-}
         WITH_GIT: ${WITH_GIT:-true}
-    image: dashboard:local
+    image: exxxdox/pri:dashboard
     container_name: dashboard
     network_mode: host
     extra_hosts:

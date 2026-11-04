@@ -88,6 +88,7 @@ async function harness(overrides: { provider?: Partial<DnsProvider> } = {}): Pro
     logger,
     createProvider: () => provider as DnsProvider,
     detectIpv6: async (): Promise<string> => '2606:4700::1',
+    detectLocalIpv6: async (): Promise<string> => '2001:4860::8888',
     sendNotification: async (): Promise<boolean> => false,
     getSchedule: () => dnsScheduler.snapshot(),
   });
@@ -250,4 +251,28 @@ describe('GET /api/dns/checks', () => {
       await h.close();
     }
   });
+});
+
+
+test('saves the IPv6 source through HTTP and uses it for detection and updates', async () => {
+  const h = await harness();
+  try {
+    const headers = { cookie: h.cookie() };
+    const saved = await h.app.inject({ method: 'PATCH', url: '/api/dns/settings', headers,
+      payload: { ...CLOUDFLARE, ipv6Source: 'local' } });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ ipv6Source: 'local' });
+    expect(JSON.stringify(saved.json())).not.toContain('"cloudflareToken"');
+    const state = await h.app.inject({ method: 'GET', url: '/api/dns', headers });
+    expect(state.json()).toMatchObject({ settings: { ipv6Source: 'local' } });
+    for (const url of ['/api/dns/ipv6', '/api/dns/update']) {
+      const result = await h.app.inject({ method: 'POST', url, headers });
+      expect(result.statusCode).toBe(200);
+      expect(result.json()).toMatchObject({ ipv6: '2001:4860::8888' });
+    }
+    const invalid = await h.app.inject({ method: 'PATCH', url: '/api/dns/settings', headers,
+      payload: { ipv6Source: 'auto' } });
+    expect(invalid.statusCode).toBe(422);
+    expect(readSettingsRow(h.db)?.ipv6_source).toBe('local');
+  } finally { await h.close(); }
 });

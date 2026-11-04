@@ -109,6 +109,10 @@ describe('configure', () => {
 });
 
 describe('a firing timer', () => {
+  test('has no last result before a scheduled check', () => {
+    expect(setup().scheduler.snapshot()).toMatchObject({ lastRunAt: null, lastOk: null, lastFailureReason: null });
+  });
+
   test('runs the check as a scheduled one and re-arms itself', async () => {
     const { scheduler, timers, calls } = setup();
     scheduler.configure({ scheduleEnabled: true, intervalMinutes: 15 });
@@ -117,6 +121,7 @@ describe('a firing timer', () => {
     await flush();
 
     expect(calls).toEqual(['scheduled']);
+    expect(scheduler.snapshot()).toMatchObject({ lastRunAt: '2026-01-01T00:00:00.000Z', lastOk: true, lastFailureReason: null });
     // Re-armed after the run rather than on a fixed cadence: a run longer than
     // the interval must not overlap itself.
     expect(timers.pending()).toBe(1);
@@ -177,6 +182,7 @@ describe('a firing timer', () => {
 
     expect(timers.pending()).toBe(1);
     expect(scheduler.snapshot().running).toBe(false);
+    expect(scheduler.snapshot()).toMatchObject({ lastOk: false, lastFailureReason: 'dns_query_failed' });
   });
 
   test('keeps the schedule alive when a run throws unexpectedly', async () => {
@@ -193,6 +199,7 @@ describe('a firing timer', () => {
     await flush();
 
     expect(timers.pending()).toBe(1);
+    expect(scheduler.snapshot()).toMatchObject({ lastRunAt: '2026-01-01T00:00:00.000Z', lastOk: false, lastFailureReason: null });
   });
 });
 

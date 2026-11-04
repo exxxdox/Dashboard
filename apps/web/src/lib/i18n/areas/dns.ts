@@ -8,6 +8,10 @@
  */
 
 const en = {
+  'dns.section.record': 'DNS status',
+  'dns.operation.title': 'Last operation',
+  'dns.form.credentials': 'Provider credentials',
+  'dns.schedule.last': 'Last scheduled check',
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
 
@@ -39,6 +43,12 @@ const en = {
   'dns.history.title': 'History',
 
   // -- settings form -------------------------------------------------------
+  'dns.form.ipv6Source': 'IPv6 address source',
+  'dns.form.ipv6SourceHint': 'Detection, manual updates and scheduled updates use this source. Local detection reads the network interfaces of the machine or container running this service.',
+  'dns.form.ipv6SourceIpify': 'ipify (public network probe)',
+  'dns.form.ipv6SourceLocal': 'Local network interfaces',
+  'dns.form.localIpv6Interface': 'Network interface (optional)',
+  'dns.form.localIpv6InterfaceHint': 'Leave blank to use the only stable public IPv6 address. If multiple interfaces have public addresses, specify an interface with exactly one stable public IPv6.',
   'dns.form.provider': 'Provider',
   'dns.form.providerHint': "Only the selected provider's credentials are required.",
   'dns.form.cloudflareToken': 'Cloudflare API token',
@@ -101,9 +111,9 @@ const en = {
   'dns.failure.not_configured': 'Nothing has been configured yet.',
   'dns.failure.invalid_settings':
     'The saved settings are incomplete, so no check was attempted.',
-  'dns.failure.ipv6_detect_failed': 'The public IPv6 probe could not be reached.',
+  'dns.failure.ipv6_detect_failed': 'IPv6 detection failed. Check the selected source and network configuration.',
   'dns.failure.ipv6_not_global':
-    'The detected address is not a public one, so nothing was written.',
+    'No single usable public IPv6 address was detected, so nothing was written.',
   'dns.failure.dns_query_failed': 'The provider could not be asked for the current record.',
   'dns.failure.dns_write_failed': 'The provider rejected the write.',
   'dns.failure.record_missing':
@@ -120,6 +130,10 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
+  'dns.section.record': 'DNS 状态',
+  'dns.operation.title': '最近操作',
+  'dns.form.credentials': '服务商凭据',
+  'dns.schedule.last': '上次定时检查',
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
 
@@ -149,6 +163,12 @@ const zh: Record<keyof typeof en, string> = {
   'dns.settings.title': '设置',
   'dns.history.title': '历史记录',
 
+  'dns.form.ipv6Source': 'IPv6 地址来源',
+  'dns.form.ipv6SourceHint': '探测、手动更新和定时更新均使用此来源。本地检测读取运行本服务的机器或容器的网卡地址。',
+  'dns.form.ipv6SourceIpify': 'ipify（公网探测）',
+  'dns.form.ipv6SourceLocal': '本地网卡',
+  'dns.form.localIpv6Interface': '网卡名称（可选）',
+  'dns.form.localIpv6InterfaceHint': '留空时自动选择唯一的稳定公网 IPv6。多网卡有公网地址时，请指定只有一个稳定公网 IPv6 的网卡。',
   'dns.form.provider': '服务商',
   'dns.form.providerHint': '只需填写所选服务商的凭据。',
   'dns.form.cloudflareToken': 'Cloudflare API 令牌',
@@ -206,8 +226,8 @@ const zh: Record<keyof typeof en, string> = {
 
   'dns.failure.not_configured': '尚未配置任何内容。',
   'dns.failure.invalid_settings': '已保存的设置不完整，因此没有执行检查。',
-  'dns.failure.ipv6_detect_failed': '无法访问公网 IPv6 探测服务。',
-  'dns.failure.ipv6_not_global': '探测到的地址不是公网地址，因此没有写入任何内容。',
+  'dns.failure.ipv6_detect_failed': 'IPv6 检测失败，请检查所选来源及网络配置。',
+  'dns.failure.ipv6_not_global': '未检测到唯一可用的公网 IPv6 地址，因此没有写入任何内容。',
   'dns.failure.dns_query_failed': '无法向服务商查询当前记录。',
   'dns.failure.dns_write_failed': '服务商拒绝了写入请求。',
   'dns.failure.record_missing': '服务商上没有该 ID 对应的记录，而本控制台不会创建记录。',

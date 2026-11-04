@@ -17,6 +17,7 @@
 
 import type {
   DnsProviderName,
+  DnsIpv6Source,
   DnsSettingsView,
   ErrorI18n,
   UpdateDnsSettingsInput,
@@ -49,6 +50,8 @@ const ALIBABA_RECORD_TYPE = 'AAAA';
 export type DnsSettingsRow = {
   id: string;
   provider: DnsProviderName;
+  ipv6_source: DnsIpv6Source;
+  local_ipv6_interface: string;
   schedule_enabled: number;
   interval_minutes: number;
   cloudflare_zone_id: string;
@@ -69,6 +72,8 @@ export type DnsSettingsRow = {
  */
 export type MutableSettings = {
   provider: DnsProviderName;
+  ipv6Source: DnsIpv6Source;
+  localIpv6Interface: string;
   scheduleEnabled: boolean;
   intervalMinutes: number;
   cloudflareZoneId: string;
@@ -83,6 +88,8 @@ export type MutableSettings = {
 function defaults(): MutableSettings {
   return {
     provider: 'cloudflare',
+    ipv6Source: 'ipify',
+    localIpv6Interface: '',
     scheduleEnabled: false,
     intervalMinutes: 10,
     cloudflareZoneId: '',
@@ -118,6 +125,8 @@ export function getSettingsView(db: Db): DnsSettingsView | null {
 export function toSettingsView(row: DnsSettingsRow): DnsSettingsView {
   return {
     provider: row.provider,
+    ipv6Source: row.ipv6_source,
+    localIpv6Interface: row.local_ipv6_interface,
     scheduleEnabled: row.schedule_enabled === 1,
     intervalMinutes: row.interval_minutes,
     cloudflareZoneId: row.cloudflare_zone_id,
@@ -140,6 +149,8 @@ export function resolveSettings(db: Db, box: SecretBox): ResolvedDnsSettings | n
   const settings = fromRow(row, box);
   return {
     provider: settings.provider,
+    ipv6Source: settings.ipv6Source,
+    localIpv6Interface: settings.localIpv6Interface,
     scheduleEnabled: settings.scheduleEnabled,
     intervalMinutes: settings.intervalMinutes,
     cloudflareToken: settings.cloudflareToken ?? '',
@@ -177,13 +188,15 @@ export function saveSettings(
   // the credential in them.
   db.prepare(
     `INSERT INTO dns_settings (
-       id, provider, schedule_enabled, interval_minutes,
+       id, provider, ipv6_source, local_ipv6_interface, schedule_enabled, interval_minutes,
        cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
        alibaba_access_key_id, alibaba_record_id, alibaba_record_type,
        alibaba_access_key_secret_encrypted, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        provider = excluded.provider,
+       ipv6_source = excluded.ipv6_source,
+       local_ipv6_interface = excluded.local_ipv6_interface,
        schedule_enabled = excluded.schedule_enabled,
        interval_minutes = excluded.interval_minutes,
        cloudflare_zone_id = excluded.cloudflare_zone_id,
@@ -197,6 +210,8 @@ export function saveSettings(
   ).run(
     SETTINGS_ID,
     merged.provider,
+    merged.ipv6Source,
+    merged.localIpv6Interface,
     merged.scheduleEnabled ? 1 : 0,
     merged.intervalMinutes,
     merged.cloudflareZoneId,
@@ -238,6 +253,8 @@ function merge(
 
   return {
     provider: input.provider ?? base.provider,
+    ipv6Source: input.ipv6Source ?? base.ipv6Source,
+    localIpv6Interface: textField(input.localIpv6Interface, base.localIpv6Interface),
     scheduleEnabled: input.scheduleEnabled ?? base.scheduleEnabled,
     intervalMinutes: input.intervalMinutes ?? base.intervalMinutes,
     cloudflareZoneId: textField(input.cloudflareZoneId, base.cloudflareZoneId),
@@ -260,6 +277,8 @@ function merge(
 function fromRow(row: DnsSettingsRow, box: SecretBox): MutableSettings {
   return {
     provider: row.provider,
+    ipv6Source: row.ipv6_source,
+    localIpv6Interface: row.local_ipv6_interface,
     scheduleEnabled: row.schedule_enabled === 1,
     intervalMinutes: row.interval_minutes,
     cloudflareZoneId: row.cloudflare_zone_id,

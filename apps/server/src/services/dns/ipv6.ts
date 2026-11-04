@@ -14,6 +14,7 @@
  * record. A test pins the absence of a dispatcher for exactly that reason.
  */
 
+import { readFile } from 'node:fs/promises';
 import { parsePublicIpv6 } from '@dashboard/shared';
 
 import { errorMessage } from '../../lib/errors.js';
@@ -23,6 +24,44 @@ import { DnsFailureError } from './types.js';
 /** A single small GET. Ten seconds is generous for it. */
 const PROBE_TIMEOUT_MS = 10_000;
 const PROBE_URL = 'https://api6.ipify.org';
+
+/** Linux exposes address state here, including temporary and DAD flags absent from networkInterfaces(). */
+export async function detectLocalIpv6(interfaceName = '', signal?: AbortSignal): Promise<string> {
+  let table: string;
+  try {
+    table = await readFile('/proc/net/if_inet6', { encoding: 'utf8', signal });
+  } catch (error) {
+    throw new DnsFailureError('The local Linux IPv6 address table could not be read', 'ipv6_detect_failed', error);
+  }
+
+  const addresses = new Set<string>();
+  for (const line of table.split('\n')) {
+    const fields = line.trim().split(/\s+/);
+    const [hex, , , scope, flags] = fields;
+    if (
+      fields.length !== 6 || !hex || !/^[\da-f]{32}$/i.test(hex) || scope !== '00' ||
+      !flags || !/^[\da-f]+$/i.test(flags)
+    ) continue;
+    if (interfaceName !== '' && fields[5] !== interfaceName) continue;
+    // Linux IFA_F_TEMPORARY | DADFAILED | DEPRECATED | TENTATIVE must never enter DDNS.
+    if ((Number.parseInt(flags, 16) & (0x01 | 0x08 | 0x20 | 0x40)) !== 0) continue;
+    try {
+      addresses.add(parsePublicIpv6(hex.replace(/(.{4})(?=.)/g, '$1:')));
+    } catch {
+      // Global scope also includes ULA and reserved ranges; reuse the public-address validator.
+    }
+  }
+
+  const [address] = addresses;
+  if (address === undefined) {
+    throw new DnsFailureError('No stable public IPv6 address was found on the local interfaces', 'ipv6_not_global');
+  }
+  // A stable ordering cannot establish which interface the operator wants published.
+  if (addresses.size > 1) {
+    throw new DnsFailureError('Local IPv6 detection found multiple stable public addresses; select a local interface', 'ipv6_detect_failed');
+  }
+  return address;
+}
 
 export async function detectPublicIpv6(signal?: AbortSignal): Promise<string> {
   const body = await readProbe(signal);
