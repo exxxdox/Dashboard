@@ -64,6 +64,8 @@ DNS and Settings share the same Gotify configuration. Test messages can use unsa
 
 `/#/settings` hold the preferences that belong to the whole dashboard: interface language (English / 简体中文), and the Gotify address and token notifications go to.
 
+After saving a Gotify address and token, scripts automatically notify on success, failure, timeout or cancellation after starting. Messages include the script, target, result, duration and run ID, without parameters, logs or raw errors. Unconfigured notifications are skipped; delivery failures are logged without changing execution results. Queued cancellations and restart interruptions do not notify. Notifications are not retried or replayed. Messages include both English and Chinese.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

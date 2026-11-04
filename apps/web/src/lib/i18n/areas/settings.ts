@@ -22,7 +22,7 @@ const en = {
 
   'settings.notifications.title': 'Notifications',
   'settings.notifications.description':
-    'Where the dashboard reaches you. A notification is sent only when something actually changed, and never in place of doing the work.',
+    'Receive script results (success, failure, timeout or cancellation after starting) and DNS record changes. Notifications omit script parameters and logs.',
   'settings.notifications.addressLabel': 'Gotify address',
   'settings.notifications.addressHint':
     'Host or full URL. A bare host is assumed to be https.',
@@ -61,7 +61,7 @@ const zh: Record<keyof typeof en, string> = {
 
   'settings.notifications.title': '通知',
   'settings.notifications.description':
-    '仪表盘向你发送消息的通道。只有内容真正发生变化时才会通知，通知也永远不会代替实际执行。',
+    '接收脚本运行结果（成功、失败、超时或启动后取消）和 DNS 记录变更通知。通知不包含脚本参数或日志。',
   'settings.notifications.addressLabel': 'Gotify 地址',
   'settings.notifications.addressHint': '主机名或完整 URL。只写主机名时按 https 处理。',
   'settings.notifications.addressPlaceholder': 'notify.example.com',

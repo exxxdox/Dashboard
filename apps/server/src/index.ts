@@ -89,19 +89,19 @@ async function main(): Promise<void> {
   // closure avoids a module cycle while keeping both dependencies explicit.
   let executions!: ExecutionService;
 
+  // Script results and DNS changes share the dashboard's notification settings.
+  const notifications = createNotificationService({ db, box });
+
   const runner = createExecutionRunner({
     db,
     hub,
     logger,
     maxLogBytes: config.maxLogBytes,
     loadSummary: (executionId) => executions.get(executionId),
+    sendNotification: (notification) => notifications.send(notification),
   });
 
   executions = createExecutionService({ db, box, config, hub, logger, runner, queue });
-
-  // Built before the DNS service, which is only its first caller: the
-  // notification credential is a dashboard setting, so it is owned here.
-  const notifications = createNotificationService({ db, box });
 
   // The same cycle as the runner and the execution service, broken the same way:
   // the scheduler needs something to run, and the service reads the scheduler's

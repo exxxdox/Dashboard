@@ -18,6 +18,7 @@ import {
 import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';
 import type { Logger } from '../lib/logger.js';
+import type { NotificationService } from '../services/notifications/service.js';
 import type { Transport } from '../transport/types.js';
 import type { ExecutionHub } from '../ws/hub.js';
 
@@ -61,6 +62,7 @@ export type RunnerDeps = {
   maxLogBytes: number;
   /** Reads back the row to publish a status event. */
   loadSummary: (executionId: string) => ExecutionSummary;
+  sendNotification: NotificationService['send'];
 };
 
 /** Log chunks are buffered this long before being written, to batch inserts. */
@@ -234,7 +236,31 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
         executionId,
       );
 
-      hub.publish(executionId, { type: 'status', execution: loadSummary(executionId) });
+      const execution = loadSummary(executionId);
+      hub.publish(executionId, { type: 'status', execution });
+
+      const label = {
+        succeeded: 'Succeeded / 成功',
+        failed: 'Failed / 失败',
+        timed_out: 'Timed out / 超时',
+        canceled: 'Canceled / 已取消',
+      }[status];
+      try {
+        // Persist first; omit parameters/logs and the possibly aborted run signal.
+        await deps.sendNotification({
+          title: `Script result / 脚本结果: ${label}`,
+          message: [
+            `Script / 脚本: ${execution.scriptName}`,
+            `Target / 目标: ${execution.targetName}`,
+            `Result / 结果: ${label}`,
+            `Duration / 耗时: ${(durationMs / 1000).toFixed(1)} s`,
+            `Run / 运行: ${executionId}`,
+          ].join('\n'),
+        });
+      } catch {
+        // Delivery must not change the result; upstream errors may contain secrets.
+        logger.warn({ executionId }, 'execution result notification failed');
+      }
 
       return status;
     },

@@ -1,11 +1,8 @@
 /**
  * Gotify notifications.
  *
- * A notification is a courtesy, never a step: it goes out only when the record
- * actually changed, and failing to send it is reported beside a run that still
- * succeeded. Nothing here throws a `DnsFailureError`, because a failed
- * notification has no place among the reason codes -- it is not why the run
- * ended.
+ * A notification is a courtesy, never a step: callers decide when to send and
+ * report delivery failures separately from the operation's actual result.
  */
 
 import { withDeadline } from '../../lib/http.js';

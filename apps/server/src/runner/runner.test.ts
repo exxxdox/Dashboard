@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { randomBytes } from 'node:crypto';
+import { beforeEach, describe, expect, test, vi, type Mock } from 'vitest';
 
-import type { ServerMessage } from '@dashboard/shared';
+import type { ExecutionSummary, ServerMessage } from '@dashboard/shared';
 import { cleanupStagingCommand, resolveInterpreter } from '@dashboard/shared';
 
 import { openDatabase, type Db } from '../db/client.js';
 import { createLogger } from '../lib/logger.js';
+import { createSecretBox } from '../lib/crypto.js';
 import { getExecution } from '../services/executions.js';
+import { createNotificationService, type NotificationService } from '../services/notifications/service.js';
+import type { GotifyMessage } from '../services/notifications/gotify.js';
 import {
   createFakeTransport,
   type FakeExec,
@@ -52,6 +56,9 @@ function seed(db: Db): void {
 type Harness = {
   db: Db;
   messages: ServerMessage[];
+  notifications: NotificationService;
+  notify: Mock<(message: GotifyMessage) => Promise<boolean>>;
+  logger: ReturnType<typeof createLogger>;
   /** What the most recent run asked the transport to do. */
   transportExecs: () => FakeExec[];
   run: (
@@ -68,12 +75,20 @@ function buildHarness(maxLogBytes = 1024 * 1024): Harness {
   const messages: ServerMessage[] = [];
   hub.subscribe(EXECUTION_ID, (message) => messages.push(message));
 
+  const notify = vi.fn<(message: GotifyMessage) => Promise<boolean>>(async () => true);
+  const notifications = createNotificationService({
+    db, box: createSecretBox(randomBytes(32)), notify,
+  });
+  notifications.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'gotify-secret' });
+  const logger = createLogger({ level: 'silent', pretty: false });
+
   const runner = createExecutionRunner({
     db,
     hub,
-    logger: createLogger({ level: 'silent', pretty: false }),
+    logger,
     maxLogBytes,
     loadSummary: (id) => getExecution(db, id),
+    sendNotification: (notification) => notifications.send(notification),
   });
 
   let lastTransport: FakeTransport | undefined;
@@ -81,6 +96,9 @@ function buildHarness(maxLogBytes = 1024 * 1024): Harness {
   return {
     db,
     messages,
+    notifications,
+    notify,
+    logger,
     /** What the most recent run asked the transport to do. */
     transportExecs: () => lastTransport?.execs ?? [],
     async run(scripts, options = {}) {
@@ -119,6 +137,75 @@ describe('createExecutionRunner', () => {
 
   beforeEach(() => {
     h = buildHarness();
+  });
+
+  test.each([
+    { script: { match: SCRIPT_PATH, exitCode: 0 }, status: 'succeeded', label: 'Succeeded / 成功' },
+    { script: { match: SCRIPT_PATH, exitCode: 3 }, status: 'failed', label: 'Failed / 失败' },
+    { script: { match: SCRIPT_PATH, failWith: new Error('connection refused') }, status: 'failed', label: 'Failed / 失败' },
+    { script: { match: SCRIPT_PATH, hangUntilAborted: true }, status: 'timed_out', label: 'Timed out / 超时' },
+  ])('notifies once after persisting $status and publishing its final status', async ({ script, status, label }) => {
+    let summaryAtSend: ExecutionSummary | undefined;
+    let eventAtSend: ServerMessage | undefined;
+    h.notify.mockImplementation(async () => {
+      summaryAtSend = getExecution(h.db, EXECUTION_ID);
+      eventAtSend = h.messages.at(-1);
+      return true;
+    });
+
+    await expect(h.run([script], { timeoutMs: 20 })).resolves.toBe(status);
+    expect(h.notify).toHaveBeenCalledTimes(1);
+    expect(h.notify).toHaveBeenCalledWith(expect.objectContaining({
+      address: 'notify.test', token: 'gotify-secret',
+      title: `Script result / 脚本结果: ${label}`,
+      message: expect.stringContaining(`Result / 结果: ${label}`),
+    }));
+    const message = h.notify.mock.calls[0]![0].message;
+    expect(summaryAtSend?.status).toBe(status);
+    expect(summaryAtSend?.finishedAt).toEqual(expect.any(String));
+    expect(eventAtSend).toMatchObject({ type: 'status', execution: { status } });
+    expect(message).toContain(`Duration / 耗时: ${(summaryAtSend!.durationMs! / 1000).toFixed(1)} s`);
+    expect(message).toContain('Script / 脚本: Deploy API');
+    expect(message).toContain('Target / 目标: edge');
+    expect(message).toContain(`Run / 运行: ${EXECUTION_ID}`);
+  });
+
+  test('notifies about a running cancellation without forwarding the aborted signal', async () => {
+    const controller = new AbortController();
+    const pending = h.run([{ match: SCRIPT_PATH, hangUntilAborted: true }], { signal: controller.signal });
+    controller.abort();
+    await expect(pending).resolves.toBe('canceled');
+    expect(h.notify).toHaveBeenCalledTimes(1);
+    expect(h.notify.mock.calls[0]![0].title).toContain('Canceled / 已取消');
+    expect(h.notify.mock.calls[0]![0].signal).toBeUndefined();
+  });
+
+  test('does not send when Gotify is unconfigured', async () => {
+    h.notifications.saveSettings({ clearGotifyToken: true });
+    await expect(h.run([{ match: SCRIPT_PATH, exitCode: 0 }])).resolves.toBe('succeeded');
+    expect(h.notify).not.toHaveBeenCalled();
+  });
+
+  test.each([{ exitCode: 0, status: 'succeeded' }, { exitCode: 3, status: 'failed' }])(
+    'keeps $status when notification delivery fails and logs no raw delivery error', async ({ exitCode, status }) => {
+    const warn = vi.spyOn(h.logger, 'warn');
+    h.notify.mockRejectedValue(new Error('Gotify answered 500 token=secret'));
+    await expect(h.run([{ match: SCRIPT_PATH, exitCode }])).resolves.toBe(status);
+    expect(getExecution(h.db, EXECUTION_ID)).toMatchObject({ status, exitCode, errorMessage: null });
+    expect(h.messages.at(-1)).toMatchObject({ type: 'status', execution: { status } });
+    expect(h.notify).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith({ executionId: EXECUTION_ID }, 'execution result notification failed');
+  });
+
+  test.each([
+    { match: SCRIPT_PATH, stdout: 'output-secret', exitCode: 0 },
+    { match: SCRIPT_PATH, failWith: new Error('transport-secret') },
+  ])('does not include arguments, parameters, output or transport errors in notifications ($exitCode)', async (script) => {
+    h.db.prepare('UPDATE executions SET param_values_json = ? WHERE id = ?')
+      .run(JSON.stringify({ TOKEN: 'parameter-secret' }), EXECUTION_ID);
+    await h.run([script], { argv: ['argument-secret'] });
+    const { title, message } = h.notify.mock.calls[0]![0];
+    expect(`${title}\n${message}`).not.toMatch(/parameter-secret|argument-secret|output-secret|transport-secret|gotify-secret/);
   });
 
   test('marks a zero exit as succeeded and records the exit code', async () => {
