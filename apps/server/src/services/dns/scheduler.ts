@@ -57,6 +57,9 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
   let generation = 0;
   let nextRunAt: number | null = null;
   let running = false;
+  let lastRunAt: string | null = null;
+  let lastOk: boolean | null = null;
+  let lastFailureReason: DnsSchedulerView['lastFailureReason'] = null;
 
   function cancel(): void {
     if (timer !== null) clearTimer(timer);
@@ -89,8 +92,12 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
       running = true;
       try {
         // The run records itself where an operator reads it: the check history.
-        await deps.service.update('scheduled');
+        const result = await deps.service.update('scheduled');
+        lastOk = result.action !== 'failed';
+        lastFailureReason = result.failureReason;
       } catch (error) {
+        lastOk = false;
+        lastFailureReason = null;
         // `update` reports everything an operator can act on as a result, so an
         // exception here is a bug. Log it and keep the schedule alive rather than
         // letting one bad run stop the timer for good.
@@ -99,6 +106,8 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
           'the scheduled DNS check failed unexpectedly',
         );
       } finally {
+        // Completion time survives reconfiguration so disabling a schedule keeps its last outcome.
+        lastRunAt = new Date(now()).toISOString();
         running = false;
       }
     }
@@ -133,6 +142,9 @@ export function createDnsScheduler(deps: DnsSchedulerDeps): DnsScheduler {
         enabled,
         running,
         intervalMinutes,
+        lastRunAt,
+        lastOk,
+        lastFailureReason,
         nextRunAt: nextRunAt === null ? null : new Date(nextRunAt).toISOString(),
       };
     },

@@ -8,6 +8,10 @@
  */
 
 const en = {
+  'dns.section.record': 'DNS status',
+  'dns.operation.title': 'Last operation',
+  'dns.form.credentials': 'Provider credentials',
+  'dns.schedule.last': 'Last scheduled check',
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
 
@@ -120,6 +124,10 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
+  'dns.section.record': 'DNS 状态',
+  'dns.operation.title': '最近操作',
+  'dns.form.credentials': '服务商凭据',
+  'dns.schedule.last': '上次定时检查',
   'dns.eyebrow': 'DNS',
   'dns.title': 'IPv6 DNS',
 

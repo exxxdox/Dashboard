@@ -32,15 +32,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
-# The registry mirror, for networks where registry.npmjs.org is slow or blocked.
-# It has to be written to a file: pnpm ignores npm_config_registry and
-# NPM_CONFIG_REGISTRY, and the repository's own .npmrc is not copied here --
-# this stage deliberately installs before any source, so it has no .npmrc yet.
-# The default keeps the official registry so the image stays reproducible
-# elsewhere; pass --build-arg NPM_REGISTRY=... to build against a mirror.
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+# Share the project's registry with local installs; an explicit build arg can override it.
+COPY .npmrc ./
+ARG NPM_REGISTRY
+# Cache policy metadata too: a warm package store alone still makes registry requests.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    printf 'registry=%s\n' "$NPM_REGISTRY" > /app/.npmrc \
+    --mount=type=cache,id=pnpm-metadata,target=/root/.cache/pnpm \
+    if [ -n "$NPM_REGISTRY" ]; then printf '\nregistry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
  && pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -76,18 +74,31 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY scripts/prune-runtime-deps.mjs scripts/
-ARG NPM_REGISTRY=https://registry.npmjs.org/
+COPY .npmrc ./
+ARG NPM_REGISTRY
 RUN --mount=type=cache,id=pnpm-alpine,target=/pnpm/store \
-    printf 'registry=%s\n' "$NPM_REGISTRY" > /app/.npmrc \
+    --mount=type=cache,id=pnpm-metadata-alpine,target=/root/.cache/pnpm \
+    if [ -n "$NPM_REGISTRY" ]; then printf '\nregistry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
  && pnpm install --frozen-lockfile --prod --filter @dashboard/server... \
  && node scripts/prune-runtime-deps.mjs /app
 
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-FROM deps AS build
-COPY . .
-RUN pnpm -r build
+# Keep unrelated files and the other app out of each compilation cache key.
+FROM deps AS shared-build
+COPY tsconfig.base.json ./
+COPY packages/shared/ packages/shared/
+RUN pnpm --filter @dashboard/shared build
+
+# BuildKit can compile both apps in parallel once their shared contract is built.
+FROM shared-build AS server-build
+COPY apps/server/ apps/server/
+RUN pnpm --filter @dashboard/server build
+
+FROM shared-build AS web-build
+COPY apps/web/ apps/web/
+RUN pnpm --filter @dashboard/web build
 
 # ---------------------------------------------------------------------------
 # Runtime
@@ -197,9 +208,9 @@ COPY --from=prod-deps /app/packages/shared/node_modules ./packages/shared/node_m
 COPY --from=prod-deps /app/apps/server/package.json ./apps/server/package.json
 COPY --from=prod-deps /app/packages/shared/package.json ./packages/shared/package.json
 
-COPY --from=build /app/apps/server/dist ./apps/server/dist
-COPY --from=build /app/packages/shared/dist ./packages/shared/dist
-COPY --from=build /app/apps/web/dist ./apps/web/dist
+COPY --from=server-build /app/apps/server/dist ./apps/server/dist
+COPY --from=shared-build /app/packages/shared/dist ./packages/shared/dist
+COPY --from=web-build /app/apps/web/dist ./apps/web/dist
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

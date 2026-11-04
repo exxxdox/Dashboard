@@ -13,7 +13,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "start": "node apps/server/dist/index.js",
-    "dbuild": "docker build -t dashboard:local . --build-arg NPM_REGISTRY=https://mirrors.cloud.tencent.com/npm/ --build-arg ALPINE_MIRROR=mirrors.cloud.tencent.com"
+    "dbuild": "docker build -t exxxdox/pri:dashboard . --build-arg ALPINE_MIRROR=mirrors.cloud.tencent.com"
   },
   "devDependencies": {
     "typescript": "~5.9.3"

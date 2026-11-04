@@ -128,6 +128,10 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         )}
       </Field>
 
+      {/* Native details keeps credentials available to keyboard and screen-reader users. */}
+      <details>
+        <summary className="focus-ring cursor-pointer font-semibold">{t('dns.form.credentials')}</summary>
+        <div className="mt-4 grid gap-5">
       {isCloudflare ? (
         <>
           <SecretField
@@ -199,6 +203,9 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
           </Field>
         </>
       )}
+
+        </div>
+      </details>
 
       <div className="border-line grid gap-5 border-t pt-5">
         <Switch

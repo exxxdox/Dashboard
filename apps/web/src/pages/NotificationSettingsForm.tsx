@@ -16,6 +16,7 @@ import { Button } from '../components/Button';
 import { Field, TextInput } from '../components/Form';
 import { SecretField } from '../components/SecretField';
 import { useSaveAppSettings, useTestNotification } from '../api/queries';
+import { errorMessage } from '../api/client';
 import { cn } from '../lib/cn';
 import { formatDateTime } from '../lib/format';
 import { useI18n, useT } from '../lib/i18n';
@@ -116,6 +117,10 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
         <span className="text-faint text-meta">{t('settings.notifications.testHint')}</span>
       </div>
 
+      {/* Keep the test outcome visible after the toast disappears. */}
+      {(test.isSuccess || test.isError) && <p role="status" className={test.isError ? 'text-danger text-meta' : 'text-ok text-meta'}>
+        {test.isError ? errorMessage(test.error, i18n) : t('toast.notificationSent')}
+      </p>}
       <p className="text-faint text-meta">
         {settings.updatedAt === null
           ? t('settings.notifications.neverSaved')

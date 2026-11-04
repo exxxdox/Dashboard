@@ -1,18 +1,4 @@
-/**
- * The IPv6 DNS console.
- *
- * What the page shows is what a check found and what it decided: the last
- * look, the result of the last run, and the newest few history rows. The two
- * things that are configuration rather than state -- the settings, and the
- * whole history -- are behind buttons, because a page someone opens to see
- * whether the record is right should not be mostly a form and a table.
- *
- * What each action found arrives as a toast rather than as a panel: a result
- * is a message about something that just happened, and the page is for what is
- * true now. Nothing is lost by it -- the address a probe detected and the
- * record a query read both land in the panel above, because the same action
- * that reports them also invalidates the state it reports them into.
- */
+/** The DNS console keeps the original overview and dialog arrangement. */
 
 import { useState } from 'react';
 import type { DnsSettingsView } from '@dashboard/shared';
@@ -26,7 +12,10 @@ import { MonoValue } from '../components/MonoValue';
 import { PageHeader } from '../components/PageHeader';
 import { Panel, Stat } from '../components/Panel';
 import { errorMessage } from '../api/client';
-import { useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } from '../api/queries';
+import { useAppSettings, useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } from '../api/queries';
+import { ipv6ProbeOutcome, recordProbeOutcome, updateOutcome, type Outcome } from '../lib/outcome';
+import { NotificationSettingsForm } from './NotificationSettingsForm';
+import { failureText } from '../lib/dns';
 import { providerLabel } from '../lib/dns';
 import { formatDateTime, formatRelative } from '../lib/format';
 import { useI18n, type Translate } from '../lib/i18n';
@@ -42,6 +31,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
   const query = useQueryDnsRecord();
   const update = useRunDnsUpdate();
 
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -96,7 +86,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               icon={<RefreshCw className="size-[18px]" aria-hidden />}
               loading={detect.isPending}
               disabled={busy}
-              onClick={() => detect.mutate()}
+              onClick={() => detect.mutate(undefined, { onSuccess: (result) => setOutcome(ipv6ProbeOutcome(t, result)), onError: (error) => setOutcome({ message: errorMessage(error, i18n), tone: 'error' }) })}
             >
               {t('dns.action.detect')}
             </Button>
@@ -104,7 +94,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               icon={<Search className="size-[18px]" aria-hidden />}
               loading={query.isPending}
               disabled={busy || settings === null}
-              onClick={() => query.mutate()}
+              onClick={() => query.mutate(undefined, { onSuccess: (result) => setOutcome(recordProbeOutcome(t, result)), onError: (error) => setOutcome({ message: errorMessage(error, i18n), tone: 'error' }) })}
             >
               {t('dns.action.query')}
             </Button>
@@ -113,7 +103,7 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
               icon={<Zap className="size-[18px]" aria-hidden />}
               loading={update.isPending}
               disabled={busy}
-              onClick={() => update.mutate()}
+              onClick={() => update.mutate(undefined, { onSuccess: (result) => setOutcome(updateOutcome(t, result)), onError: (error) => setOutcome({ message: errorMessage(error, i18n), tone: 'error' }) })}
             >
               {t('dns.action.checkAndUpdate')}
             </Button>
@@ -122,6 +112,13 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
       />
 
       <div className="mt-5 grid gap-4">
+        {/* Results remain readable without changing the overview's initial arrangement. */}
+        {outcome && <Panel title={t('dns.operation.title')}>
+          <div role="status" aria-live="polite" className={outcome.tone === 'error' ? 'text-danger' : 'text-ink'}>
+            <p>{outcome.message}</p>
+            {outcome.detail && <p className="mt-2 whitespace-pre-wrap break-all text-meta">{outcome.detail}</p>}
+          </div>
+        </Panel>}
         <Panel title={t('dns.lastCheck.title')}>
           <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 xl:grid-cols-3">
             <Stat label={t('dns.stat.publicIpv6')}>
@@ -187,6 +184,12 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
                 </span>
               )}
             </Stat>
+            <Stat label={t('dns.schedule.last')} mono={false}>
+              {data.schedule?.lastRunAt ? <span className="grid gap-1">
+                <RelativeTime iso={data.schedule.lastRunAt} />
+                <span>{data.schedule.lastOk ? t('dns.history.succeeded') : data.schedule.lastFailureReason ? failureText(t, data.schedule.lastFailureReason) : t('dns.resultLabel.failed')}</span>
+              </span> : <span className="text-faint">{t('common.notYet')}</span>}
+            </Stat>
           </div>
         </Panel>
 
@@ -207,6 +210,10 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
         {/* Remounted whenever the stored settings change, so the form's
             one-shot seed of its fields cannot go stale. */}
         <DnsSettingsForm key={settings?.updatedAt ?? 'new'} settings={settings} />
+        <details className="border-line mt-5 border-t pt-5">
+          <summary className="focus-ring cursor-pointer font-semibold">{t('settings.notifications.title')}</summary>
+          <div className="mt-5"><InlineNotifications /></div>
+        </details>
       </Modal>
 
       <Modal
@@ -254,4 +261,12 @@ export function settingsSummary(t: Translate, settings: DnsSettingsView | null):
   return settings.scheduleEnabled
     ? t('dns.settings.summaryConfigured', { provider, minutes: settings.intervalMinutes })
     : t('dns.settings.summaryOff', { provider });
+}
+/** Fetch global notification settings only while the inline form is mounted. */
+function InlineNotifications() {
+  const i18n = useI18n();
+  const settings = useAppSettings();
+  if (settings.isError) return <ErrorBanner message={errorMessage(settings.error, i18n)} onRetry={() => void settings.refetch()} />;
+  if (!settings.data) return <LoadingBlock />;
+  return <NotificationSettingsForm key={settings.data.updatedAt ?? 'new'} settings={settings.data} />;
 }

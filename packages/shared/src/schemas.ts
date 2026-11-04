@@ -551,6 +551,11 @@ export type DnsSchedulerView = {
   intervalMinutes: number;
   /** When the next scheduled check is due; null while the schedule is off. */
   nextRunAt: string | null;
+  /** Last completed scheduled check in this process; null until one finishes. */
+  lastRunAt: string | null;
+  lastOk: boolean | null;
+  /** Null for success or an unexpected internal error, distinguished by lastOk. */
+  lastFailureReason: DnsFailureReason | null;
 };
 
 export type DnsState = {

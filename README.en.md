@@ -49,7 +49,16 @@ Declared params arrive as **environment variables**. Values header not declare c
 
 ## IPv6 DNS console
 
-"DNS" page keep one AAAA record pointed at this host public IPv6, on Cloudflare or Alibaba Cloud.
+The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare or Alibaba Cloud.
+
+- Open Settings from the page header to configure the provider, credentials, check interval and Gotify notifications in a dialog. Credentials and notifications can be collapsed.
+- Use the header actions to detect public IPv6, query the record and check/update manually. Results remain visible until the next action or leaving the page.
+- The status card shows addresses, the DNS record, the next scheduled check and the last scheduled result. Choose View all in the history preview to open statistics and paginated details.
+- Status columns adapt to screen width. The page supports English and Chinese.
+
+Probes run from the dashboard host and require public IPv6 egress. If using Fake-IP DNS such as Clash/Mihomo, configure `api6.ipify.org` to resolve to real addresses and connect directly. The last scheduled result resets on service restart; check history is retained.
+
+DNS and Settings share the same Gotify configuration. Test messages can use unsaved form values.
 
 ## Settings
 
