@@ -54,12 +54,21 @@ describe('formatBytes', () => {
 
 describe('runTag', () => {
   it('is short, prefixed and stable', () => {
-    expect(runTag('ex-77f3a1b2-c4d5-4e6f-8a9b-0c1d2e3f4a5b')).toBe('r-ex77f');
-    expect(runTag('abcdef')).toBe('r-abcde');
+    expect(runTag('run_Rk9Miw-amDJVLn2l')).toBe('r-Rk9Miw-a');
+    expect(runTag('abcdef')).toBe('r-abcdef');
+  });
+
+  it('distinguishes runs using random characters rather than the shared prefix', () => {
+    expect(runTag('run_Rk9Miw-amDJVLn2l')).not.toBe(runTag('run_Rz9Miw-amDJVLn2l'));
+    expect(runTag('run_abcdefgh12345678')).not.toBe(runTag('run_abcdeXYZ12345678'));
+  });
+
+  it('preserves case and URL-safe random characters', () => {
+    expect(runTag('run_aB-_cD0912345678')).toBe('r-aB-_cD09');
   });
 
   it('is the same for the same id', () => {
-    expect(runTag('ex-12345678')).toBe(runTag('ex-12345678'));
+    expect(runTag('run_12345678abcdefgh')).toBe(runTag('run_12345678abcdefgh'));
   });
 });
 

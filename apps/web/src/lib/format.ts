@@ -14,9 +14,9 @@ const MS_PER_MINUTE = 60 * MS_PER_SECOND;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 
-/** Short stable handle for an execution, e.g. `r-7f3a1`. */
+/** Strip the shared prefix so all eight display characters identify the run. */
 export function runTag(id: string): string {
-  return `r-${id.replace(/-/g, '').slice(0, 5)}`;
+  return `r-${id.replace(/^run_/, '').slice(0, 8)}`;
 }
 
 /** `380ms` / `4.2s` / `1m 12s` / `2h 04m`; an em dash while the run is open. */
