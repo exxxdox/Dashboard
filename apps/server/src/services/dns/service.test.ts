@@ -404,6 +404,58 @@ describe('update', () => {
 });
 
 describe('detect and queryRecord', () => {
+  test('clears the cache when only the Alibaba record id changes', async () => {
+    const h = setup();
+    try {
+      h.service.saveSettings({
+        provider: 'alibaba', alibabaAccessKeyId: 'key',
+        alibabaAccessKeySecret: 'secret', alibabaRecordId: 'rec-1',
+      });
+      await h.service.detect();
+      await h.service.queryRecord();
+      expect(h.service.consistency().state).toBe('consistent');
+      h.service.saveSettings({ alibabaRecordId: 'rec-2' });
+      expect(h.service.state()).toMatchObject({ record: null, recordCheckedAt: null });
+      expect(h.service.consistency().state).toBe('unknown');
+    } finally { h.db.close(); }
+  });
+
+  test.each([
+    { cloudflareRecordName: 'new.example.com' },
+    { cloudflareZoneId: 'zone-2' },
+    { provider: 'alibaba' as const, alibabaAccessKeyId: 'key', alibabaAccessKeySecret: 'secret', alibabaRecordId: 'rec-2' },
+  ])('clears the old record when its identity changes: %j', async input => {
+    const h = setup();
+    try {
+      h.save();
+      await h.service.detect();
+      await h.service.queryRecord();
+      expect(h.service.consistency().state).toBe('consistent');
+      h.service.saveSettings(input);
+      expect(h.service.state()).toMatchObject({ record: null, recordCheckedAt: null });
+      expect(h.service.consistency().state).toBe('unknown');
+    } finally { h.db.close(); }
+  });
+
+  test.each(['queryRecord', 'update'] as const)('an old %s cannot overwrite the new record cache', async operation => {
+    const h = setup();
+    try {
+      h.save();
+      let finish!: (record: DnsRecord) => void;
+      h.provider.getRecord.mockReturnValueOnce(new Promise<DnsRecord>(resolve => { finish = resolve; }));
+      const pending = operation === 'queryRecord' ? h.service.queryRecord() : h.service.update('manual');
+      await flush();
+      expect(h.provider.getRecord).toHaveBeenCalledOnce();
+      h.service.saveSettings({ cloudflareRecordName: 'new.example.com' });
+      const newRecord = { ...EXISTING, recordId: 'new', recordName: 'new.example.com' };
+      h.provider.getRecord.mockResolvedValueOnce(newRecord);
+      await h.service.queryRecord();
+      finish(EXISTING);
+      await pending;
+      expect(h.service.state().record).toEqual(newRecord);
+    } finally { h.db.close(); }
+  });
+
   test('remember what they saw, for the state payload', async () => {
     const h = setup();
     try {

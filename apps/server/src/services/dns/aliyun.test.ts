@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { createAlibabaProvider } from './aliyun.js';
@@ -83,6 +85,15 @@ afterEach(() => {
   sdk.configs = [];
   sdk.describeResult.mockReset();
   sdk.updateResult.mockReset();
+});
+
+test('constructs the real SDK under Node ESM without making a request', async () => {
+  // A child process bypasses Vitest's CJS interop and the SDK mock above.
+  await promisify(execFile)(process.execPath, [
+    '--import', import.meta.resolve('tsx'), '--input-type=module', '--eval',
+    `import { createAlibabaProvider } from ${JSON.stringify(new URL('./aliyun.ts', import.meta.url).href)};
+     createAlibabaProvider(${JSON.stringify(settings())});`,
+  ]);
 });
 
 describe('getRecord', () => {

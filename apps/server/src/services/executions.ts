@@ -38,7 +38,7 @@ import type { Transport } from '../transport/types.js';
 import type { ExecutionHub } from '../ws/hub.js';
 import {
   getSourceRow,
-  sourceDirectory,
+  sourceScriptDirectory,
   toScriptSummary,
   type ScriptRow,
   type SourceRow,
@@ -252,7 +252,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
     target: TargetRow,
     input: ExecuteScriptInput,
   ): ExecutionPlan => {
-    const scriptContainerPath = joinRoot(sourceDirectory(config, source), script.relPath);
+    const scriptContainerPath = joinRoot(sourceScriptDirectory(config, source), script.relPath);
 
     if (!isInside(config.scriptRootContainer, scriptContainerPath)) {
       throw new ValidationError('The script path escapes the shared script root');

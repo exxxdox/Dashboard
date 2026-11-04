@@ -151,6 +151,12 @@ export function sourceDirectory(config: AppConfig, row: SourceRow): string {
   return joinRoot(config.scriptRootContainer, row.mount_path);
 }
 
+// Script paths are relative to the selected root, while Git and deletion own the whole checkout.
+export function sourceScriptDirectory(config: AppConfig, row: SourceRow): string {
+  const directory = sourceDirectory(config, row);
+  return row.kind === 'github' && row.sub_path ? joinRoot(directory, row.sub_path) : directory;
+}
+
 /** The four columns that a kind and its fields determine. */
 type SourceShape = {
   repoUrl: string | null;
@@ -195,7 +201,7 @@ function githubShape(fields: {
 }): SourceShape {
   // Throws with a readable reason for anything that is not a public GitHub repo.
   const repo = parseGithubRepo(fields.repoUrl);
-  const subPath = fields.subPath?.trim() ?? '';
+  const subPath = assertSafeRelative(fields.subPath?.trim() ?? '');
 
   return {
     repoUrl: repo.cloneUrl,
@@ -514,11 +520,14 @@ export async function syncSource(
 
     // A subdirectory of a repo can be chosen as the script root; scanning starts
     // there, but stored paths stay relative to it.
-    const scanRoot = row.kind === 'github' && row.sub_path ? join(absolute, row.sub_path) : absolute;
+    const scanRoot = sourceScriptDirectory(config, row);
 
     const outcome = await scanSourceDirectory(scanRoot);
     warnings.push(...outcome.warnings);
-    if (outcome.incomplete) warnings.push('The scan stopped early, so the script list may be incomplete.');
+    // An unreadable subtree is not evidence that its previously known scripts disappeared.
+    if (outcome.incomplete) {
+      throw new TargetError(`The scan is incomplete; the script list was kept. ${warnings.join(' ')}`);
+    }
 
     const counts = syncScripts(db, id, outcome.scripts);
     const timestamp = nowIso();

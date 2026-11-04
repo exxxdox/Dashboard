@@ -62,6 +62,22 @@ afterEach(() => {
 });
 
 describe('getRecord', () => {
+  test.each([
+    ['HOME.example.com', 'home.example.com'],
+    ['home.example.com.', 'home.example.com'],
+    ['home.example.com', 'HOME.example.com.'],
+  ])('matches configured %s with returned %s without creating another record', async (recordName, returnedName) => {
+    const calls = stubFetch({ payload: { success: true, result: [
+      { id: 'rec-1', name: returnedName, type: 'AAAA', content: '2001:db8::1' },
+    ] } });
+    const provider = createCloudflareProvider(settings({ cloudflareRecordName: recordName }));
+    const current = await provider.getRecord();
+    expect(current?.recordId).toBe('rec-1');
+    expect(calls[0]?.url).toContain('name=home.example.com');
+    await expect(provider.setIpv6('2001:db8::1', current)).resolves.toBe('unchanged');
+    expect(calls).toHaveLength(1);
+  });
+
   test('asks for the type and name, and maps only what it reads', async () => {
     const calls = stubFetch({
       payload: {

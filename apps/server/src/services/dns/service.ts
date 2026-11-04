@@ -155,12 +155,14 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
   let detectionGeneration = 0;
   let lastRecord: DnsRecord | null = null;
   let lastRecordAt: string | null = null;
+  let recordGeneration = 0;
 
   async function runUpdate(
     source: DnsCheckSource,
     signal: AbortSignal | undefined,
   ): Promise<DnsUpdateResult> {
     const settings = resolveSettings(db, box);
+    const recordOwner = recordGeneration;
     if (!settings) return remember(source, failure('not_configured', null, ''));
 
     // Checked again here rather than trusted from save time: the row can be
@@ -243,7 +245,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     // The record panel reflects what this run knows. After a create there was no
     // record to query, so it appears on the next explicit query rather than being
     // invented here without an id.
-    if (current) {
+    if (current && recordOwner === recordGeneration) {
       lastRecord = { ...current, value: action === 'unchanged' ? current.value : ipv6 };
       lastRecordAt = nowIso();
     }
@@ -310,12 +312,16 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     },
 
     async queryRecord(signal) {
+      const generation = recordGeneration;
       const settings = requireSettings();
       const provider = createProvider(settings);
       const record = await provider.getRecord(signal);
-      lastRecord = record;
-      lastRecordAt = nowIso();
-      return { record, queriedAt: lastRecordAt };
+      const queriedAt = nowIso();
+      if (generation === recordGeneration) {
+        lastRecord = record;
+        lastRecordAt = queriedAt;
+      }
+      return { record, queriedAt };
     },
 
     consistency() {
@@ -369,6 +375,17 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     saveSettings(input) {
       const previous = getSettingsView(db);
       const view = writeSettings(db, box, input);
+      if (
+        view.provider !== previous?.provider ||
+        (view.provider === 'cloudflare'
+          ? view.cloudflareZoneId !== previous.cloudflareZoneId || view.cloudflareRecordName !== previous.cloudflareRecordName
+          : view.alibabaRecordId !== previous.alibabaRecordId)
+      ) {
+        // A verdict about the previous record cannot describe the new one, even after an old request finishes.
+        recordGeneration += 1;
+        lastRecord = null;
+        lastRecordAt = null;
+      }
       // A cached address from the previous source is no longer the configured observation.
       if (
         view.ipv6Source !== (previous?.ipv6Source ?? 'ipify') ||

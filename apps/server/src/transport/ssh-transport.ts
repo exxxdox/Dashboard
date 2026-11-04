@@ -11,6 +11,8 @@
  * back to `.default` works under both the ESM and the CJS view.
  */
 
+import { StringDecoder } from 'node:string_decoder';
+
 import type { Client as SshClient, ClientChannel, ConnectConfig } from 'ssh2';
 import * as ssh2Namespace from 'ssh2';
 
@@ -189,6 +191,9 @@ function pump(
     let settled = false;
     let canceled = false;
     let timedOut = false;
+    // SSH chunks split bytes arbitrarily; each stream must retain its own partial UTF-8 character.
+    const stdoutDecoder = new StringDecoder('utf8');
+    const stderrDecoder = new StringDecoder('utf8');
     let stderrBuffer = '';
     let stderrSeen = 0;
     let pidResolved = false;
@@ -207,6 +212,10 @@ function pump(
       if (settled) return;
       settled = true;
       cleanup();
+      const stdoutTail = stdoutDecoder.end();
+      if (stdoutTail !== '') options.onChunk({ stream: 'stdout', data: stdoutTail });
+      emitStderr(stderrBuffer + stderrDecoder.end());
+      stderrBuffer = '';
       resolve(result);
     };
 
@@ -216,11 +225,14 @@ function pump(
     };
 
     channel.on('data', (buffer: Buffer) => {
-      options.onChunk({ stream: 'stdout', data: buffer.toString('utf8') });
+      if (settled) return;
+      const data = stdoutDecoder.write(buffer);
+      if (data !== '') options.onChunk({ stream: 'stdout', data });
     });
 
     channel.stderr.on('data', (buffer: Buffer) => {
-      const text = buffer.toString('utf8');
+      if (settled) return;
+      const text = stderrDecoder.write(buffer);
 
       if (pidResolved) {
         emitStderr(text);
@@ -266,7 +278,6 @@ function pump(
     });
 
     channel.on('close', (code: number | null, signal?: string | null) => {
-      if (!pidResolved && stderrBuffer !== '') emitStderr(stderrBuffer);
       settle({
         exitCode: typeof code === 'number' ? code : null,
         signal: signal ?? null,
@@ -369,12 +380,13 @@ function runCommand(client: SshClient, command: string, options: { timeoutMs: nu
       }
 
       let stdout = '';
+      const decoder = new StringDecoder('utf8');
       channel.on('data', (buffer: Buffer) => {
-        stdout += buffer.toString('utf8');
+        stdout += decoder.write(buffer);
       });
       channel.on('close', () => {
         clearTimeout(timer);
-        resolve(stdout);
+        resolve(stdout + decoder.end());
       });
     });
   });

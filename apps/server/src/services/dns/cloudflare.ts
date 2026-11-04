@@ -35,8 +35,10 @@ type CloudflareRecord = {
 };
 
 export function createCloudflareProvider(settings: ResolvedDnsSettings): DnsProvider {
-  const { cloudflareToken: token, cloudflareZoneId: zoneId, cloudflareRecordName: recordName } =
+  const { cloudflareToken: token, cloudflareZoneId: zoneId } =
     settings;
+  // DNS names are case-insensitive, and a trailing root dot names the same record.
+  const recordName = normalizeRecordName(settings.cloudflareRecordName);
 
   async function request<T>(
     path: string,
@@ -96,7 +98,7 @@ export function createCloudflareProvider(settings: ResolvedDnsSettings): DnsProv
       // able to hand back a record of another type or name for us to overwrite.
       const candidates = Array.isArray(result) ? result : [];
       const match = candidates.find(
-        (record) => record.name === recordName && record.type === 'AAAA',
+        (record) => typeof record.name === 'string' && normalizeRecordName(record.name) === recordName && record.type === 'AAAA',
       );
       // No record is a value, not a failure: the caller creates one.
       if (!match) return null;
@@ -160,6 +162,10 @@ export function createCloudflareProvider(settings: ResolvedDnsSettings): DnsProv
       return 'updated';
     },
   };
+}
+
+function normalizeRecordName(name: string): string {
+  return name.trim().toLowerCase().replace(/\.$/, '');
 }
 
 /** `null` unless the API reported a real boolean; a string "true" is not one. */

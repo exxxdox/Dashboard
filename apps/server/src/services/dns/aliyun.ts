@@ -35,8 +35,11 @@ const ENDPOINT = 'alidns.cn-hangzhou.aliyuncs.com';
 const CONNECT_TIMEOUT_MS = 5_000;
 const READ_TIMEOUT_MS = 15_000;
 
+// Node ESM exposes the CJS module object; test/build loaders may unwrap it already.
+const AlidnsClient = (Alidns as unknown as { default?: typeof Alidns }).default ?? Alidns;
+
 export function createAlibabaProvider(settings: ResolvedDnsSettings): DnsProvider {
-  const client = new Alidns(
+  const client = new AlidnsClient(
     new OpenApiConfig({
       accessKeyId: settings.alibabaAccessKeyId,
       accessKeySecret: settings.alibabaAccessKeySecret,

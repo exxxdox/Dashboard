@@ -45,6 +45,13 @@ export class LogStream {
       return;
     }
 
+    // A failed fill keeps its buffered tail; a later event may retry it.
+    if (this.pending.length > 0) {
+      this.pending.push(chunk);
+      void this.fill(this.cursor);
+      return;
+    }
+
     // Already delivered: the backfill and the socket overlap by design.
     if (chunk.seq <= this.cursor) return;
 
@@ -70,13 +77,21 @@ export class LogStream {
     this.filling = true;
     this.lastFillFrom = fromSeq;
 
+    let succeeded = false;
     try {
-      const chunks = await api.getExecutionLogs(this.executionId, fromSeq);
-      for (const chunk of [...chunks].sort((a, b) => a.seq - b.seq)) {
-        if (chunk.seq <= this.cursor) continue;
-        this.cursor = chunk.seq;
-        this.onChunk(chunk);
+      // The API caps each page at 5,000 chunks, including for completed runs.
+      let pageFrom = fromSeq;
+      while (true) {
+        const chunks = await api.getExecutionLogs(this.executionId, pageFrom);
+        for (const chunk of [...chunks].sort((a, b) => a.seq - b.seq)) {
+          if (chunk.seq <= this.cursor) continue;
+          this.cursor = chunk.seq;
+          this.onChunk(chunk);
+        }
+        if (chunks.length < 5_000 || this.cursor <= pageFrom) break;
+        pageFrom = this.cursor;
       }
+      succeeded = true;
     } catch {
       // A failed fill is not fatal and has nowhere to be reported: the hole is
       // still in the stream, and the next chunk re-requests it. Clearing the
@@ -84,9 +99,12 @@ export class LogStream {
       this.lastFillFrom = -1;
     } finally {
       this.filling = false;
-      const buffered = this.pending;
-      this.pending = [];
-      for (const chunk of buffered) this.push(chunk);
+      // Replaying a failed request's tail here would immediately retry forever.
+      if (succeeded) {
+        const buffered = this.pending;
+        this.pending = [];
+        for (const chunk of buffered) this.push(chunk);
+      }
     }
   }
 }

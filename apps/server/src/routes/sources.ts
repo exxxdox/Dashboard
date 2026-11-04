@@ -21,7 +21,7 @@ import {
   getSourceRow,
   getSourceTree,
   listSources,
-  sourceDirectory,
+  sourceScriptDirectory,
   syncSource,
   toScriptSummary,
   updateSource,
@@ -119,7 +119,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: AppContext): voi
     // mounted directory, bounded, and never fail the request over it: the file
     // may have disappeared between a sync and this call.
     const content = await readFile(
-      joinRoot(sourceDirectory(ctx.config, source), script.relPath),
+      joinRoot(sourceScriptDirectory(ctx.config, source), script.relPath),
       'utf8',
     )
       .then((text) => (text.length > MAX_SNIPPET_CHARS ? text.slice(0, MAX_SNIPPET_CHARS) : text))

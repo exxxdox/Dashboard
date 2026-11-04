@@ -180,3 +180,45 @@ describe('LogStream live merging', () => {
     expect(received).toEqual([1]);
   });
 });
+
+describe('LogStream recovery boundaries', () => {
+  it('waits for a later event after a failed gap fill', async () => {
+    getExecutionLogs.mockResolvedValueOnce([chunk(1)]);
+    const { stream, received } = makeStream();
+    await stream.loadHistory();
+    getExecutionLogs.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([chunk(2), chunk(3)]);
+    stream.push(chunk(3));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getExecutionLogs).toHaveBeenCalledTimes(2);
+    expect(received).toEqual([1]);
+    await stream.resync();
+    expect(received).toEqual([1, 2, 3]);
+  });
+
+  it('loads every page of a finished execution', async () => {
+    getExecutionLogs.mockResolvedValueOnce(Array.from({ length: 5000 }, (_, i) => chunk(i + 1)))
+      .mockResolvedValueOnce([chunk(5001)]);
+    const { stream, received } = makeStream();
+    await stream.loadHistory();
+    expect(received).toHaveLength(5001);
+    expect(getExecutionLogs).toHaveBeenLastCalledWith('ex-1', 5000);
+  });
+});
+
+it('retries a failed gap only when another live chunk arrives', async () => {
+  getExecutionLogs.mockResolvedValueOnce([chunk(1)]);
+  const { stream, received } = makeStream();
+  await stream.loadHistory();
+  getExecutionLogs.mockRejectedValue(new Error('offline'));
+  stream.push(chunk(3));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(getExecutionLogs).toHaveBeenCalledTimes(2);
+  stream.push(chunk(4));
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(getExecutionLogs).toHaveBeenCalledTimes(3);
+  expect(received).toEqual([1]);
+  getExecutionLogs.mockResolvedValue([chunk(2), chunk(3), chunk(4)]);
+  await stream.resync();
+  expect(received).toEqual([1, 2, 3, 4]);
+});

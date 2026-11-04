@@ -146,7 +146,9 @@ export function clearSessionCookie(): string {
 
 /** Wrong passwords allowed from one address inside the window. */
 const MAX_FAILURES = 5;
-const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+// A short window bounds guessing without a long lockout for clients sharing a proxy.
+export const LOGIN_RETRY_AFTER_SEC = 30;
+const FAILURE_WINDOW_MS = LOGIN_RETRY_AFTER_SEC * 1000;
 
 export type LoginThrottle = {
   isLocked: (ip: string, now: number) => boolean;

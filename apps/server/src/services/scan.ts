@@ -74,6 +74,7 @@ export async function scanSourceDirectory(rootAbsolute: string): Promise<ScanOut
     try {
       entries = await readdir(absolute, { withFileTypes: true });
     } catch (error) {
+      incomplete = true;
       warnings.push(
         `Could not read ${relDir || '.'}: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -129,6 +130,7 @@ export async function scanSourceDirectory(rootAbsolute: string): Promise<ScanOut
           meta,
         });
       } catch (error) {
+        incomplete = true;
         warnings.push(`${relPath} skipped: ${error instanceof Error ? error.message : String(error)}`);
       }
     }

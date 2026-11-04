@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   MAX_PARAM_COUNT,
   type ScriptParam,
@@ -178,6 +178,7 @@ export function RunPanel({ script }: RunPanelProps) {
     setShowErrors(true);
     if (hasErrors || effectiveTargetId === '') return;
 
+    flushDraft();
     execute.mutate(
       {
         scriptId: script.id,
@@ -194,26 +195,54 @@ export function RunPanel({ script }: RunPanelProps) {
   const [seeded, setSeeded] = useState(false);
   if (prefill.data && !seeded) {
     setSeeded(true);
-    const restored = formFromDraft(prefill.data.draft, script.params);
-    setValues(restored.values);
-    setCustomRows(restored.rows);
-    if (restored.timeoutSec !== '') setTimeoutSec(restored.timeoutSec);
-    setCustomOpen(script.params.length === 0 || restored.rows.length > 0);
+    // A slow prefill must not replace edits made while the request was pending.
+    if (!touched) {
+      const restored = formFromDraft(prefill.data.draft, script.params);
+      setValues(restored.values);
+      setCustomRows(restored.rows);
+      if (restored.timeoutSec !== '') setTimeoutSec(restored.timeoutSec);
+      setCustomOpen(script.params.length === 0 || restored.rows.length > 0);
+    }
   }
 
   // Save as they type, without a button: debounced rather than a request per
   // keystroke, skipped when nothing changed, and only once they have touched
   // something -- opening a script must not rewrite its draft.
   const savedDraft = prefill.data?.draft;
-  const save = saveDraft.mutate;
-  useEffect(() => {
-    if (!touched || !seeded) return;
-    const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout });
-    if (savedDraft && sameDraft(savedDraft, draft)) return;
+  const save = saveDraft.mutateAsync;
+  const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout });
+  const lastRequested = useRef('');
+  const saveQueue = useRef<Promise<unknown> | null>(null);
+  const serialized = JSON.stringify(draft);
+  // Compare against queued writes too, so reverting an in-flight edit is saved.
+  function hasUnsavedDraft(): boolean {
+    return touched && (lastRequested.current
+      ? lastRequested.current !== serialized
+      : !savedDraft || !sameDraft(savedDraft, draft));
+  }
+  const dirty = hasUnsavedDraft();
+  const flushRef = useRef<() => void>(() => undefined);
+  function flushDraft(): void {
+    // Failure clears the ref without a render; check its current value at flush.
+    if (!hasUnsavedDraft()) return;
+    lastRequested.current = serialized;
+    // Preserve edit order even when an earlier save is still in flight at close.
+    const request = () => save({ id: script.id, draft });
+    saveQueue.current = (saveQueue.current ? saveQueue.current.then(request) : request()).catch(() => {
+      // A failed background write must remain retryable on submit or close.
+      if (lastRequested.current === serialized) lastRequested.current = '';
+    });
+  }
+  flushRef.current = flushDraft;
 
-    const timer = setTimeout(() => save({ id: script.id, draft }), DRAFT_SAVE_DELAY_MS);
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = setTimeout(() => flushRef.current(), DRAFT_SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [touched, seeded, values, customRows, timeout, savedDraft, save, script.id]);
+  }, [dirty, values, customRows, timeout]);
+
+  // Only unmount flushes immediately; ordinary edits still share the debounce.
+  useEffect(() => () => flushRef.current(), []);
 
   const restoredNotice = prefill.data ? describePrefill(prefill.data) : null;
   // Counts every row that will be sent, not every row with a name: an argument
