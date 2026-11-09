@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 8;
+const TARGET_VERSION = 9;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -312,6 +312,26 @@ export const MIGRATIONS: Migration[] = [
       DROP TABLE dns_checks;
       ALTER TABLE dns_checks_v8 RENAME TO dns_checks;
       CREATE INDEX idx_dns_checks_at ON dns_checks(at DESC);
+    `);
+  },
+  // v9 -- schedules own their invocation snapshot, independently of editable run drafts.
+  (db) => {
+    db.exec(`
+      CREATE TABLE script_schedules (
+        script_id         TEXT PRIMARY KEY REFERENCES scripts(id) ON DELETE CASCADE,
+        target_id         TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+        cron              TEXT NOT NULL,
+        time_zone         TEXT NOT NULL,
+        enabled           INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        run_input_json    TEXT NOT NULL,
+        next_run_at       TEXT,
+        last_triggered_at TEXT,
+        last_execution_id TEXT REFERENCES executions(id) ON DELETE SET NULL,
+        last_error        TEXT CHECK (last_error IN ('submit_failed', 'invalid_schedule')),
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_script_schedules_due ON script_schedules(enabled, next_run_at);
     `);
   },
 ];

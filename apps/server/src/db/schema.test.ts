@@ -362,3 +362,27 @@ describe('v8 migration', () => {
     }
   });
 });
+
+describe('v9 script schedules migration', () => {
+  test('upgrades populated databases and preserves schedules until their owner is deleted', () => {
+    const db = versionOneDatabase();
+    try {
+      for (const migration of MIGRATIONS.slice(1, 8)) migration(db);
+      db.pragma('user_version = 8');
+      migrate(db);
+      expect(columnsOf(db, 'script_schedules')).toContain('run_input_json');
+      expect(db.prepare('SELECT work_dir FROM executions').get()).toEqual({ work_dir: '/srv/scripts' });
+      const insert = db.prepare(`INSERT INTO script_schedules
+        (script_id,target_id,cron,time_zone,enabled,run_input_json,last_execution_id,created_at,updated_at)
+        VALUES ('scr_1','tgt_1','0 9 * * *','Asia/Shanghai',1,'{"params":{},"argv":[]}',?, ?, ?)`);
+      insert.run('run_1', NOW, NOW);
+      db.prepare("DELETE FROM executions WHERE id = 'run_1'").run();
+      expect(db.prepare('SELECT last_execution_id FROM script_schedules').get()).toEqual({ last_execution_id: null });
+      expect(() => db.prepare('UPDATE script_schedules SET enabled = 2').run()).toThrow(/CHECK/);
+      expect(() => db.prepare("UPDATE script_schedules SET target_id = 'missing'").run()).toThrow(/FOREIGN KEY/);
+      db.prepare("DELETE FROM targets WHERE id = 'tgt_1'").run();
+      expect(db.prepare('SELECT * FROM script_schedules').all()).toEqual([]);
+      expect(() => migrate(db)).not.toThrow();
+    } finally { db.close(); }
+  });
+});

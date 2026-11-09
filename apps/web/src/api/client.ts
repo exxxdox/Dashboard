@@ -18,6 +18,8 @@ import type {
   ScriptTreeNode,
   RunDraft,
   ScriptRunPrefill,
+  SaveScriptScheduleInput,
+  ScriptSchedule,
   SourceSummary,
   SyncResult,
   TargetCheckResult,
@@ -225,6 +227,12 @@ export const api = {
       method: 'PUT',
       body,
     }),
+  scriptSchedule: (id: string) =>
+    apiRequest<ScriptSchedule | null>(`/scripts/${encodeURIComponent(id)}/schedule`),
+  saveScriptSchedule: (id: string, body: SaveScriptScheduleInput) =>
+    apiRequest<ScriptSchedule>(`/scripts/${encodeURIComponent(id)}/schedule`, { method: 'PUT', body }),
+  deleteScriptSchedule: (id: string) =>
+    apiRequest<void>(`/scripts/${encodeURIComponent(id)}/schedule`, { method: 'DELETE' }),
   executeScript: (id: string, body: ExecuteScriptInput) =>
     apiRequest<{ executionId: string; status: ExecutionSummary['status'] }>(
       `/scripts/${encodeURIComponent(id)}/execute`,

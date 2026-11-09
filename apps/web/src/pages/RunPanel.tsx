@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   MAX_PARAM_COUNT,
+  type ExecuteScriptInput,
   type ScriptParam,
   type ScriptSummary,
   type TargetSummary,
@@ -34,6 +35,7 @@ import {
   type CustomParamRow,
 } from '../lib/run-params';
 import { toRunInput } from '../lib/run-submit';
+import { ScriptSchedulePanel } from './ScriptSchedulePanel';
 
 type ParamValues = Record<string, string>;
 
@@ -174,9 +176,15 @@ export function RunPanel({ script }: RunPanelProps) {
     editRows(addRow);
   }
 
-  function submit(): void {
+  function currentInput(): ExecuteScriptInput | null {
     setShowErrors(true);
-    if (hasErrors || effectiveTargetId === '') return;
+    if (hasErrors || effectiveTargetId === '') return null;
+    return toRunInput({ values, rows: customRows, timeoutSec: timeout }, effectiveTargetId);
+  }
+
+  function submit(): void {
+    const input = currentInput();
+    if (!input) return;
 
     flushDraft();
     execute.mutate(
@@ -184,7 +192,7 @@ export function RunPanel({ script }: RunPanelProps) {
         scriptId: script.id,
         // Custom rows cannot collide with a declared name: validateRows refuses
         // a row that repeats one.
-        input: toRunInput({ values, rows: customRows, timeoutSec: timeout }, effectiveTargetId),
+        input,
       },
       { onSuccess: (result) => navigate(`/runs/${encodeURIComponent(result.executionId)}`) },
     );
@@ -493,6 +501,7 @@ export function RunPanel({ script }: RunPanelProps) {
         </Button>
         <span className="text-faint text-meta">{t('runs.submitHint')}</span>
       </div>
+      <ScriptSchedulePanel scriptId={script.id} getInput={currentInput} />
     </div>
   );
 }

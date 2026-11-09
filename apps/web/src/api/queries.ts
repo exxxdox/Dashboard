@@ -13,6 +13,8 @@ import type {
   ExecutionSummary,
   RunDraft,
   ScriptRunPrefill,
+  SaveScriptScheduleInput,
+  ScriptSchedule,
   ScriptSummary,
   TargetSummary,
   TestNotificationInput,
@@ -287,6 +289,38 @@ export function useSaveScriptRunDraft() {
     // A debounced background write: it repeats on its own, so announcing it
     // would be a toast per pause in typing, and announcing each failure worse.
     meta: { quiet: true },
+  });
+}
+
+export function useScriptSchedule(scriptId: string) {
+  return useQuery({
+    queryKey: queryKeys.scriptSchedule(scriptId),
+    queryFn: () => api.scriptSchedule(scriptId),
+    // Trigger times and the latest execution change while the dialog stays open.
+    refetchInterval: 15_000,
+  });
+}
+
+export function useSaveScriptSchedule() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ scriptId, input }: { scriptId: string; input: SaveScriptScheduleInput }) =>
+      api.saveScriptSchedule(scriptId, input),
+    meta: { success: 'toast.scheduleSaved' },
+    onSuccess: (schedule: ScriptSchedule, { scriptId }) => {
+      client.setQueryData(queryKeys.scriptSchedule(scriptId), schedule);
+    },
+  });
+}
+
+export function useDeleteScriptSchedule() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (scriptId: string) => api.deleteScriptSchedule(scriptId),
+    meta: { success: 'toast.scheduleDeleted' },
+    onSuccess: (_result, scriptId) => {
+      client.setQueryData(queryKeys.scriptSchedule(scriptId), null);
+    },
   });
 }
 

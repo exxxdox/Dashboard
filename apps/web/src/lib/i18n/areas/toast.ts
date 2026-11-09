@@ -27,6 +27,8 @@ const en = {
   'toast.sourceSynced': 'Source synced',
 
   'toast.scriptSaved': 'Script metadata saved',
+  'toast.scheduleSaved': 'Schedule saved',
+  'toast.scheduleDeleted': 'Schedule deleted',
 
   'toast.runStarted': 'Run queued',
   'toast.runCancelled': 'Cancellation requested',
@@ -56,6 +58,8 @@ const zh: Record<keyof typeof en, string> = {
   'toast.sourceSynced': '脚本源已同步',
 
   'toast.scriptSaved': '脚本信息已保存',
+  'toast.scheduleSaved': '定时计划已保存',
+  'toast.scheduleDeleted': '定时计划已删除',
 
   'toast.runStarted': '运行已排队',
   'toast.runCancelled': '已请求取消',

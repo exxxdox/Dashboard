@@ -87,6 +87,8 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Live logs uncapped; stored output capped.** Watcher of runaway script must still see it. Only persistence bounded by `MAX_LOG_BYTES`.
 
+**Script schedules own invocation snapshots.** `services/script-schedules.ts` uses Croner to calculate five-field Cron times in an explicit time zone; `script_schedules` stores one plan per script, separately from the editable run draft. A trigger calls `executions.submit`, so validation, concurrency, logs and notifications share the manual path. Save resolves parameter defaults and timeout; editing the draft does not alter scheduled runs. Restart recomputes future triggers after interrupted runs are reconciled; missed times are skipped. A previous scheduled run still queued/running skips the new trigger. Stop the scheduler before closing the database. Target/script deletion cascades to the plan; soft-deleted scripts never submit. See `docs/script-schedules.md`.
+
 **Queue in-process.** Global limit (SSH connections) + per-target (one busy host can't consume all slots). Restart loses queued + running, so `markInterrupted()` at boot: non-terminal rows from dead process reconciled, not shown running.
 
 **Script ids soft-deleted.** Resync missing file set `deleted_at`, not row removal: history stays readable, returning file recognised. `syncScripts` rewrite metadata only on content-hash change, so display-name edits survive.

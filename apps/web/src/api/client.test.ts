@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, UNAUTHORIZED_EVENT, apiRequest, errorMessage } from './client';
+import { ApiError, UNAUTHORIZED_EVENT, api, apiRequest, errorMessage } from './client';
 
 function jsonResponse(body: string, status: number): Response {
   return new Response(body, { status, headers: { 'content-type': 'application/json' } });
@@ -186,5 +186,21 @@ describe('unauthorized responses', () => {
     stubFetch(async () => jsonResponse('{"error":{"code":"no","message":"nope"}}', 500));
     await expect(apiRequest('/targets')).rejects.toBeInstanceOf(ApiError);
     expect(window.dispatchEvent).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('script schedule API', () => {
+  it('reads, saves and deletes a schedule with an encoded script id', async () => {
+    const spy = stubFetch(async () => jsonResponse('null', 200));
+    const input = { cron: '0 8 * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'target', params: { NAME: 'test' }, argv: ['a b'] } };
+    await expect(api.scriptSchedule('script/id')).resolves.toBeNull();
+    await api.saveScriptSchedule('script/id', input);
+    await api.deleteScriptSchedule('script/id');
+    expect(spy.mock.calls.map(([url]) => (url as URL).pathname)).toEqual([
+      '/api/scripts/script%2Fid/schedule', '/api/scripts/script%2Fid/schedule', '/api/scripts/script%2Fid/schedule',
+    ]);
+    expect(spy.mock.calls.map(([, init]) => init?.method)).toEqual(['GET', 'PUT', 'DELETE']);
+    expect(JSON.parse(spy.mock.calls[1]?.[1]?.body as string)).toEqual(input);
   });
 });

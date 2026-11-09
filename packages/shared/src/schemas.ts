@@ -135,6 +135,26 @@ export const executeScriptSchema = z.object({
 });
 export type ExecuteScriptInput = z.infer<typeof executeScriptSchema>;
 
+// A schedule owns a snapshot; later edits to the run draft must not alter unattended runs.
+export const saveScriptScheduleSchema = z.object({
+  cron: z.string().trim().min(1).max(200),
+  timeZone: z.string().trim().min(1).max(100),
+  enabled: z.boolean(),
+  input: executeScriptSchema,
+});
+export type SaveScriptScheduleInput = z.infer<typeof saveScriptScheduleSchema>;
+
+export type ScriptSchedule = SaveScriptScheduleInput & {
+  scriptId: string;
+  targetName: string;
+  nextRunAt: string | null;
+  lastTriggeredAt: string | null;
+  lastExecutionId: string | null;
+  /** Localized by the client; never contains submitted parameters or SSH errors. */
+  lastError: 'submit_failed' | 'invalid_schedule' | null;
+  updatedAt: string;
+};
+
 /**
  * Sign-in. There is no registration and no user list: the server compares this
  * against one username and password from its environment.

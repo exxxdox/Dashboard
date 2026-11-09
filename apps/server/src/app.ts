@@ -20,6 +20,7 @@ import { readCookie, SESSION_COOKIE } from './lib/auth.js';
 import { registerModelRelayRoutes } from './routes/model-relay.js';
 import { registerDnsRoutes } from './routes/dns.js';
 import { registerExecutionRoutes } from './routes/executions.js';
+import { registerScriptScheduleRoutes } from './routes/script-schedules.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerSourceRoutes } from './routes/sources.js';
 import { registerTargetRoutes } from './routes/targets.js';
@@ -173,6 +174,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerTargetRoutes(app, ctx);
   registerSourceRoutes(app, ctx);
   registerExecutionRoutes(app, ctx);
+  registerScriptScheduleRoutes(app, ctx);
   registerDnsRoutes(app, ctx);
   registerSettingsRoutes(app, ctx);
   registerModelRelayRoutes(app, ctx);

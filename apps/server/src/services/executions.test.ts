@@ -19,6 +19,7 @@ import { createFakeTransport } from '../transport/fake-transport.js';
 import type { Transport } from '../transport/types.js';
 import { createExecutionHub } from '../ws/hub.js';
 import { createExecutionService } from './executions.js';
+import { createScriptScheduleService } from './script-schedules.js';
 import { MAX_FILE_BYTES } from './scan.js';
 import { createTransportForTarget } from './targets.js';
 
@@ -182,4 +183,37 @@ describe('execution history and lifecycle', () => {
   test('zero retention keeps all history', () => {
     const h = setup(0); h.addRun('old'); expect(h.service.prune()).toBe(0); expect(h.service.get('old').id).toBe('old');
   });
+});
+
+
+test('Cron submissions use the ordinary execution history and runner plan', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-01-01T00:00:30.000Z'));
+  const h = setup();
+  const schedules = createScriptScheduleService({
+    db: h.db,
+    executions: h.service,
+    config: { defaultTimeoutSec: 60 },
+    logger: createLogger({ level: 'silent', pretty: false }),
+  });
+  cleanups.push(() => schedules.stop());
+  const saved = schedules.save('scr_1', {
+    cron: '* * * * *', timeZone: 'UTC', enabled: true,
+    input: { ...h.input, argv: ['with space'], timeoutSec: 7 },
+  });
+  expect(saved.input.params).toEqual({ ENV: 'prod', COUNT: '3' });
+  schedules.start();
+  await vi.advanceTimersByTimeAsync(30_000);
+  const runs = h.service.list({ limit: 10, offset: 0 });
+  expect(runs.total).toBe(1);
+  expect(runs.items[0]).toMatchObject({ status: 'queued', paramValues: saved.input.params, argv: ['with space'] });
+  expect(schedules.get('scr_1')?.lastExecutionId).toBe(runs.items[0]?.id);
+  // A slow or queued scheduled run cannot accumulate another invocation each minute.
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(h.service.list({ limit: 10, offset: 0 }).total).toBe(1);
+  h.scheduled.shift()!();
+  const drained = h.queue.drain();
+  await vi.advanceTimersByTimeAsync(10);
+  await drained;
+  expect(h.run.mock.calls[0]![0]).toMatchObject({ argv: ['with space'], timeoutMs: 7000, env: { ENV: 'prod', COUNT: '3' } });
 });

@@ -57,6 +57,10 @@ Configuration stays in `DATA_DIR/model-ext-mcp.sqlite`. To migrate an existing d
 
 With MCP network access disabled, only TCP peers on loopback or local interface subnets are accepted; forwarded headers are ignored. Default host networking includes the host LAN in those subnets. A local reverse proxy counts as local, so restrict the proxy or firewall as needed.
 
+## Scheduled scripts
+
+Script run settings support a five-field Cron schedule with an explicit time zone, target, and saved run parameters. Schedules persist across restarts and use the normal run history and logs. Missed triggers during downtime are skipped, as are triggers while the preceding scheduled run is still queued or running.
+
 ## IPv6 DNS console
 
 The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare.

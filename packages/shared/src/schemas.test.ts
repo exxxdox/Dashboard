@@ -227,3 +227,16 @@ test('validates and trims the optional local IPv6 interface name', () => {
   expect(updateDnsSettingsSchema.parse({ localIpv6Interface: '' })).toEqual({ localIpv6Interface: '' });
   expect(updateDnsSettingsSchema.safeParse({ localIpv6Interface: 'x'.repeat(16) }).success).toBe(false);
 });
+
+
+describe('script schedule contract', () => {
+  test('requires an explicit target and time zone and defaults run arguments', async () => {
+    const { saveScriptScheduleSchema } = await import('./schemas.js');
+    const valid = { cron: '*/5 * * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'tgt_1' } };
+    expect(saveScriptScheduleSchema.parse(valid).input).toEqual({ targetId: 'tgt_1', params: {}, argv: [] });
+    expect(saveScriptScheduleSchema.safeParse({ ...valid, timeZone: '' }).success).toBe(false);
+    expect(saveScriptScheduleSchema.safeParse({ ...valid, cron: 'x'.repeat(201) }).success).toBe(false);
+    expect(saveScriptScheduleSchema.safeParse({ ...valid, input: { targetId: '' } }).success).toBe(false);
+    expect(saveScriptScheduleSchema.safeParse({ ...valid, input: { targetId: 'tgt_1', timeoutSec: 0 } }).success).toBe(false);
+  });
+});

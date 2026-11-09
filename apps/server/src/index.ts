@@ -22,6 +22,7 @@ import { createDnsService, type DnsService } from './services/dns/service.js';
 import { resolveSettings } from './services/dns/settings.js';
 import { createExecutionService, type ExecutionService } from './services/executions.js';
 import { createNotificationService } from './services/notifications/service.js';
+import { createScriptScheduleService } from './services/script-schedules.js';
 import { createExecutionHub } from './ws/hub.js';
 
 /** How often retention runs. Daily is plenty for a self-hosted dashboard. */
@@ -102,6 +103,7 @@ async function main(): Promise<void> {
   });
 
   executions = createExecutionService({ db, box, config, hub, logger, runner, queue });
+  const scriptSchedules = createScriptScheduleService({ db, executions, logger, config });
 
   // The same cycle as the runner and the execution service, broken the same way:
   // the scheduler needs something to run, and the service reads the scheduler's
@@ -131,6 +133,7 @@ async function main(): Promise<void> {
     queue,
     runner,
     executions,
+    scriptSchedules,
     dns,
     dnsScheduler,
     notifications,
@@ -184,6 +187,7 @@ async function main(): Promise<void> {
     // Stopped before the database closes: a tick that fired now would run
     // against a closed handle.
     dnsScheduler.stop();
+    scriptSchedules.stop();
 
     // Stop accepting work first, then give the queue a bounded window to finish.
     // Runs that do not finish are reported as interrupted on the next boot.
@@ -210,6 +214,8 @@ async function main(): Promise<void> {
   installCrashHandlers({ logger, shutdown });
 
   await app.listen({ port: config.port, host: config.host });
+  // Restore future triggers only after restart reconciliation and successful startup.
+  scriptSchedules.start();
 
   logger.info(
     {

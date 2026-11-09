@@ -33,6 +33,7 @@ import { errorMessages } from './areas/errors';
 import { overviewMessages } from './areas/overview';
 import { runsMessages } from './areas/runs';
 import { scriptsMessages } from './areas/scripts';
+import { scheduleMessages } from './areas/schedule';
 import { settingsMessages } from './areas/settings';
 import { sourcesMessages } from './areas/sources';
 import { targetsMessages } from './areas/targets';
@@ -52,6 +53,7 @@ const AREAS = {
   dns: dnsMessages,
   settings: settingsMessages,
   scripts: scriptsMessages,
+  schedule: scheduleMessages,
   runs: runsMessages,
   targets: targetsMessages,
   sources: sourcesMessages,

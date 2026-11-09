@@ -16,6 +16,7 @@ import type { ExecutionRunner } from './runner/runner.js';
 import type { DnsScheduler } from './services/dns/scheduler.js';
 import type { DnsService } from './services/dns/service.js';
 import type { ExecutionService } from './services/executions.js';
+import type { ScriptScheduleService } from './services/script-schedules.js';
 import type { NotificationService } from './services/notifications/service.js';
 import type { ExecutionHub } from './ws/hub.js';
 
@@ -35,6 +36,7 @@ export type AppContext = {
   queue: Queue;
   runner: ExecutionRunner;
   executions: ExecutionService;
+  scriptSchedules: ScriptScheduleService;
   /** The IPv6 DNS console: one settings row, one history table, one timer. */
   dns: DnsService;
   dnsScheduler: DnsScheduler;
