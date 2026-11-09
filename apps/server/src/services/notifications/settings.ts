@@ -20,7 +20,6 @@ import { ConflictError } from '../../lib/errors.js';
 import {
   decryptOptionalSecret,
   encryptSecret,
-  mergeSecret,
   textField,
 } from '../../lib/secrets.js';
 
@@ -35,6 +34,8 @@ export type AppSettingsRow = {
   id: string;
   gotify_address: string;
   gotify_token_encrypted: string | null;
+  notify_script_results: number;
+  notify_dns_changes: number;
   created_at: string;
   updated_at: string;
 };
@@ -43,11 +44,13 @@ export type AppSettingsRow = {
 export type MutableAppSettings = {
   gotifyAddress: string;
   gotifyToken: string | null;
+  notifyScriptResults: boolean;
+  notifyDnsChanges: boolean;
 };
 
 /** What a fresh install has, before anything has been saved. */
 function defaults(): MutableAppSettings {
-  return { gotifyAddress: '', gotifyToken: null };
+  return { gotifyAddress: '', gotifyToken: null, notifyScriptResults: true, notifyDnsChanges: true };
 }
 
 /** The stored row, or null when nothing has been saved yet. */
@@ -69,7 +72,7 @@ export function readSettingsRow(db: Db): AppSettingsRow | null {
 export function getAppSettingsView(db: Db): AppSettingsView {
   const row = readSettingsRow(db);
   if (!row) {
-    return { gotifyAddress: '', hasGotifyToken: false, notificationsReady: false, updatedAt: null };
+    return { gotifyAddress: '', hasGotifyToken: false, notificationsReady: false, notifyScriptResults: true, notifyDnsChanges: true, updatedAt: null };
   }
   return toView(row);
 }
@@ -79,6 +82,8 @@ function toView(row: AppSettingsRow): AppSettingsView {
   return {
     gotifyAddress: row.gotify_address,
     hasGotifyToken,
+    notifyScriptResults: row.notify_script_results === 1,
+    notifyDnsChanges: row.notify_dns_changes === 1,
     // Derived rather than stored: a third column could disagree with these two,
     // and "ready" is not a fact anyone can hold separately from them.
     notificationsReady: hasGotifyToken && row.gotify_address.trim() !== '',
@@ -99,6 +104,8 @@ export function resolveNotificationSettings(db: Db, box: SecretBox): MutableAppS
   return {
     gotifyAddress: row.gotify_address,
     gotifyToken: decryptOptionalSecret(row.gotify_token_encrypted, box, 'Gotify token'),
+    notifyScriptResults: row.notify_script_results === 1,
+    notifyDnsChanges: row.notify_dns_changes === 1,
   };
 }
 
@@ -109,29 +116,28 @@ export function saveAppSettings(
   input: UpdateAppSettingsInput,
 ): AppSettingsView {
   const row = readSettingsRow(db);
-  const base: MutableAppSettings = row
-    ? {
-        gotifyAddress: row.gotify_address,
-        gotifyToken: decryptOptionalSecret(row.gotify_token_encrypted, box, 'Gotify token'),
-      }
-    : defaults();
-
-  const merged: MutableAppSettings = {
-    gotifyAddress: textField(input.gotifyAddress, base.gotifyAddress),
-    gotifyToken: mergeSecret(input.gotifyToken, input.clearGotifyToken, base.gotifyToken),
-  };
+  const gotifyAddress = textField(input.gotifyAddress, row?.gotify_address ?? '');
+  const token = (input.gotifyToken ?? '').trim();
+  // Preference changes must work even when an old token can no longer be decrypted.
+  const encryptedToken = input.clearGotifyToken
+    ? null
+    : token !== '' ? encryptSecret(token, box) : row?.gotify_token_encrypted ?? null;
+  const notifyScriptResults = input.notifyScriptResults ?? (row ? row.notify_script_results === 1 : true);
+  const notifyDnsChanges = input.notifyDnsChanges ?? (row ? row.notify_dns_changes === 1 : true);
 
   const timestamp = nowIso();
   // `created_at` belongs to the insert half only: replacing the address or the
   // token does not change when the row was first written.
   db.prepare(
-    `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, notify_script_results, notify_dns_changes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        gotify_address = excluded.gotify_address,
        gotify_token_encrypted = excluded.gotify_token_encrypted,
+       notify_script_results = excluded.notify_script_results,
+       notify_dns_changes = excluded.notify_dns_changes,
        updated_at = excluded.updated_at`,
-  ).run(SETTINGS_ID, merged.gotifyAddress, encryptSecret(merged.gotifyToken, box), timestamp, timestamp);
+  ).run(SETTINGS_ID, gotifyAddress, encryptedToken, notifyScriptResults ? 1 : 0, notifyDnsChanges ? 1 : 0, timestamp, timestamp);
 
   const stored = readSettingsRow(db);
   if (!stored) throw new ConflictError('The application settings could not be stored');

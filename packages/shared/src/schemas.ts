@@ -312,6 +312,8 @@ export const updateAppSettingsSchema = z.object({
   gotifyAddress: z.string().max(500).optional(),
   gotifyToken: z.string().max(500).optional(),
   clearGotifyToken: z.boolean().optional(),
+  notifyScriptResults: z.boolean().optional(),
+  notifyDnsChanges: z.boolean().optional(),
 });
 export type UpdateAppSettingsInput = z.infer<typeof updateAppSettingsSchema>;
 
@@ -498,6 +500,8 @@ export type AppSettingsView = {
   gotifyAddress: string;
   hasGotifyToken: boolean;
   notificationsReady: boolean;
+  notifyScriptResults: boolean;
+  notifyDnsChanges: boolean;
   updatedAt: string | null;
 };
 

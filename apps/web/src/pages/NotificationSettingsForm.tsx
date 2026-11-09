@@ -13,7 +13,7 @@ import type { AppSettingsView, UpdateAppSettingsInput } from '@dashboard/shared'
 import { Save, Send } from 'lucide-react';
 
 import { Button } from '../components/Button';
-import { Field, TextInput } from '../components/Form';
+import { Field, Switch, TextInput } from '../components/Form';
 import { SecretField } from '../components/SecretField';
 import { useSaveAppSettings, useTestNotification } from '../api/queries';
 import { errorMessage } from '../api/client';
@@ -24,11 +24,16 @@ import { useI18n, useT } from '../lib/i18n';
 type FormState = {
   gotifyAddress: string;
   gotifyToken: string;
+  notifyScriptResults: boolean;
+  notifyDnsChanges: boolean;
 };
 
 /** Secrets are never sent back, so the token starts blank on every load. */
 function toFormState(settings: AppSettingsView): FormState {
-  return { gotifyAddress: settings.gotifyAddress, gotifyToken: '' };
+  return {
+    gotifyAddress: settings.gotifyAddress, gotifyToken: '',
+    notifyScriptResults: settings.notifyScriptResults, notifyDnsChanges: settings.notifyDnsChanges,
+  };
 }
 
 export function NotificationSettingsForm({ settings }: { settings: AppSettingsView }) {
@@ -44,7 +49,12 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
 
   /** Only a credential that says something is sent; blank means "keep". */
   function buildUpdate(extra: UpdateAppSettingsInput = {}): UpdateAppSettingsInput {
-    const input: UpdateAppSettingsInput = { gotifyAddress: state.gotifyAddress, ...extra };
+    const input: UpdateAppSettingsInput = {
+      gotifyAddress: state.gotifyAddress,
+      notifyScriptResults: state.notifyScriptResults,
+      notifyDnsChanges: state.notifyDnsChanges,
+      ...extra,
+    };
     if (state.gotifyToken !== '') input.gotifyToken = state.gotifyToken;
     return input;
   }
@@ -65,6 +75,19 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
   return (
     <form onSubmit={submit} className="grid gap-5">
       <NotificationState settings={settings} />
+
+      {/* Event choices are saved with the destination, so each notification has one settings entry. */}
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="label">{t('settings.notifications.scriptResults')}</span>
+          <Switch label={t('settings.notifications.scriptResults')} checked={state.notifyScriptResults} onChange={(checked) => patch({ notifyScriptResults: checked })} disabled={save.isPending} />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="label">{t('settings.notifications.dnsChanges')}</span>
+          <Switch label={t('settings.notifications.dnsChanges')} checked={state.notifyDnsChanges} onChange={(checked) => patch({ notifyDnsChanges: checked })} disabled={save.isPending} />
+        </div>
+        <p className="text-faint text-meta">{t('settings.notifications.eventsHint')}</p>
+      </div>
 
       <Field
         label={t('settings.notifications.addressLabel')}
@@ -133,7 +156,7 @@ export function NotificationSettingsForm({ settings }: { settings: AppSettingsVi
 }
 
 /**
- * Whether a notification would go out, said once and in one place.
+ * Whether the stored destination is configured; event choices decide what is sent.
  *
  * Derived from what is *stored* rather than from what is in the boxes: the
  * boxes describe a configuration nobody has saved yet, and reporting on that

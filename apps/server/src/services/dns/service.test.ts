@@ -298,7 +298,8 @@ describe('update', () => {
           notificationFailed: false,
         });
         expect(h.sendNotification).toHaveBeenCalledTimes(1);
-        const sent = h.sendNotification.mock.calls[0]?.[0] as { message: string };
+        const sent = h.sendNotification.mock.calls[0]?.[0] as { kind: string; message: string };
+        expect(sent.kind).toBe('dns_change');
         expect(sent.message).toContain('2606:4700::1');
       } finally {
         h.db.close();
@@ -321,7 +322,7 @@ describe('update', () => {
     }
   });
 
-  test('reports a notification that was not configured as a skip', async () => {
+  test('reports a disabled or unconfigured notification as a skip', async () => {
     const h = setup({ provider: { setIpv6: async () => 'updated' } });
     try {
       h.save();

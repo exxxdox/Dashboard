@@ -240,3 +240,13 @@ describe('script schedule contract', () => {
     expect(saveScriptScheduleSchema.safeParse({ ...valid, input: { targetId: 'tgt_1', timeoutSec: 0 } }).success).toBe(false);
   });
 });
+
+
+test('notification event switches are partial booleans and stay out of explicit test messages', () => {
+  expect(updateAppSettingsSchema.parse({ notifyScriptResults: false, notifyDnsChanges: true }))
+    .toEqual({ notifyScriptResults: false, notifyDnsChanges: true });
+  expect(updateAppSettingsSchema.parse({})).toEqual({});
+  expect(updateAppSettingsSchema.safeParse({ notifyScriptResults: 'false' }).success).toBe(false);
+  expect(testNotificationSchema.parse({ gotifyAddress: 'notify.test', notifyScriptResults: false }))
+    .toEqual({ gotifyAddress: 'notify.test' });
+});

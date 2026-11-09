@@ -82,7 +82,7 @@ export type DnsServiceDeps = {
    * is a dashboard-wide setting, and a console that quietly sent nothing would
    * look exactly like one whose notifications work.
    *
-   * False means nothing is configured, which is a skip rather than a failure.
+   * False means the event is disabled or nothing is configured, which is a skip rather than a failure.
    */
   sendNotification: (
     notification: OutgoingNotification,
@@ -224,9 +224,10 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     if (action === 'created' || action === 'updated') {
       try {
         // The call itself answers "was one attempted": false means nothing is
-        // configured, which is a skip and not a failure.
+        // configured or the event is disabled, which is a skip and not a failure.
         notificationAttempted = await sendNotification(
           {
+            kind: 'dns_change',
             title: 'DNS IPv6 updated',
             message: `${provider.name}: ${previousValue ?? '(no record)'} -> ${ipv6}`,
           },

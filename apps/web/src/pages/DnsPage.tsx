@@ -12,9 +12,8 @@ import { MonoValue } from '../components/MonoValue';
 import { PageHeader } from '../components/PageHeader';
 import { Panel, Stat } from '../components/Panel';
 import { errorMessage } from '../api/client';
-import { useAppSettings, useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } from '../api/queries';
+import { useDetectDnsIpv6, useDnsState, useQueryDnsRecord, useRunDnsUpdate } from '../api/queries';
 import { ipv6ProbeOutcome, recordProbeOutcome, updateOutcome, type Outcome } from '../lib/outcome';
-import { NotificationSettingsForm } from './NotificationSettingsForm';
 import { failureText } from '../lib/dns';
 import { providerLabel } from '../lib/dns';
 import { formatDateTime, formatRelative } from '../lib/format';
@@ -210,10 +209,6 @@ export function DnsPage({ search }: { search: URLSearchParams }) {
         {/* Remounted whenever the stored settings change, so the form's
             one-shot seed of its fields cannot go stale. */}
         <DnsSettingsForm key={settings?.updatedAt ?? 'new'} settings={settings} />
-        <details className="border-line mt-5 border-t pt-5">
-          <summary className="focus-ring cursor-pointer font-semibold">{t('settings.notifications.title')}</summary>
-          <div className="mt-5"><InlineNotifications /></div>
-        </details>
       </Modal>
 
       <Modal
@@ -261,12 +256,4 @@ export function settingsSummary(t: Translate, settings: DnsSettingsView | null):
   return settings.scheduleEnabled
     ? t('dns.settings.summaryConfigured', { provider, minutes: settings.intervalMinutes })
     : t('dns.settings.summaryOff', { provider });
-}
-/** Fetch global notification settings only while the inline form is mounted. */
-function InlineNotifications() {
-  const i18n = useI18n();
-  const settings = useAppSettings();
-  if (settings.isError) return <ErrorBanner message={errorMessage(settings.error, i18n)} onRetry={() => void settings.refetch()} />;
-  if (!settings.data) return <LoadingBlock />;
-  return <NotificationSettingsForm key={settings.data.updatedAt ?? 'new'} settings={settings.data} />;
 }

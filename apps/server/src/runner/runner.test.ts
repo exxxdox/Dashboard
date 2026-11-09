@@ -180,6 +180,16 @@ describe('createExecutionRunner', () => {
     expect(h.notify.mock.calls[0]![0].signal).toBeUndefined();
   });
 
+  test.each([{ exitCode: 0, status: 'succeeded' }, { exitCode: 3, status: 'failed' }])(
+    'persists $status without sending when script result notifications are disabled', async ({ exitCode, status }) => {
+      h.notifications.saveSettings({ notifyScriptResults: false });
+      await expect(h.run([{ match: SCRIPT_PATH, exitCode }])).resolves.toBe(status);
+      expect(getExecution(h.db, EXECUTION_ID)).toMatchObject({ status, exitCode });
+      expect(h.messages.at(-1)).toMatchObject({ type: 'status', execution: { status } });
+      expect(h.notify).not.toHaveBeenCalled();
+    },
+  );
+
   test('does not send when Gotify is unconfigured', async () => {
     h.notifications.saveSettings({ clearGotifyToken: true });
     await expect(h.run([{ match: SCRIPT_PATH, exitCode: 0 }])).resolves.toBe('succeeded');

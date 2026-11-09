@@ -27,6 +27,7 @@ import { getAppSettingsView, resolveNotificationSettings, saveAppSettings } from
 
 /** What a caller asks to have sent. Where it lands is not its business. */
 export type OutgoingNotification = {
+  kind: 'script_result' | 'dns_change';
   title: string;
   message: string;
 };
@@ -49,7 +50,7 @@ export type NotificationService = {
   /**
    * Send one message with the stored settings.
    *
-   * False means nothing is configured, which is a skip rather than a failure:
+   * False means the event is disabled or nothing is configured, which is a skip rather than a failure:
    * an operator who does not want notifications should not have to read an
    * error about it on every run.
    */
@@ -98,6 +99,10 @@ export function createNotificationService(deps: NotificationServiceDeps): Notifi
     },
 
     async send(notification, signal) {
+      const preferences = getAppSettingsView(db);
+      // Gate events before decrypting: disabled notifications never depend on a usable credential.
+      const enabled = notification.kind === 'script_result' ? preferences.notifyScriptResults : preferences.notifyDnsChanges;
+      if (!enabled || !preferences.notificationsReady) return false;
       const settings = resolveNotificationSettings(db, box);
       // Short-circuited here rather than left to the notifier: "not configured"
       // is a property of these settings, and a transport asked to POST to an

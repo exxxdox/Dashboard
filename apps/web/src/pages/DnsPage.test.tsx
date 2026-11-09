@@ -2,8 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
 import { DnsPage } from './DnsPage';
 
+const hooks = vi.hoisted(() => ({ appSettings: vi.fn(() => ({ data: { updatedAt: null } })) }));
 vi.mock('../api/queries', () => ({
-  useAppSettings: () => ({ data: { updatedAt: null } }),
+  useAppSettings: hooks.appSettings,
   useDnsState: () => ({ data: { settings: null, ipv6: null, ipv6CheckedAt: null,
     record: null, recordCheckedAt: null, schedule: null, history: { records: [] } } }),
   useDetectDnsIpv6: () => ({}), useQueryDnsRecord: () => ({}),
@@ -18,9 +19,12 @@ vi.mock('./NotificationSettingsForm', () => ({ NotificationSettingsForm: () => <
 
 // The DNS page has one UI, including when opened through an old layout link.
 test.each(['', 'layout=domainUpdate'])('DNS exposes all controls without a layout switch (%s)', (query) => {
+  hooks.appSettings.mockClear();
   const html = renderToStaticMarkup(<DnsPage search={new URLSearchParams(query)} />);
   expect(html).toContain('data-testid="dns-settings"');
-  expect(html).toContain('data-testid="notifications"');
+  expect(html).not.toContain('data-testid="notifications"');
+  expect(hooks.appSettings).not.toHaveBeenCalled();
+  expect(html).not.toContain('settings.notifications.title');
   expect(html).toContain('data-testid="full-history"');
   expect(html).toContain('data-testid="history-preview"');
   expect(html).toContain('dns.action.settings');

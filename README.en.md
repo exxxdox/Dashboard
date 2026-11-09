@@ -65,20 +65,20 @@ The Scheduled runs page lets you select a script and configure a five-field Cron
 
 The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare.
 
-- Open Settings from the page header to configure the provider, credentials, IPv6 detection source, check interval and Gotify notifications in a dialog. Credentials and notifications can be collapsed.
+- Open Settings from the page header to configure the provider, credentials, IPv6 detection source, check interval in a dialog. Credentials can be collapsed.
 - Use the header actions to detect public IPv6, query the record and check/update manually. Results remain visible until the next action or leaving the page.
 - The status card shows addresses, the DNS record, the next scheduled check and the last scheduled result. Choose View all in the history preview to open statistics and paginated details.
 - Status columns adapt to screen width. The page supports English and Chinese.
 
 Choose ipify (the default) or local interfaces as the IPv6 source. Once saved, address detection, manual updates and scheduled updates all use that source. ipify requires public IPv6 egress; with Fake-IP DNS such as Clash/Mihomo, configure `api6.ipify.org` to resolve to real addresses and connect directly. Local detection reads stable public IPv6 addresses from Linux interfaces and excludes private, temporary, deprecated and unready addresses. Optionally specify an interface name such as `enp1s0`; leave it blank for automatic detection. It stops updates when there are no candidates or multiple candidates, without switching sources. Containers need host networking to read host interface addresses. Local detection needs no ipify connection, but DNS updates still require access to the provider API. The last scheduled result resets on service restart; check history is retained.
 
-DNS and Settings share the same Gotify configuration. Test messages can use unsaved form values.
+Gotify is configured only in Settings. Test messages can use unsaved form values and bypass automatic event switches.
 
 ## Settings
 
-`/#/settings` hold the preferences that belong to the whole dashboard: interface language (English / 简体中文), and the Gotify address and token notifications go to.
+`/#/settings` hold the preferences that belong to the whole dashboard: interface language (English / 简体中文), and the Gotify address, token, Script result notifications and DNS update notifications switches.
 
-After saving a Gotify address and token, scripts automatically notify on success, failure, timeout or cancellation after starting. Messages include the script, target, result, duration and run ID, without parameters, logs or raw errors. Unconfigured notifications are skipped; delivery failures are logged without changing execution results. Queued cancellations and restart interruptions do not notify. Notifications are not retried or replayed. Messages include both English and Chinese.
+After saving a Gotify address and token and enabling Script result notifications, manual and scheduled scripts notify on success, failure, timeout or cancellation after starting. Messages include the script, target, result, duration and run ID, without parameters, logs or raw errors. Unconfigured notifications are skipped; delivery failures are logged without changing execution results. Queued cancellations and restart interruptions do not notify. Notifications are not retried or replayed. Messages include both English and Chinese. DNS update notifications independently control messages after AAAA creation or an address change.
 
 ## License
 

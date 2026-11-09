@@ -40,6 +40,8 @@ describe('settings', () => {
         gotifyAddress: '',
         hasGotifyToken: false,
         notificationsReady: false,
+        notifyScriptResults: true,
+        notifyDnsChanges: true,
         updatedAt: null,
       });
     } finally {
@@ -107,7 +109,7 @@ describe('send', () => {
   test('skips without calling the notifier when nothing is configured', async () => {
     const h = setup();
     try {
-      expect(await h.service.send({ title: 't', message: 'm' })).toBe(false);
+      expect(await h.service.send({ kind: 'script_result', title: 't', message: 'm' })).toBe(false);
       expect(h.notify).not.toHaveBeenCalled();
     } finally {
       h.db.close();
@@ -119,7 +121,7 @@ describe('send', () => {
     try {
       h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret' });
 
-      expect(await h.service.send({ title: 'A run finished', message: 'exit 0' })).toBe(true);
+      expect(await h.service.send({ kind: 'script_result', title: 'A run finished', message: 'exit 0' })).toBe(true);
       expect(h.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           address: 'notify.test',
@@ -139,7 +141,7 @@ describe('send', () => {
       h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret' });
       h.notify.mockRejectedValue(new Error('Gotify answered 500'));
 
-      await expect(h.service.send({ title: 't', message: 'm' })).rejects.toThrow(
+      await expect(h.service.send({ kind: 'script_result', title: 't', message: 'm' })).rejects.toThrow(
         'Gotify answered 500',
       );
     } finally {
@@ -221,4 +223,65 @@ describe('test', () => {
       h.db.close();
     }
   });
+});
+
+
+describe('notification preferences', () => {
+  test('defaults both event types on and preserves preferences across partial updates', () => {
+    const h = setup();
+    try {
+      expect(h.service.state()).toMatchObject({ notifyScriptResults: true, notifyDnsChanges: true });
+      expect(h.service.saveSettings({ notifyScriptResults: false })).toMatchObject({ notifyScriptResults: false, notifyDnsChanges: true });
+      expect(h.service.saveSettings({ gotifyAddress: 'notify.test', notifyDnsChanges: false })).toMatchObject({ notifyScriptResults: false, notifyDnsChanges: false });
+      expect(h.service.saveSettings({ notifyScriptResults: true })).toMatchObject({ notifyScriptResults: true, notifyDnsChanges: false });
+    } finally { h.db.close(); }
+  });
+
+  test.each([
+    { kind: 'script_result' as const, preference: 'notifyScriptResults' as const, other: 'dns_change' as const },
+    { kind: 'dns_change' as const, preference: 'notifyDnsChanges' as const, other: 'script_result' as const },
+  ])('only suppresses the disabled $kind event', async ({ kind, preference, other }) => {
+    const h = setup();
+    try {
+      h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret', [preference]: false });
+      expect(await h.service.send({ kind, title: 'disabled', message: 'm' })).toBe(false);
+      expect(h.notify).not.toHaveBeenCalled();
+      expect(await h.service.send({ kind: other, title: 'enabled', message: 'm' })).toBe(true);
+      expect(h.notify).toHaveBeenCalledTimes(1);
+      expect(h.notify.mock.calls[0]?.[0]).not.toHaveProperty('kind');
+    } finally { h.db.close(); }
+  });
+
+  test('disabled events skip before decrypting a damaged credential', async () => {
+    const h = setup();
+    try {
+      h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret', notifyScriptResults: false, notifyDnsChanges: false });
+      h.db.prepare("UPDATE app_settings SET gotify_token_encrypted = 'damaged'").run();
+      expect(await h.service.send({ kind: 'script_result', title: 't', message: 'm' })).toBe(false);
+      expect(await h.service.send({ kind: 'dns_change', title: 't', message: 'm' })).toBe(false);
+      expect(h.notify).not.toHaveBeenCalled();
+    } finally { h.db.close(); }
+  });
+
+  test('explicit test messages bypass automatic notification preferences', async () => {
+    const h = setup();
+    try {
+      h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret', notifyScriptResults: false, notifyDnsChanges: false });
+      expect(await h.service.test({})).toEqual({ sent: true });
+      expect(h.notify).toHaveBeenCalledTimes(1);
+    } finally { h.db.close(); }
+  });
+});
+
+
+test('changing notification preferences can preserve an unreadable token without decrypting it', () => {
+  const h = setup();
+  try {
+    h.service.saveSettings({ gotifyAddress: 'notify.test', gotifyToken: 'secret' });
+    h.db.prepare("UPDATE app_settings SET gotify_token_encrypted = 'damaged'").run();
+    expect(h.service.saveSettings({ notifyScriptResults: false, notifyDnsChanges: false })).toMatchObject({
+      notifyScriptResults: false, notifyDnsChanges: false, hasGotifyToken: true,
+    });
+    expect(h.db.prepare('SELECT gotify_token_encrypted FROM app_settings').get()).toEqual({ gotify_token_encrypted: 'damaged' });
+  } finally { h.db.close(); }
 });

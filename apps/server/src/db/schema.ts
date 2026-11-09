@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 9;
+const TARGET_VERSION = 10;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -332,6 +332,15 @@ export const MIGRATIONS: Migration[] = [
         updated_at        TEXT NOT NULL
       );
       CREATE INDEX idx_script_schedules_due ON script_schedules(enabled, next_run_at);
+    `);
+  },
+  // v10 -- preserve current delivery behavior while allowing each event type to be disabled.
+  (db) => {
+    db.exec(`
+      ALTER TABLE app_settings ADD COLUMN notify_script_results INTEGER NOT NULL DEFAULT 1
+        CHECK (notify_script_results IN (0, 1));
+      ALTER TABLE app_settings ADD COLUMN notify_dns_changes INTEGER NOT NULL DEFAULT 1
+        CHECK (notify_dns_changes IN (0, 1));
     `);
   },
 ];

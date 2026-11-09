@@ -386,3 +386,22 @@ describe('v9 script schedules migration', () => {
     } finally { db.close(); }
   });
 });
+
+
+describe('v10 notification preferences migration', () => {
+  test('preserves existing credentials and enables both existing notification types', () => {
+    const db = versionFiveDatabase();
+    try {
+      for (const migration of MIGRATIONS.slice(5, 9)) migration(db);
+      db.pragma('user_version = 9');
+      const before = db.prepare<[], Record<string, unknown>>('SELECT * FROM app_settings').get();
+      migrate(db);
+      expect(db.prepare('SELECT * FROM app_settings').get()).toEqual({
+        ...before, notify_script_results: 1, notify_dns_changes: 1,
+      });
+      expect(() => db.prepare('UPDATE app_settings SET notify_script_results = 2').run()).toThrow(/CHECK/);
+      expect(() => db.prepare('UPDATE app_settings SET notify_dns_changes = -1').run()).toThrow(/CHECK/);
+      expect(() => migrate(db)).not.toThrow();
+    } finally { db.close(); }
+  });
+});

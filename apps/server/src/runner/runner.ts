@@ -248,6 +248,7 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
       try {
         // Persist first; omit parameters/logs and the possibly aborted run signal.
         await deps.sendNotification({
+          kind: 'script_result',
           title: `Script result / 脚本结果: ${label}`,
           message: [
             `Script / 脚本: ${execution.scriptName}`,
