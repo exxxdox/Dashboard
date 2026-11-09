@@ -68,10 +68,11 @@ export function ScriptSchedulePanel({ scriptId, getInput }: {
         <Clock className="text-accent size-4" aria-hidden />
         {t('schedule.title')}
       </h3>
-      {query.isPending ? <p className="text-mute text-meta">{t('schedule.loading')}</p> : query.isError ? (
+      {query.isPending ? <p className="text-mute text-meta">{t('schedule.loading')}</p> : query.isError && schedule === undefined ? (
         <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} />
       ) : (
         <>
+          {query.isError ? <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} /> : null}
           <p className="text-mute text-meta">{t('schedule.snapshotHint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('schedule.cron')} hint={t('schedule.cronHint')}>

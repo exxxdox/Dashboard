@@ -3,6 +3,7 @@ import { saveScriptScheduleSchema } from '@dashboard/shared';
 import type { AppContext } from '../context.js';
 
 export function registerScriptScheduleRoutes(app: FastifyInstance, ctx: AppContext): void {
+  app.get('/api/script-schedules', () => ctx.scriptSchedules.list());
   app.get<{ Params: { id: string } }>('/api/scripts/:id/schedule', (request) =>
     ctx.scriptSchedules.get(request.params.id),
   );

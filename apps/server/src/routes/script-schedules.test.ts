@@ -23,6 +23,7 @@ async function setup(login = false) {
     lastTriggeredAt: null, lastExecutionId: null, lastError: null, updatedAt: '2026-11-10T00:00:00.000Z',
   };
   const scriptSchedules = {
+    list: vi.fn(() => [schedule]),
     get: vi.fn((id: string) => { if (id !== 'scr_1') throw new NotFoundError('Script'); return schedule; }),
     save: vi.fn(() => schedule), remove: vi.fn(), start: vi.fn(), stop: vi.fn(),
   } satisfies ScriptScheduleService;
@@ -40,6 +41,7 @@ async function setup(login = false) {
 test('schedule GET, PUT and DELETE use the service and validated request contract', async () => {
   const h = await setup();
   const url = '/api/scripts/scr_1/schedule';
+  expect((await h.app.inject('/api/script-schedules')).json()).toEqual([h.schedule]);
   expect((await h.app.inject(url)).json()).toEqual(h.schedule);
   const response = await h.app.inject({ method: 'PUT', url, payload: h.payload });
   expect(response.statusCode).toBe(200); expect(response.json()).toEqual(h.schedule);
@@ -66,6 +68,7 @@ test('invalid updates and service errors use the API error contract', async () =
 
 test('schedule reads and writes require sign-in and refuse cross-site changes', async () => {
   const h = await setup(true); const url = '/api/scripts/scr_1/schedule';
+  expect((await h.app.inject('/api/script-schedules')).statusCode).toBe(401);
   for (const method of ['GET', 'PUT', 'DELETE'] as const) {
     const response = await h.app.inject({ method, url, ...(method === 'PUT' ? { payload: h.payload } : {}) });
     expect(response.statusCode).toBe(401);

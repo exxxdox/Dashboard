@@ -6,7 +6,7 @@ import { ScriptSchedulePanel } from './ScriptSchedulePanel';
 
 const hooks = vi.hoisted(() => ({
   direct: false, slots: [] as unknown[], index: 0, changed: false,
-  data: null as ScriptSchedule | null, pending: false, error: false,
+  data: null as ScriptSchedule | null | undefined, pending: false, error: false,
   save: vi.fn(), remove: vi.fn(), refetch: vi.fn(), mutationError: false,
 }));
 vi.mock('react', async (original) => {
@@ -105,7 +105,7 @@ test('keeps save unavailable until the saved schedule loads', () => {
 });
 
 test('offers retry rather than presenting a failed read as an empty schedule', () => {
-  hooks.error = true;
+  hooks.data = undefined; hooks.error = true;
   const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
   expect(html).toContain('offline');
   expect(html).not.toContain('schedule.save');
@@ -122,4 +122,12 @@ test('shows save validation failures inside the schedule dialog', () => {
   hooks.mutationError = true;
   const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
   expect(html).toContain('Invalid Cron');
+});
+
+
+test('preserves controls on background read failure when a saved schedule is cached', () => {
+  hooks.data = saved; hooks.error = true;
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
+  expect(html).toContain('schedule.cron');
+  expect(html).toContain('offline');
 });

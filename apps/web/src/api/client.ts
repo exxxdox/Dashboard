@@ -227,6 +227,7 @@ export const api = {
       method: 'PUT',
       body,
     }),
+  listScriptSchedules: () => apiRequest<ScriptSchedule[]>('/script-schedules'),
   scriptSchedule: (id: string) =>
     apiRequest<ScriptSchedule | null>(`/scripts/${encodeURIComponent(id)}/schedule`),
   saveScriptSchedule: (id: string, body: SaveScriptScheduleInput) =>

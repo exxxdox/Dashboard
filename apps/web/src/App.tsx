@@ -8,6 +8,7 @@ import { useRoute, navigate } from './lib/router';
 import { usePointerEffects } from './lib/pointer-effects';
 import { OverviewPage } from './pages/OverviewPage';
 import { ScriptsPage } from './pages/ScriptsPage';
+import { SchedulesPage } from './pages/SchedulesPage';
 import { RunsPage } from './pages/RunsPage';
 import { RunDetailPage } from './pages/RunDetailPage';
 import { TargetsPage } from './pages/TargetsPage';
@@ -80,6 +81,8 @@ function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
       return <OverviewPage />;
     case 'scripts':
       return <ScriptsPage scriptId={route.scriptId} />;
+    case 'schedules':
+      return <SchedulesPage scriptId={route.scriptId} />;
     case 'runs':
       return route.executionId === null ? (
         <RunsPage route={route} />

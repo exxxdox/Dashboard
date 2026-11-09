@@ -35,7 +35,6 @@ import {
   type CustomParamRow,
 } from '../lib/run-params';
 import { toRunInput } from '../lib/run-submit';
-import { ScriptSchedulePanel } from './ScriptSchedulePanel';
 
 type ParamValues = Record<string, string>;
 
@@ -48,6 +47,9 @@ const DRAFT_SAVE_DELAY_MS = 700;
 
 type RunPanelProps = {
   script: ScriptSummary;
+  mode?: 'run' | 'schedule';
+  initialInput?: ExecuteScriptInput;
+  children?: (getInput: () => ExecuteScriptInput | null) => ReactNode;
 };
 
 /** A declared default is the value the form starts from. */
@@ -118,17 +120,23 @@ function RunRow({
  * The run form. Mount it with `key={script.id}`: a different script means a
  * different parameter set, and remounting is clearer than re-seeding state.
  */
-export function RunPanel({ script }: RunPanelProps) {
+export function RunPanel({ script, mode = 'run', initialInput, children }: RunPanelProps) {
   const i18n = useI18n();
   const { t } = i18n;
   const targets = useTargets();
   const execute = useExecuteScript();
-  const prefill = useScriptRunDraft(script.id);
+  const prefill = useScriptRunDraft(mode === 'run' ? script.id : null);
   const saveDraft = useSaveScriptRunDraft();
 
-  const [targetId, setTargetId] = useState('');
-  const [values, setValues] = useState<ParamValues>(() => seedValues(script.params));
-  const [timeout, setTimeoutSec] = useState('');
+  // A plan edits its own saved invocation; the manual run draft is a separate document.
+  const [initial] = useState(() => initialInput ? formFromDraft({
+    params: initialInput.params,
+    custom: initialInput.argv.map((value) => ({ name: '', value, mode: 'argv' as const })),
+    timeoutSec: initialInput.timeoutSec === undefined ? '' : String(initialInput.timeoutSec),
+  }, script.params) : null);
+  const [targetId, setTargetId] = useState(initialInput?.targetId ?? '');
+  const [values, setValues] = useState<ParamValues>(() => initial?.values ?? seedValues(script.params));
+  const [timeout, setTimeoutSec] = useState(initial?.timeoutSec ?? '');
   const [showErrors, setShowErrors] = useState(false);
   // Whether the operator has touched the form since it opened. Nothing is saved
   // until they have, so merely opening a script does not rewrite its draft.
@@ -137,8 +145,8 @@ export function RunPanel({ script }: RunPanelProps) {
   // A script that declares nothing has no other way in, so the list that can
   // carry anything starts open; with declared parameters above it, it stays out
   // of the way until asked for.
-  const [customOpen, setCustomOpen] = useState(script.params.length === 0);
-  const [customRows, setCustomRows] = useState<CustomParamRow[]>([]);
+  const [customOpen, setCustomOpen] = useState(script.params.length === 0 || Boolean(initial?.rows.length));
+  const [customRows, setCustomRows] = useState<CustomParamRow[]>(initial?.rows ?? []);
 
   // Every edit marks the form dirty; the seed above deliberately does not, or
   // opening a script would count as typing in it.
@@ -201,7 +209,7 @@ export function RunPanel({ script }: RunPanelProps) {
   // The draft arrives once per script; it seeds the form and then stops being
   // authoritative, so typing is never overwritten by a late response.
   const [seeded, setSeeded] = useState(false);
-  if (prefill.data && !seeded) {
+  if (mode === 'run' && prefill.data && !seeded) {
     setSeeded(true);
     // A slow prefill must not replace edits made while the request was pending.
     if (!touched) {
@@ -224,7 +232,7 @@ export function RunPanel({ script }: RunPanelProps) {
   const serialized = JSON.stringify(draft);
   // Compare against queued writes too, so reverting an in-flight edit is saved.
   function hasUnsavedDraft(): boolean {
-    return touched && (lastRequested.current
+    return mode === 'run' && touched && (lastRequested.current
       ? lastRequested.current !== serialized
       : !savedDraft || !sameDraft(savedDraft, draft));
   }
@@ -252,7 +260,7 @@ export function RunPanel({ script }: RunPanelProps) {
   // Only unmount flushes immediately; ordinary edits still share the debounce.
   useEffect(() => () => flushRef.current(), []);
 
-  const restoredNotice = prefill.data ? describePrefill(prefill.data) : null;
+  const restoredNotice = mode === 'run' && prefill.data ? describePrefill(prefill.data) : null;
   // Counts every row that will be sent, not every row with a name: an argument
   // row usually has no label, and a badge that said 1 for three rows would be
   // worse than no badge.
@@ -489,7 +497,7 @@ export function RunPanel({ script }: RunPanelProps) {
         </RunRow>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {mode === 'run' ? <div className="flex flex-wrap items-center gap-3">
         <Button
           variant="primary"
           icon={<Play className="size-4" aria-hidden />}
@@ -500,8 +508,7 @@ export function RunPanel({ script }: RunPanelProps) {
           {t('runs.submit')}
         </Button>
         <span className="text-faint text-meta">{t('runs.submitHint')}</span>
-      </div>
-      <ScriptSchedulePanel scriptId={script.id} getInput={currentInput} />
+      </div> : children?.(currentInput)}
     </div>
   );
 }

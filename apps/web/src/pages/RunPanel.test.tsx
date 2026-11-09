@@ -55,13 +55,13 @@ function elements(node: unknown): Element[] {
   const element = node as Element;
   return [element, ...elements(element.props.children)];
 }
-function render(): Element {
+function render(props: Partial<Parameters<typeof RunPanel>[0]> = {}): Element {
   let tree: Element;
   do {
     hooks.changed = false;
     hooks.index = 0;
     hooks.pending = [];
-    tree = RunPanel({ script });
+    tree = RunPanel({ script, ...props });
   } while (hooks.changed);
   for (const effect of hooks.pending) effect();
   return tree;
@@ -153,4 +153,24 @@ test('retries on close after a pending-state render and a later failure', async 
   unmount();
   await settle();
   expect(hooks.save).toHaveBeenCalledTimes(2);
+});
+
+
+test('manual run settings contain no scheduling controls', () => {
+  const tree = render();
+  expect(elements(tree).some((element) => typeof element.type === 'function' && element.type.name === 'ScriptSchedulePanel')).toBe(false);
+});
+
+test('schedule editing restores its saved invocation without touching the manual draft', async () => {
+  const props = { mode: 'schedule' as const, initialInput: { targetId: 'target', params: { NAME: 'scheduled' }, argv: ['saved arg'], timeoutSec: 23 } };
+  const tree = render(props);
+  const row = elements(tree).find((element) => element.props.label === 'NAME')!;
+  const input = (row.props.children as (props: { id: string }) => Element)({ id: 'name' });
+  expect(input.props.value).toBe('scheduled');
+  input.props.onChange!({ target: { value: 'schedule edit' } });
+  render(props);
+  await vi.advanceTimersByTimeAsync(1000);
+  unmount();
+  expect(hooks.save).not.toHaveBeenCalled();
+  expect(elements(render(props)).some((element) => element.props.children === 'runs.submit')).toBe(false);
 });

@@ -13,6 +13,8 @@ describe('parseRoute', () => {
     expect(parseRoute('#/runs').name).toBe('runs');
     expect(parseRoute('#/targets')).toEqual({ name: 'targets' });
     expect(parseRoute('#/sources')).toEqual({ name: 'sources' });
+    expect(parseRoute('#/schedules')).toEqual({ name: 'schedules', scriptId: null });
+    expect(parseRoute('#/schedules/script%2Fid')).toEqual({ name: 'schedules', scriptId: 'script/id' });
   });
 
   it('keeps all model relay pages inside the dashboard shell', () => {

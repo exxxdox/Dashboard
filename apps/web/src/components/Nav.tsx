@@ -1,4 +1,4 @@
-import { Activity, BrainCircuit, FileCode, FolderTree, Globe, Server, Settings, Terminal } from 'lucide-react';
+import { Activity, BrainCircuit, Clock, FileCode, FolderTree, Globe, Server, Settings, Terminal } from 'lucide-react';
 
 import { cn } from '../lib/cn';
 import { href, type Route } from '../lib/router';
@@ -16,6 +16,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { route: 'overview', label: 'nav.overview', path: '/', icon: Activity },
   { route: 'scripts', label: 'nav.scripts', path: '/scripts', icon: FileCode },
+  { route: 'schedules', label: 'nav.schedules', path: '/schedules', icon: Clock },
   { route: 'runs', label: 'nav.runs', path: '/runs', icon: Terminal },
   { route: 'targets', label: 'nav.targets', path: '/targets', icon: Server },
   { route: 'sources', label: 'nav.sources', path: '/sources', icon: FolderTree },

@@ -292,6 +292,14 @@ export function useSaveScriptRunDraft() {
   });
 }
 
+export function useScriptSchedules() {
+  return useQuery({
+    queryKey: queryKeys.scriptSchedules(),
+    queryFn: api.listScriptSchedules,
+    refetchInterval: 15_000,
+  });
+}
+
 export function useScriptSchedule(scriptId: string) {
   return useQuery({
     queryKey: queryKeys.scriptSchedule(scriptId),
@@ -309,6 +317,7 @@ export function useSaveScriptSchedule() {
     meta: { success: 'toast.scheduleSaved' },
     onSuccess: (schedule: ScriptSchedule, { scriptId }) => {
       client.setQueryData(queryKeys.scriptSchedule(scriptId), schedule);
+      void client.invalidateQueries({ queryKey: queryKeys.scriptSchedules() });
     },
   });
 }
@@ -320,6 +329,7 @@ export function useDeleteScriptSchedule() {
     meta: { success: 'toast.scheduleDeleted' },
     onSuccess: (_result, scriptId) => {
       client.setQueryData(queryKeys.scriptSchedule(scriptId), null);
+      void client.invalidateQueries({ queryKey: queryKeys.scriptSchedules() });
     },
   });
 }

@@ -182,3 +182,13 @@ describe('script schedules', () => {
     expect(h.service.get('scr_1')).toBeNull();
   });
 });
+
+
+test('lists saved plans for the dedicated module and excludes soft-deleted scripts', () => {
+  const h = setup();
+  expect(h.service.list()).toEqual([]);
+  const saved = h.service.save('scr_1', h.input);
+  expect(h.service.list()).toEqual([saved]);
+  h.db.prepare('UPDATE scripts SET deleted_at = ?').run(NOW);
+  expect(h.service.list()).toEqual([]);
+});

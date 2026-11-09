@@ -204,3 +204,10 @@ describe('script schedule API', () => {
     expect(JSON.parse(spy.mock.calls[1]?.[1]?.body as string)).toEqual(input);
   });
 });
+
+
+it('lists saved script schedules from their independent endpoint', async () => {
+  const spy = stubFetch(async () => jsonResponse('[]', 200));
+  await expect(api.listScriptSchedules()).resolves.toEqual([]);
+  expect((spy.mock.calls[0]?.[0] as URL).pathname).toBe('/api/script-schedules');
+});

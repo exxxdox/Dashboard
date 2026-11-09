@@ -33,6 +33,7 @@ type ScheduleRow = {
 };
 
 export type ScriptScheduleService = {
+  list: () => ScriptSchedule[];
   get: (scriptId: string) => ScriptSchedule | null;
   save: (scriptId: string, input: SaveScriptScheduleInput) => ScriptSchedule;
   remove: (scriptId: string) => void;
@@ -158,6 +159,12 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
   }
 
   return {
+    list() {
+      return db.prepare<[], ScheduleRow>(`${select}
+        JOIN scripts s ON s.id = ss.script_id AND s.deleted_at IS NULL
+        ORDER BY s.display_name COLLATE NOCASE, ss.script_id`).all().map(toView);
+    },
+
     get(scriptId) {
       script(scriptId);
       const current = row(scriptId);
