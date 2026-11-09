@@ -18,43 +18,59 @@ async function setup(login = false) {
   const db = openDatabase(':memory:');
   const auth = createAuthenticator(login ? { username: 'operator', password: 'password' } : {});
   const schedule: ScriptSchedule = {
-    scriptId: 'scr_1', targetName: 'edge', cron: '* * * * *', timeZone: 'UTC', enabled: true,
+    id: 'sch_1', scriptId: 'scr_1', name: 'Daily job', retentionDays: 30,
+    targetName: 'edge', cron: '* * * * *', timeZone: 'UTC', enabled: true,
     input: { targetId: 'tgt_1', params: {}, argv: [] }, nextRunAt: '2026-11-10T00:01:00.000Z',
     lastTriggeredAt: null, lastExecutionId: null, lastError: null, updatedAt: '2026-11-10T00:00:00.000Z',
   };
   const scriptSchedules = {
-    list: vi.fn(() => [schedule]),
-    get: vi.fn((id: string) => { if (id !== 'scr_1') throw new NotFoundError('Script'); return schedule; }),
-    save: vi.fn(() => schedule), remove: vi.fn(), start: vi.fn(), stop: vi.fn(),
+    list: vi.fn(() => [schedule]), get: vi.fn((id: string) => { if (id !== 'sch_1') throw new NotFoundError('Schedule'); return schedule; }),
+    create: vi.fn(() => schedule), save: vi.fn(() => schedule), remove: vi.fn(), start: vi.fn(), stop: vi.fn(),
   } satisfies ScriptScheduleService;
+  const executions = { list: vi.fn(() => ({ items: [], total: 0 })) };
   let shuttingDown = false;
   const app = await buildApp({
     config: loadConfig({ SERVE_WEB: 'false' }), db, auth, loginThrottle: createLoginThrottle(),
     box: createSecretBox(randomBytes(32)), logger: createLogger({ level: 'silent', pretty: false }),
-    scriptSchedules, isShuttingDown: () => shuttingDown,
+    scriptSchedules, executions, isShuttingDown: () => shuttingDown,
   } as unknown as AppContext);
   cleanups.push(async () => { await app.close(); db.close(); });
-  const payload = { cron: '* * * * *', timeZone: 'UTC', enabled: true, input: { targetId: 'tgt_1' } };
-  return { app, scriptSchedules, payload, schedule, shutdown: () => { shuttingDown = true; } };
+  const payload = { scriptId: 'scr_1', name: 'Daily job', cron: '* * * * *', timeZone: 'UTC', enabled: true, input: { targetId: 'tgt_1' } };
+  return { app, scriptSchedules, executions, payload, schedule, shutdown: () => { shuttingDown = true; } };
 }
 
-test('schedule GET, PUT and DELETE use the service and validated request contract', async () => {
-  const h = await setup();
-  const url = '/api/scripts/scr_1/schedule';
+test('collection create and plan CRUD address independent plan ids', async () => {
+  const h = await setup(); const url = '/api/script-schedules/sch_1';
   expect((await h.app.inject('/api/script-schedules')).json()).toEqual([h.schedule]);
+  const created = await h.app.inject({ method: 'POST', url: '/api/script-schedules', payload: h.payload });
+  expect(created.statusCode).toBe(201); expect(created.json()).toEqual(h.schedule);
+  const parsed = { ...h.payload, retentionDays: 30, input: { targetId: 'tgt_1', params: {}, argv: [] } };
+  expect(h.scriptSchedules.create).toHaveBeenCalledWith(parsed);
   expect((await h.app.inject(url)).json()).toEqual(h.schedule);
-  const response = await h.app.inject({ method: 'PUT', url, payload: h.payload });
-  expect(response.statusCode).toBe(200); expect(response.json()).toEqual(h.schedule);
-  expect(h.scriptSchedules.save).toHaveBeenCalledWith('scr_1', { ...h.payload, input: { targetId: 'tgt_1', params: {}, argv: [] } });
-  const removed = await h.app.inject({ method: 'DELETE', url });
-  expect(removed.statusCode).toBe(204); expect(removed.body).toBe('');
-  expect(h.scriptSchedules.remove).toHaveBeenCalledWith('scr_1');
-  expect((await h.app.inject('/api/scripts/missing/schedule')).statusCode).toBe(404);
+  const updated = await h.app.inject({ method: 'PUT', url, payload: { ...h.payload, retentionDays: 0 } });
+  expect(updated.statusCode).toBe(200);
+  expect(h.scriptSchedules.save).toHaveBeenCalledWith('sch_1', { ...parsed, retentionDays: 0 });
+  expect((await h.app.inject({ method: 'DELETE', url })).statusCode).toBe(204);
+  expect(h.scriptSchedules.remove).toHaveBeenCalledWith('sch_1');
+  expect((await h.app.inject('/api/script-schedules/missing')).statusCode).toBe(404);
+  expect((await h.app.inject('/api/scripts/scr_1/schedule')).statusCode).toBe(404);
 });
 
-test('invalid updates and service errors use the API error contract', async () => {
-  const h = await setup(); const url = '/api/scripts/scr_1/schedule';
-  for (const payload of [{}, { ...h.payload, enabled: 'true' }, { ...h.payload, timeZone: '' }, { ...h.payload, input: { targetId: 'tgt_1', timeoutSec: -1 } }]) {
+test('history is filtered by plan with bounded paging and rejects unknown plans', async () => {
+  const h = await setup(); const url = '/api/script-schedules/sch_1/executions';
+  expect((await h.app.inject(url)).json()).toEqual({ items: [], total: 0 });
+  expect(h.executions.list).toHaveBeenLastCalledWith({ scheduleId: 'sch_1', limit: 50, offset: 0 });
+  expect((await h.app.inject(url + '?limit=2&offset=4')).statusCode).toBe(200);
+  expect(h.executions.list).toHaveBeenLastCalledWith({ scheduleId: 'sch_1', limit: 2, offset: 4 });
+  for (const query of ['limit=0', 'limit=201', 'offset=-1']) {
+    expect((await h.app.inject(url + '?' + query)).statusCode).toBe(422);
+  }
+  expect((await h.app.inject('/api/script-schedules/missing/executions')).statusCode).toBe(404);
+});
+
+test('invalid updates, shutdown and service failures retain the API error contract', async () => {
+  const h = await setup(); const url = '/api/script-schedules/sch_1';
+  for (const payload of [{}, { ...h.payload, name: '' }, { ...h.payload, retentionDays: -1 }, { ...h.payload, retentionDays: 3651 }, { ...h.payload, enabled: 'true' }, { ...h.payload, timeZone: '' }, { ...h.payload, input: { targetId: 'tgt_1', timeoutSec: -1 } }]) {
     expect((await h.app.inject({ method: 'PUT', url, payload })).statusCode).toBe(422);
   }
   expect(h.scriptSchedules.save).not.toHaveBeenCalled();
@@ -63,22 +79,20 @@ test('invalid updates and service errors use the API error contract', async () =
   expect(error.statusCode).toBe(422); expect(error.json().error.i18n.key).toBe('error.schedule.cron');
   h.shutdown();
   expect((await h.app.inject({ method: 'PUT', url, payload: h.payload })).statusCode).toBe(503);
-  expect(h.scriptSchedules.save).toHaveBeenCalledTimes(1);
+  expect((await h.app.inject({ method: 'POST', url: '/api/script-schedules', payload: h.payload })).statusCode).toBe(503);
+  expect(h.scriptSchedules.create).not.toHaveBeenCalled(); expect(h.scriptSchedules.save).toHaveBeenCalledTimes(1);
 });
 
-test('schedule reads and writes require sign-in and refuse cross-site changes', async () => {
-  const h = await setup(true); const url = '/api/scripts/scr_1/schedule';
-  expect((await h.app.inject('/api/script-schedules')).statusCode).toBe(401);
-  for (const method of ['GET', 'PUT', 'DELETE'] as const) {
-    const response = await h.app.inject({ method, url, ...(method === 'PUT' ? { payload: h.payload } : {}) });
-    expect(response.statusCode).toBe(401);
+test('plans and their histories require sign-in, and writes refuse cross-site requests', async () => {
+  const h = await setup(true); const url = '/api/script-schedules/sch_1';
+  for (const [method, path] of [['GET','/api/script-schedules'], ['POST','/api/script-schedules'], ['GET',url], ['PUT',url], ['DELETE',url], ['GET',url+'/executions']] as const) {
+    expect((await h.app.inject({ method, url: path, ...(method === 'POST' || method === 'PUT' ? { payload: h.payload } : {}) })).statusCode).toBe(401);
   }
   const signedIn = await h.app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'operator', password: 'password' } });
   const cookie = signedIn.cookies.map(item => `${item.name}=${item.value}`).join('; ');
   expect((await h.app.inject({ url, headers: { cookie } })).statusCode).toBe(200);
-  for (const method of ['PUT', 'DELETE'] as const) {
-    expect((await h.app.inject({ method, url, headers: { cookie, 'sec-fetch-site': 'cross-site' }, ...(method === 'PUT' ? { payload: h.payload } : {}) })).statusCode).toBe(403);
+  for (const [method,path] of [['POST','/api/script-schedules'], ['PUT',url], ['DELETE',url]] as const) {
+    expect((await h.app.inject({ method, url: path, headers: { cookie, 'sec-fetch-site': 'cross-site' }, ...(method === 'DELETE' ? {} : { payload: h.payload }) })).statusCode).toBe(403);
   }
-  expect(h.scriptSchedules.save).not.toHaveBeenCalled();
-  expect(h.scriptSchedules.remove).not.toHaveBeenCalled();
+  expect(h.scriptSchedules.create).not.toHaveBeenCalled(); expect(h.scriptSchedules.save).not.toHaveBeenCalled(); expect(h.scriptSchedules.remove).not.toHaveBeenCalled();
 });

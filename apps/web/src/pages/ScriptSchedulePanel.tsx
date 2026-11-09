@@ -1,65 +1,57 @@
 import { useState } from 'react';
-import type { ExecuteScriptInput } from '@dashboard/shared';
+import type { ExecuteScriptInput, ScriptSchedule } from '@dashboard/shared';
 import { Clock, Save, Trash } from 'lucide-react';
-import { useDeleteScriptSchedule, useSaveScriptSchedule, useScriptSchedule } from '../api/queries';
+import { useDeleteScriptSchedule, useSaveScriptSchedule } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, Switch, TextInput } from '../components/Form';
 import { formatDateTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
-import { href } from '../lib/router';
+import { href, navigate } from '../lib/router';
 
 const DEFAULT_CRON = '*/5 * * * *';
 
-export function ScriptSchedulePanel({ scriptId, getInput }: {
+export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput }: {
   scriptId: string;
+  schedule: ScriptSchedule | null;
+  defaultName: string;
   /** Uses the run form's own validation, so unattended runs cannot bypass it. */
   getInput: () => ExecuteScriptInput | null;
 }) {
   const i18n = useI18n();
   const { t, locale } = i18n;
-  const query = useScriptSchedule(scriptId);
   const save = useSaveScriptSchedule();
   const remove = useDeleteScriptSchedule();
-  const schedule = query.data;
-  const [cron, setCron] = useState(DEFAULT_CRON);
-  const [timeZone, setTimeZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+  const [name, setName] = useState(schedule?.name ?? defaultName);
+  const [cron, setCron] = useState(schedule?.cron ?? DEFAULT_CRON);
+  const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC');
+  const [retentionDays, setRetentionDays] = useState(String(schedule?.retentionDays ?? 30));
   const [newEnabled, setNewEnabled] = useState(true);
-  const [seeded, setSeeded] = useState(false);
-
-  if (schedule !== undefined && !seeded) {
-    setSeeded(true);
-    if (schedule) {
-      setCron(schedule.cron);
-      setTimeZone(schedule.timeZone);
-    }
-  }
-
   const pending = save.isPending || remove.isPending;
   const enabled = schedule?.enabled ?? newEnabled;
+  const retention = Number(retentionDays);
+  const validRetention = retentionDays.trim() !== '' && Number.isInteger(retention) && retention >= 0 && retention <= 3650;
 
   function submit(): void {
     const input = getInput();
-    if (!input || !cron.trim() || !timeZone.trim()) return;
-    save.mutate({ scriptId, input: { cron, timeZone, enabled, input } });
+    if (!input || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention) return;
+    save.mutate({ scheduleId: schedule?.id, input: { scriptId, name, retentionDays: retention, cron, timeZone, enabled, input } }, {
+      onSuccess: (saved) => { if (!schedule) navigate(`/schedules/${encodeURIComponent(saved.id)}`); },
+    });
   }
 
   function toggle(next: boolean): void {
-    if (!schedule) {
-      setNewEnabled(next);
-      return;
-    }
-    // Toggling must preserve the saved target and arguments, even if the run form has changed.
-    save.mutate({ scriptId, input: { cron: schedule.cron, timeZone: schedule.timeZone, enabled: next, input: schedule.input } });
+    if (!schedule) { setNewEnabled(next); return; }
+    // Toggling must preserve the saved invocation and policy, even while fields have unsaved edits.
+    save.mutate({ scheduleId: schedule.id, input: {
+      scriptId: schedule.scriptId, name: schedule.name, retentionDays: schedule.retentionDays,
+      cron: schedule.cron, timeZone: schedule.timeZone, enabled: next, input: schedule.input,
+    } });
   }
 
   function deleteSchedule(): void {
-    remove.mutate(scriptId, { onSuccess: () => {
-      setCron(DEFAULT_CRON);
-      setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
-      setNewEnabled(true);
-    } });
+    if (schedule) remove.mutate(schedule.id, { onSuccess: () => navigate('/schedules') });
   }
 
   return (
@@ -68,13 +60,14 @@ export function ScriptSchedulePanel({ scriptId, getInput }: {
         <Clock className="text-accent size-4" aria-hidden />
         {t('schedule.title')}
       </h3>
-      {query.isPending ? <p className="text-mute text-meta">{t('schedule.loading')}</p> : query.isError && schedule === undefined ? (
-        <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} />
-      ) : (
-        <>
-          {query.isError ? <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} /> : null}
           <p className="text-mute text-meta">{t('schedule.snapshotHint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t('schedule.name')}>
+              {({ id }) => <TextInput id={id} value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />}
+            </Field>
+            <Field label={t('schedule.retention')} hint={t('schedule.retentionHint')}>
+              {({ id, describedBy }) => <TextInput id={id} aria-describedby={describedBy} type="number" min={0} max={3650} step={1} value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} />}
+            </Field>
             <Field label={t('schedule.cron')} hint={t('schedule.cronHint')}>
               {({ id, describedBy }) => <TextInput id={id} aria-describedby={describedBy} className="mono" value={cron} maxLength={200} placeholder={DEFAULT_CRON} onChange={(event) => setCron(event.target.value)} />}
             </Field>
@@ -107,11 +100,9 @@ export function ScriptSchedulePanel({ scriptId, getInput }: {
           {remove.isError ? <ErrorBanner message={errorMessage(remove.error, i18n)} /> : null}
           <p className="text-faint text-meta">{t('schedule.behaviorHint')}</p>
           <div className="flex flex-wrap gap-3">
-            <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !cron.trim() || !timeZone.trim()} loading={save.isPending}>{t('schedule.save')}</Button>
+            <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>
             {schedule ? <Button icon={<Trash className="size-4" aria-hidden />} onClick={deleteSchedule} disabled={pending} loading={remove.isPending}>{t('schedule.delete')}</Button> : null}
           </div>
-        </>
-      )}
     </section>
   );
 }

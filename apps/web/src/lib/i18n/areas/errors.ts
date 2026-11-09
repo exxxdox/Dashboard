@@ -28,6 +28,7 @@ const en = {
   'error.entity.source': 'Source',
   'error.entity.script': 'Script',
   'error.entity.execution': 'Execution',
+  'error.entity.schedule': 'Schedule',
   'error.entity.record': 'Record',
 
   'error.dns.missingCredentials': 'The selected provider still needs: {fields}',
@@ -57,6 +58,7 @@ const zh: Record<keyof typeof en, string> = {
   'error.entity.source': '脚本源',
   'error.entity.script': '脚本',
   'error.entity.execution': '运行记录',
+  'error.entity.schedule': '定时计划',
   'error.entity.record': '记录',
 
   'error.dns.missingCredentials': '所选服务商仍缺少：{fields}',

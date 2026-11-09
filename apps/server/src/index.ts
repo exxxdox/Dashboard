@@ -25,8 +25,8 @@ import { createNotificationService } from './services/notifications/service.js';
 import { createScriptScheduleService } from './services/script-schedules.js';
 import { createExecutionHub } from './ws/hub.js';
 
-/** How often retention runs. Daily is plenty for a self-hosted dashboard. */
-const PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** Bound cleanup delay for independently configured schedule retention policies. */
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 /** How long running scripts are given to finish after a shutdown signal. */
 const SHUTDOWN_GRACE_MS = 10_000;
 

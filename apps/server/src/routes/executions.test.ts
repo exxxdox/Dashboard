@@ -18,7 +18,7 @@ afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) awai
 async function setup() {
   const db = openDatabase(':memory:');
   const summary: ExecutionSummary = {
-    id: 'run_1', scriptId: 'scr_1', targetId: 'tgt_1', status: 'queued', exitCode: null, signal: null,
+    id: 'run_1', scheduleId: null, scheduleName: null, scriptId: 'scr_1', targetId: 'tgt_1', status: 'queued', exitCode: null, signal: null,
     commandDisplay: 'bash deploy.sh', targetName: 'edge', scriptName: 'Deploy', scriptRelPath: 'deploy.sh',
     paramValues: {}, argv: [], queuedAt: '2026-01-01T00:00:00.000Z', startedAt: null, finishedAt: null,
     durationMs: null, logBytes: 0, truncated: false, errorMessage: null,
@@ -72,6 +72,8 @@ test('history validates paging and status, applies defaults and forwards filters
   const response = await h.app.inject('/api/executions?scriptId=scr_1&targetId=tgt_1&status=failed&limit=2&offset=3');
   expect(response.json().total).toBe(1);
   expect(h.executions.list).toHaveBeenLastCalledWith({ scriptId: 'scr_1', targetId: 'tgt_1', status: 'failed', limit: 2, offset: 3 });
+  await h.app.inject('/api/executions?scheduleId=sch_1');
+  expect(h.executions.list).toHaveBeenLastCalledWith({ scheduleId: 'sch_1', limit: 50, offset: 0 });
   for (const query of ['limit=0', 'limit=201', 'offset=-1', 'status=unknown']) {
     expect((await h.app.inject(`/api/executions?${query}`)).statusCode).toBe(422);
   }

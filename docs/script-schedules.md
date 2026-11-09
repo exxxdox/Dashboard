@@ -1,18 +1,37 @@
 # Script schedules
 
-Each script can have one saved schedule. The dedicated Scheduled runs page lets you select a script and saves a five-field Cron expression (`minute hour day-of-month month day-of-week`), an IANA time zone, an enabled flag, and a snapshot of the selected target, parameters, arguments, and timeout. The schedule editor loads its own saved target and parameters; editing a schedule never writes the manual run draft. Saving explicitly replaces the scheduled invocation snapshot.
+The independent Scheduled runs page (`#/schedules`) manages named plans. Multiple plans can run the same script with different Cron rules, time zones, targets, arguments and retention policies. Each plan has its own stable ID; selecting a script never overwrites another plan.
 
-The dashboard must be running. Schedules survive restarts, but missed times are not replayed. A trigger skips submission while the preceding scheduled execution is queued or running. Manual runs remain independent. All actual runs use the existing execution service, queue, logs, history, and notifications.
+The editor saves a snapshot of the selected target, environment parameters, positional arguments and resolved timeout. Editing a plan never reads or writes the manual run draft. Saved plans keep their script; create another plan to schedule a different script.
 
-Cron parsing and next-occurrence calculation use Croner, including time zones and daylight-saving transitions. Five fields only; seconds and aliases are not accepted. Cron day-of-month and day-of-week follow standard OR semantics. The browser time zone is the initial default and is saved explicitly.
+## Triggering
 
-Storage: `script_schedules`, keyed by script ID; target ID is a foreign key, and the remaining run input is JSON. Deleting a script/source or its target deletes the schedule. Soft-deleted scripts are never submitted. Last execution references become null if history is removed. Submission errors are reported without storing parameters or transport details in the error message.
+Cron uses five fields (`minute hour day-of-month month day-of-week`), an explicit IANA time zone, and standard day-of-month/day-of-week OR semantics. Croner calculates future times, including daylight-saving transitions. The browser time zone is the default for new plans.
 
-API: authenticated `GET /api/script-schedules` lists live scripts’ plans; `GET`, `PUT`, and `DELETE /api/scripts/:id/schedule` manage one plan. GET returns a schedule or null. PUT validates Cron, time zone, target, and script parameters before saving. The response includes the next trigger, latest trigger, latest execution, and latest submission error. Disabling a schedule does not cancel an already queued/running execution.
+The dashboard must be running. Plans survive restarts; missed times are not replayed. A trigger skips submission while that same plan's preceding execution is queued or running. Different plans for one script are independent and use the normal global/per-target queue limits, logs, history and notification preferences. Pausing or deleting a plan does not cancel already submitted work.
 
-Implementation and verification:
+## Execution history and retention
 
-1. Add shared request/response contracts and schema v9; test boundary defaults/bounds and migration foreign keys.
-2. Add schedule service and routes; test Cron/time zones, saved snapshots, restoration, disable/delete, overlap, missed times, errors, and route authorization.
-3. Expose the schedule list and script picker under `#/schedules`, with a shared run-parameter form, bilingual labels, status and history links. Keep manual run drafts independent; test editing existing snapshots and API wiring.
-4. Restore schedules after interrupted runs are reconciled; stop timers before shutdown. Run shared build, type checks, tests, production build, and browser checks.
+Each plan has paginated execution records linking to the existing run details and logs. The execution service records plan ID, plan name and a retention snapshot in the same insert that queues the execution. Manual executions have no plan association.
+
+Retention is configured per plan in days, from 0 to 3650; 0 means keep forever. New plans default to 30 days. A plan's current retention applies to all its completed records and their logs. Retention starts at completion (`finished_at`, or `queued_at` for legacy rows without a completion time). Queued and running records are never pruned. Cleanup runs at startup and hourly, so expiration can lag by up to one cleanup interval while the dashboard is running.
+
+Deleting a plan leaves its execution records in the global run history. Before deletion, its latest retention policy is copied onto its executions; cleanup can still honor that policy afterward. Manual runs continue using the dashboard's `RETENTION_DAYS` default. A global value of 0 does not override a finite policy on a scheduled plan.
+
+## Upgrade and storage
+
+Migration v11 replaces the script-keyed plan table with independent IDs and permits multiple rows per script. Existing plans keep their settings and inherit the previous global retention policy until explicitly saved. The old model only recorded the latest scheduled execution ID; that provable association is migrated. Other old executions remain in the global history rather than being incorrectly attributed to a plan.
+
+`script_schedules` references scripts and targets. Deleting an owner cascades to its plans; soft-deleted scripts never submit. Execution origin IDs intentionally survive plan deletion. Failed submissions expose only a fixed error code, never parameters or transport details.
+
+## API
+
+All routes require the dashboard session when authentication is enabled:
+
+- `GET /api/script-schedules`: list plans.
+- `POST /api/script-schedules`: create a plan.
+- `GET`, `PUT`, `DELETE /api/script-schedules/:id`: manage an identified plan.
+- `GET /api/script-schedules/:id/executions?limit=20&offset=0`: paginated plan history.
+- `GET /api/executions?scheduleId=:id`: filter global history, including a deleted plan's surviving records.
+
+Create/update accepts `scriptId`, `name`, `retentionDays`, `cron`, `timeZone`, `enabled`, and the normal execution `input`. The former single-plan `/api/scripts/:id/schedule` routes are removed because a script no longer uniquely identifies a plan.

@@ -59,7 +59,7 @@ With MCP network access disabled, only TCP peers on loopback or local interface 
 
 ## Scheduled scripts
 
-The Scheduled runs page lets you select a script and configure a five-field Cron schedule with an explicit time zone, target, and saved run parameters. Schedules persist across restarts and use the normal run history and logs. Missed triggers during downtime are skipped, as are triggers while the preceding scheduled run is still queued or running.
+The Scheduled runs page manages named plans with a script, five-field Cron expression, time zone, target and saved run parameters. Multiple plans can use the same script. Each has its own execution history and log links, with configurable retention in days (0 keeps records forever). Schedules persist across restarts and use the normal run history and logs. Missed triggers during downtime are skipped, as are triggers while the preceding scheduled run is still queued or running.
 
 ## IPv6 DNS console
 

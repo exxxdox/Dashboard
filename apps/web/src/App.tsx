@@ -82,7 +82,7 @@ function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
     case 'scripts':
       return <ScriptsPage scriptId={route.scriptId} />;
     case 'schedules':
-      return <SchedulesPage scriptId={route.scriptId} />;
+      return <SchedulesPage scheduleId={route.scheduleId} />;
     case 'runs':
       return route.executionId === null ? (
         <RunsPage route={route} />

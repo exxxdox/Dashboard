@@ -13,7 +13,8 @@ export const queryKeys = {
   script: (id: string) => ['scripts', id] as const,
   scriptRunDraft: (id: string) => ['scripts', id, 'run-draft'] as const,
   scriptSchedules: () => ['script-schedules'] as const,
-  scriptSchedule: (id: string) => ['scripts', id, 'schedule'] as const,
+  scriptSchedule: (id: string) => ['script-schedules', id] as const,
+  scriptScheduleExecutions: (id: string, offset: number) => ['script-schedules', id, 'executions', offset] as const,
 
   executions: (filter: Record<string, string | number | undefined>) =>
     ['executions', filter] as const,

@@ -191,16 +191,17 @@ describe('unauthorized responses', () => {
 
 
 describe('script schedule API', () => {
-  it('reads, saves and deletes a schedule with an encoded script id', async () => {
+  it('reads, saves and deletes a schedule with an encoded plan id', async () => {
     const spy = stubFetch(async () => jsonResponse('null', 200));
-    const input = { cron: '0 8 * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'target', params: { NAME: 'test' }, argv: ['a b'] } };
-    await expect(api.scriptSchedule('script/id')).resolves.toBeNull();
-    await api.saveScriptSchedule('script/id', input);
-    await api.deleteScriptSchedule('script/id');
+    const input = { scriptId: 'script', name: 'Morning', retentionDays: 7, cron: '0 8 * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'target', params: { NAME: 'test' }, argv: ['a b'] } };
+    await expect(api.scriptSchedule('plan/id')).resolves.toBeNull();
+    await api.createScriptSchedule(input);
+    await api.saveScriptSchedule('plan/id', input);
+    await api.deleteScriptSchedule('plan/id');
     expect(spy.mock.calls.map(([url]) => (url as URL).pathname)).toEqual([
-      '/api/scripts/script%2Fid/schedule', '/api/scripts/script%2Fid/schedule', '/api/scripts/script%2Fid/schedule',
+      '/api/script-schedules/plan%2Fid', '/api/script-schedules', '/api/script-schedules/plan%2Fid', '/api/script-schedules/plan%2Fid',
     ]);
-    expect(spy.mock.calls.map(([, init]) => init?.method)).toEqual(['GET', 'PUT', 'DELETE']);
+    expect(spy.mock.calls.map(([, init]) => init?.method)).toEqual(['GET', 'POST', 'PUT', 'DELETE']);
     expect(JSON.parse(spy.mock.calls[1]?.[1]?.body as string)).toEqual(input);
   });
 });
@@ -210,4 +211,13 @@ it('lists saved script schedules from their independent endpoint', async () => {
   const spy = stubFetch(async () => jsonResponse('[]', 200));
   await expect(api.listScriptSchedules()).resolves.toEqual([]);
   expect((spy.mock.calls[0]?.[0] as URL).pathname).toBe('/api/script-schedules');
+});
+
+
+it('loads history for one plan with explicit paging', async () => {
+  const spy = stubFetch(async () => jsonResponse('{"items":[],"total":0}', 200));
+  await api.scriptScheduleExecutions('plan/id', { limit: 20, offset: 20 });
+  const url = spy.mock.calls[0]?.[0] as URL;
+  expect(url.pathname).toBe('/api/script-schedules/plan%2Fid/executions');
+  expect(url.searchParams.get('offset')).toBe('20');
 });

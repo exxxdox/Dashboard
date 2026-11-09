@@ -31,7 +31,7 @@ vi.mock('../lib/i18n', () => ({ useI18n: () => ({ locale: 'en', t: (key: string)
 
 const input: ExecuteScriptInput = { targetId: 'new-target', params: { NAME: 'new' }, argv: ['new argument'], timeoutSec: 15 };
 const saved: ScriptSchedule = {
-  scriptId: 'script', cron: '0 8 * * *', timeZone: 'Asia/Shanghai', enabled: true,
+  id: 'sch_1', name: 'Morning', retentionDays: 7, scriptId: 'script', cron: '0 8 * * *', timeZone: 'Asia/Shanghai', enabled: true,
   input: { targetId: 'saved-target', params: { NAME: 'saved' }, argv: ['saved argument'], timeoutSec: 30 },
   targetName: 'Saved host', nextRunAt: '2026-11-11T00:00:00Z', lastTriggeredAt: '2026-11-10T00:00:00Z',
   lastExecutionId: 'run_1', lastError: null, updatedAt: '2026-11-10T00:00:00Z',
@@ -48,7 +48,7 @@ function render(getInput: () => ExecuteScriptInput | null = () => input): Elemen
   let tree: Element;
   do {
     hooks.changed = false; hooks.index = 0;
-    tree = ScriptSchedulePanel({ scriptId: 'script', getInput });
+    tree = ScriptSchedulePanel({ scriptId: 'script', schedule: hooks.data ?? null, defaultName: 'New plan', getInput });
   } while (hooks.changed);
   return tree;
 }
@@ -62,7 +62,7 @@ beforeEach(() => {
 
 test('shows the saved target and snapshot separately from the current run form', () => {
   hooks.data = saved;
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={hooks.data ?? null} defaultName="New plan" getInput={() => input} />);
   expect(html).toContain('Saved host');
   expect(html).toContain('saved argument');
   expect(html).toContain('NAME');
@@ -76,7 +76,7 @@ test('shows the saved target and snapshot separately from the current run form',
 test('saving a schedule explicitly snapshots the current run settings', () => {
   hooks.data = saved;
   click('schedule.save');
-  expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scriptId: 'script', input: { cron: saved.cron, timeZone: saved.timeZone, enabled: true, input } });
+  expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scheduleId: 'sch_1', input: { scriptId: 'script', name: 'Morning', retentionDays: 7, cron: saved.cron, timeZone: saved.timeZone, enabled: true, input } });
 });
 
 test('refuses saving when the run form is invalid', () => {
@@ -88,46 +88,32 @@ test('disabling keeps the saved run settings instead of the current form', () =>
   hooks.data = saved;
   const toggle = elements(render()).find((el) => el.props.label === 'schedule.enabled')!;
   toggle.props.onChange!(false);
-  expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scriptId: 'script', input: { cron: saved.cron, timeZone: saved.timeZone, enabled: false, input: saved.input } });
+  expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scheduleId: 'sch_1', input: { scriptId: 'script', name: 'Morning', retentionDays: 7, cron: saved.cron, timeZone: saved.timeZone, enabled: false, input: saved.input } });
 });
 
 test('deletes the saved schedule', () => {
   hooks.data = saved;
   click('schedule.delete');
-  expect(hooks.remove.mock.calls[0]?.[0]).toBe('script');
-});
-
-test('keeps save unavailable until the saved schedule loads', () => {
-  hooks.pending = true;
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
-  expect(html).toContain('schedule.loading');
-  expect(html).not.toContain('schedule.save');
-});
-
-test('offers retry rather than presenting a failed read as an empty schedule', () => {
-  hooks.data = undefined; hooks.error = true;
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
-  expect(html).toContain('offline');
-  expect(html).not.toContain('schedule.save');
+  expect(hooks.remove.mock.calls[0]?.[0]).toBe('sch_1');
 });
 
 test('localizes persisted submission errors without rendering raw error details', () => {
   hooks.data = { ...saved, lastError: 'submit_failed' };
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={hooks.data ?? null} defaultName="New plan" getInput={() => input} />);
   expect(html).toContain('schedule.error.submit_failed');
 });
 
 
 test('shows save validation failures inside the schedule dialog', () => {
   hooks.mutationError = true;
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={hooks.data ?? null} defaultName="New plan" getInput={() => input} />);
   expect(html).toContain('Invalid Cron');
 });
 
 
-test('preserves controls on background read failure when a saved schedule is cached', () => {
-  hooks.data = saved; hooks.error = true;
-  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" getInput={() => input} />);
-  expect(html).toContain('schedule.cron');
-  expect(html).toContain('offline');
+test('creates a distinct plan with its own name and retention', () => {
+  click('schedule.save');
+  expect(hooks.save.mock.calls[0]?.[0]).toMatchObject({
+    scheduleId: undefined, input: { scriptId: 'script', name: 'New plan', retentionDays: 30, input },
+  });
 });

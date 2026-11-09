@@ -369,7 +369,8 @@ describe('v9 script schedules migration', () => {
     try {
       for (const migration of MIGRATIONS.slice(1, 8)) migration(db);
       db.pragma('user_version = 8');
-      migrate(db);
+      MIGRATIONS[8]!(db);
+      db.pragma('user_version = 9');
       expect(columnsOf(db, 'script_schedules')).toContain('run_input_json');
       expect(db.prepare('SELECT work_dir FROM executions').get()).toEqual({ work_dir: '/srv/scripts' });
       const insert = db.prepare(`INSERT INTO script_schedules
@@ -401,6 +402,34 @@ describe('v10 notification preferences migration', () => {
       });
       expect(() => db.prepare('UPDATE app_settings SET notify_script_results = 2').run()).toThrow(/CHECK/);
       expect(() => db.prepare('UPDATE app_settings SET notify_dns_changes = -1').run()).toThrow(/CHECK/);
+      expect(() => migrate(db)).not.toThrow();
+    } finally { db.close(); }
+  });
+});
+
+
+describe('v11 independent schedule identities', () => {
+  test('preserves old plans and the known scheduled run, and allows multiple plans per script', () => {
+    const db = versionOneDatabase();
+    try {
+      for (const migration of MIGRATIONS.slice(1, 10)) migration(db);
+      db.pragma('user_version = 10');
+      db.prepare(`INSERT INTO script_schedules
+        (script_id,target_id,cron,time_zone,enabled,run_input_json,last_execution_id,created_at,updated_at)
+        VALUES ('scr_1','tgt_1','0 9 * * *','UTC',1,'{"params":{},"argv":["keep"],"timeoutSec":12}','run_1',?,?)`).run(NOW, NOW);
+      migrate(db);
+      expect(db.prepare('SELECT id,script_id,name,cron,retention_days,run_input_json FROM script_schedules').get()).toEqual({
+        id: 'sch_scr_1', script_id: 'scr_1', name: 'API', cron: '0 9 * * *', retention_days: null,
+        run_input_json: '{"params":{},"argv":["keep"],"timeoutSec":12}',
+      });
+      expect(db.prepare('SELECT schedule_id,schedule_name FROM executions').get()).toEqual({ schedule_id: 'sch_scr_1', schedule_name: 'API' });
+      db.prepare(`INSERT INTO script_schedules
+        (id,script_id,name,target_id,cron,time_zone,enabled,retention_days,run_input_json,created_at,updated_at)
+        VALUES ('sch_two','scr_1','second','tgt_1','0 18 * * *','UTC',1,7,'{}',?,?)`).run(NOW, NOW);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM script_schedules').get()).toEqual({ n: 2 });
+      expect(() => db.prepare('UPDATE script_schedules SET retention_days = -1').run()).toThrow(/CHECK/);
+      db.prepare("DELETE FROM script_schedules WHERE id = 'sch_scr_1'").run();
+      expect(db.prepare('SELECT schedule_id FROM executions').get()).toEqual({ schedule_id: 'sch_scr_1' });
       expect(() => migrate(db)).not.toThrow();
     } finally { db.close(); }
   });

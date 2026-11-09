@@ -12,11 +12,15 @@ import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';
 import { NotFoundError, ValidationError } from '../lib/errors.js';
 import type { Logger } from '../lib/logger.js';
+import { newScriptScheduleId } from '../lib/ids.js';
 import type { ExecutionService } from './executions.js';
 import { toScriptSummary, type ScriptRow } from './sources.js';
 import { getTargetRow } from './targets.js';
 
 type ScheduleRow = {
+  id: string;
+  name: string;
+  retention_days: number | null;
   script_id: string;
   target_id: string;
   target_name: string;
@@ -34,9 +38,10 @@ type ScheduleRow = {
 
 export type ScriptScheduleService = {
   list: () => ScriptSchedule[];
-  get: (scriptId: string) => ScriptSchedule | null;
-  save: (scriptId: string, input: SaveScriptScheduleInput) => ScriptSchedule;
-  remove: (scriptId: string) => void;
+  get: (id: string) => ScriptSchedule;
+  create: (input: SaveScriptScheduleInput) => ScriptSchedule;
+  save: (id: string, input: SaveScriptScheduleInput) => ScriptSchedule;
+  remove: (id: string) => void;
   start: () => void;
   stop: () => void;
 };
@@ -45,7 +50,7 @@ type Deps = {
   db: Db;
   executions: Pick<ExecutionService, 'submit'>;
   logger: Logger;
-  config: Pick<AppConfig, 'defaultTimeoutSec'>;
+  config: Pick<AppConfig, 'defaultTimeoutSec' | 'retentionDays'>;
 };
 
 function nextRun(cron: string, timeZone: string, after: Date): string {
@@ -74,8 +79,11 @@ function runInput(row: ScheduleRow): SaveScriptScheduleInput['input'] {
   return executeScriptSchema.parse({ ...JSON.parse(row.run_input_json), targetId: row.target_id });
 }
 
-function toView(row: ScheduleRow): ScriptSchedule {
+function toView(row: ScheduleRow, fallbackRetentionDays: number): ScriptSchedule {
   return {
+    id: row.id,
+    name: row.name,
+    retentionDays: row.retention_days ?? fallbackRetentionDays,
     scriptId: row.script_id,
     targetName: row.target_name,
     cron: row.cron,
@@ -96,7 +104,6 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
   let timer: NodeJS.Timeout | null = null;
   const submitting = new Set<string>();
   const revisions = new Map<string, number>();
-  const deletions = new Map<string, number>();
 
   function script(scriptId: string): ScriptRow {
     const row = db.prepare<[string], ScriptRow>('SELECT * FROM scripts WHERE id = ? AND deleted_at IS NULL').get(scriptId);
@@ -104,33 +111,36 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
     return row;
   }
 
-  function row(scriptId: string): ScheduleRow | undefined {
-    return db.prepare<[string], ScheduleRow>(`${select} WHERE ss.script_id = ?`).get(scriptId);
+  function row(id: string): ScheduleRow {
+    const current = db.prepare<[string], ScheduleRow>(`${select} WHERE ss.id = ?`).get(id);
+    if (!current) throw new NotFoundError('Schedule');
+    return current;
   }
 
-  function disableInvalid(scriptId: string): void {
-    db.prepare("UPDATE script_schedules SET enabled = 0, next_run_at = NULL, last_error = 'invalid_schedule' WHERE script_id = ?").run(scriptId);
-    logger.warn({ scriptId }, 'invalid stored script schedule was disabled');
+  function disableInvalid(id: string): void {
+    db.prepare("UPDATE script_schedules SET enabled = 0, next_run_at = NULL, last_error = 'invalid_schedule' WHERE id = ?").run(id);
+    logger.warn({ scheduleId: id }, 'invalid stored script schedule was disabled');
   }
 
   async function submit(due: ScheduleRow): Promise<void> {
-    const id = due.script_id;
+    const id = due.id;
     const revision = revisions.get(id);
-    const deletion = deletions.get(id);
     submitting.add(id);
     try {
-      const execution = await executions.submit(id, runInput(due));
-      // A settings edit keeps the in-flight run for overlap protection; a deletion/recreation must not inherit it.
-      if (timer !== null && deletions.get(id) === deletion) {
+      const execution = await executions.submit(due.script_id, runInput(due), {
+        scheduleId: id, scheduleName: due.name, retentionDays: due.retention_days ?? config.retentionDays,
+      });
+      // A settings edit retains the in-flight run for overlap protection; deleting the plan leaves no row to update.
+      if (timer !== null) {
         db.prepare(`UPDATE script_schedules SET last_execution_id = ?,
-          last_error = CASE WHEN ? THEN NULL ELSE last_error END WHERE script_id = ?`)
+          last_error = CASE WHEN ? THEN NULL ELSE last_error END WHERE id = ?`)
           .run(execution.id, revisions.get(id) === revision ? 1 : 0, id);
       }
     } catch {
       // Parameters and upstream errors may contain secrets; expose only a fixed, localizable outcome.
-      if (timer !== null && revisions.get(id) === revision && deletions.get(id) === deletion) {
-        db.prepare("UPDATE script_schedules SET last_error = 'submit_failed' WHERE script_id = ?").run(id);
-        logger.warn({ scriptId: id }, 'scheduled script could not be submitted');
+      if (timer !== null && revisions.get(id) === revision) {
+        db.prepare("UPDATE script_schedules SET last_error = 'submit_failed' WHERE id = ?").run(id);
+        logger.warn({ scheduleId: id }, 'scheduled script could not be submitted');
       }
     } finally {
       submitting.delete(id);
@@ -147,60 +157,68 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
       try {
         const next = nextRun(current.cron, current.time_zone, now);
         // Advance before submitting: missed times and slow submissions cannot create a catch-up burst.
-        db.prepare('UPDATE script_schedules SET next_run_at = ?, last_triggered_at = ? WHERE script_id = ?')
-          .run(next, now.toISOString(), current.script_id);
+        db.prepare('UPDATE script_schedules SET next_run_at = ?, last_triggered_at = ? WHERE id = ?')
+          .run(next, now.toISOString(), current.id);
         const active = current.last_execution_id && db.prepare<[string], { status: string }>('SELECT status FROM executions WHERE id = ?').get(current.last_execution_id);
-        if (submitting.has(current.script_id) || (active && (active.status === 'queued' || active.status === 'running'))) continue;
+        if (submitting.has(current.id) || (active && (active.status === 'queued' || active.status === 'running'))) continue;
         void submit(current);
       } catch {
-        disableInvalid(current.script_id);
+        disableInvalid(current.id);
       }
     }
+  }
+
+  function write(id: string, rawInput: SaveScriptScheduleInput): ScriptSchedule {
+    const input = saveScriptScheduleSchema.parse(rawInput);
+    const metadata = toScriptSummary(script(input.scriptId));
+    getTargetRow(db, input.input.targetId);
+    const next = nextRun(input.cron, input.timeZone, new Date());
+    const validation = validateParams(metadata.params, input.input.params);
+    if (!validation.ok) throw new ValidationError('One or more parameters are invalid', validation.errors, { key: 'error.schedule.params' });
+    const snapshot = {
+      params: validation.env,
+      argv: input.input.argv,
+      timeoutSec: input.input.timeoutSec ?? metadata.timeoutSec ?? config.defaultTimeoutSec,
+    };
+    const timestamp = nowIso();
+    db.prepare(`INSERT INTO script_schedules
+      (id,script_id,name,retention_days,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+      script_id = excluded.script_id, name = excluded.name, retention_days = excluded.retention_days,
+      target_id = excluded.target_id, cron = excluded.cron, time_zone = excluded.time_zone,
+      enabled = excluded.enabled, run_input_json = excluded.run_input_json,
+      next_run_at = excluded.next_run_at, last_error = NULL, updated_at = excluded.updated_at`)
+      .run(id, input.scriptId, input.name, input.retentionDays, input.input.targetId, input.cron, input.timeZone,
+        input.enabled ? 1 : 0, JSON.stringify(snapshot), input.enabled ? next : null, timestamp, timestamp);
+    revisions.set(id, (revisions.get(id) ?? 0) + 1);
+    return toView(row(id), config.retentionDays);
   }
 
   return {
     list() {
       return db.prepare<[], ScheduleRow>(`${select}
         JOIN scripts s ON s.id = ss.script_id AND s.deleted_at IS NULL
-        ORDER BY s.display_name COLLATE NOCASE, ss.script_id`).all().map(toView);
+        ORDER BY ss.name COLLATE NOCASE, ss.id`).all().map((current) => toView(current, config.retentionDays));
     },
 
-    get(scriptId) {
-      script(scriptId);
-      const current = row(scriptId);
-      return current ? toView(current) : null;
+    get: (id) => toView(row(id), config.retentionDays),
+
+    create: (input) => write(newScriptScheduleId(), input),
+
+    save(id, input) {
+      row(id);
+      return write(id, input);
     },
 
-    save(scriptId, rawInput) {
-      const input = saveScriptScheduleSchema.parse(rawInput);
-      const metadata = toScriptSummary(script(scriptId));
-      getTargetRow(db, input.input.targetId);
-      const next = nextRun(input.cron, input.timeZone, new Date());
-      const validation = validateParams(metadata.params, input.input.params);
-      if (!validation.ok) throw new ValidationError('One or more parameters are invalid', validation.errors, { key: 'error.schedule.params' });
-      const snapshot = {
-        params: validation.env,
-        argv: input.input.argv,
-        timeoutSec: input.input.timeoutSec ?? metadata.timeoutSec ?? config.defaultTimeoutSec,
-      };
-      const timestamp = nowIso();
-      db.prepare(`INSERT INTO script_schedules
-        (script_id,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(script_id) DO UPDATE SET
-        target_id = excluded.target_id, cron = excluded.cron, time_zone = excluded.time_zone,
-        enabled = excluded.enabled, run_input_json = excluded.run_input_json,
-        next_run_at = excluded.next_run_at, last_error = NULL, updated_at = excluded.updated_at`)
-        .run(scriptId, input.input.targetId, input.cron, input.timeZone, input.enabled ? 1 : 0,
-          JSON.stringify(snapshot), input.enabled ? next : null, timestamp, timestamp);
-      revisions.set(scriptId, (revisions.get(scriptId) ?? 0) + 1);
-      return toView(row(scriptId)!);
-    },
-
-    remove(scriptId) {
-      script(scriptId);
-      db.prepare('DELETE FROM script_schedules WHERE script_id = ?').run(scriptId);
-      revisions.set(scriptId, (revisions.get(scriptId) ?? 0) + 1);
-      deletions.set(scriptId, (deletions.get(scriptId) ?? 0) + 1);
+    remove(id) {
+      const current = row(id);
+      // Detached history keeps the policy in effect when its plan was removed.
+      db.transaction(() => {
+        db.prepare('UPDATE executions SET retention_days = ? WHERE schedule_id = ?')
+          .run(current.retention_days ?? config.retentionDays, id);
+        db.prepare('DELETE FROM script_schedules WHERE id = ?').run(id);
+      })();
+      revisions.set(id, (revisions.get(id) ?? 0) + 1);
     },
 
     start() {
@@ -210,9 +228,9 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
         try {
           runInput(stored);
           const next = nextRun(stored.cron, stored.time_zone, new Date());
-          db.prepare('UPDATE script_schedules SET next_run_at = ? WHERE script_id = ?').run(next, stored.script_id);
+          db.prepare('UPDATE script_schedules SET next_run_at = ? WHERE id = ?').run(next, stored.id);
         } catch {
-          disableInvalid(stored.script_id);
+          disableInvalid(stored.id);
         }
       }
       timer = setInterval(() => {

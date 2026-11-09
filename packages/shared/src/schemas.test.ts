@@ -232,7 +232,7 @@ test('validates and trims the optional local IPv6 interface name', () => {
 describe('script schedule contract', () => {
   test('requires an explicit target and time zone and defaults run arguments', async () => {
     const { saveScriptScheduleSchema } = await import('./schemas.js');
-    const valid = { cron: '*/5 * * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'tgt_1' } };
+    const valid = { scriptId: 'scr_1', name: 'Daily job', cron: '*/5 * * * *', timeZone: 'Asia/Shanghai', enabled: true, input: { targetId: 'tgt_1' } };
     expect(saveScriptScheduleSchema.parse(valid).input).toEqual({ targetId: 'tgt_1', params: {}, argv: [] });
     expect(saveScriptScheduleSchema.safeParse({ ...valid, timeZone: '' }).success).toBe(false);
     expect(saveScriptScheduleSchema.safeParse({ ...valid, cron: 'x'.repeat(201) }).success).toBe(false);
@@ -249,4 +249,16 @@ test('notification event switches are partial booleans and stay out of explicit 
   expect(updateAppSettingsSchema.safeParse({ notifyScriptResults: 'false' }).success).toBe(false);
   expect(testNotificationSchema.parse({ gotifyAddress: 'notify.test', notifyScriptResults: false }))
     .toEqual({ gotifyAddress: 'notify.test' });
+});
+
+
+test('schedule identities and per-plan retention are explicit and bounded', async () => {
+  const { saveScriptScheduleSchema } = await import('./schemas.js');
+  const input = { scriptId: 'scr_1', name: 'daily', cron: '0 8 * * *', timeZone: 'UTC', enabled: true, input: { targetId: 'tgt_1' } };
+  expect(saveScriptScheduleSchema.parse(input).retentionDays).toBe(30);
+  expect(saveScriptScheduleSchema.parse({ ...input, retentionDays: 0 }).retentionDays).toBe(0);
+  expect(saveScriptScheduleSchema.safeParse({ ...input, retentionDays: -1 }).success).toBe(false);
+  expect(saveScriptScheduleSchema.safeParse({ ...input, retentionDays: 3651 }).success).toBe(false);
+  expect(saveScriptScheduleSchema.safeParse({ ...input, name: '' }).success).toBe(false);
+  expect(saveScriptScheduleSchema.safeParse({ ...input, scriptId: '' }).success).toBe(false);
 });

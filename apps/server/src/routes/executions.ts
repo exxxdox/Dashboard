@@ -16,6 +16,7 @@ import type { AppContext } from '../context.js';
 import { NotFoundError } from '../lib/errors.js';
 
 const listQuery = z.object({
+  scheduleId: z.string().optional(),
   scriptId: z.string().optional(),
   targetId: z.string().optional(),
   status: executionStatusSchema.optional(),

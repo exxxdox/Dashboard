@@ -229,11 +229,15 @@ export const api = {
     }),
   listScriptSchedules: () => apiRequest<ScriptSchedule[]>('/script-schedules'),
   scriptSchedule: (id: string) =>
-    apiRequest<ScriptSchedule | null>(`/scripts/${encodeURIComponent(id)}/schedule`),
+    apiRequest<ScriptSchedule>(`/script-schedules/${encodeURIComponent(id)}`),
+  createScriptSchedule: (body: SaveScriptScheduleInput) =>
+    apiRequest<ScriptSchedule>('/script-schedules', { method: 'POST', body }),
   saveScriptSchedule: (id: string, body: SaveScriptScheduleInput) =>
-    apiRequest<ScriptSchedule>(`/scripts/${encodeURIComponent(id)}/schedule`, { method: 'PUT', body }),
+    apiRequest<ScriptSchedule>(`/script-schedules/${encodeURIComponent(id)}`, { method: 'PUT', body }),
   deleteScriptSchedule: (id: string) =>
-    apiRequest<void>(`/scripts/${encodeURIComponent(id)}/schedule`, { method: 'DELETE' }),
+    apiRequest<void>(`/script-schedules/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  scriptScheduleExecutions: (id: string, filter: { limit: number; offset: number }) =>
+    apiRequest<ExecutionListResponse>(`/script-schedules/${encodeURIComponent(id)}/executions`, { query: filter }),
   executeScript: (id: string, body: ExecuteScriptInput) =>
     apiRequest<{ executionId: string; status: ExecutionSummary['status'] }>(
       `/scripts/${encodeURIComponent(id)}/execute`,

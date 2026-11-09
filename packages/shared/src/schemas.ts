@@ -137,6 +137,9 @@ export type ExecuteScriptInput = z.infer<typeof executeScriptSchema>;
 
 // A schedule owns a snapshot; later edits to the run draft must not alter unattended runs.
 export const saveScriptScheduleSchema = z.object({
+  scriptId: z.string().min(1),
+  name: z.string().trim().min(1).max(100),
+  retentionDays: z.number().int().min(0).max(3650).default(30),
   cron: z.string().trim().min(1).max(200),
   timeZone: z.string().trim().min(1).max(100),
   enabled: z.boolean(),
@@ -145,7 +148,7 @@ export const saveScriptScheduleSchema = z.object({
 export type SaveScriptScheduleInput = z.infer<typeof saveScriptScheduleSchema>;
 
 export type ScriptSchedule = SaveScriptScheduleInput & {
-  scriptId: string;
+  id: string;
   targetName: string;
   nextRunAt: string | null;
   lastTriggeredAt: string | null;
@@ -397,6 +400,8 @@ export type ScriptTreeNode = {
 
 export type ExecutionSummary = {
   id: string;
+  scheduleId: string | null;
+  scheduleName: string | null;
   scriptId: string;
   targetId: string;
   status: ExecutionStatus;

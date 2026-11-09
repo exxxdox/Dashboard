@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 10;
+const TARGET_VERSION = 11;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -341,6 +341,47 @@ export const MIGRATIONS: Migration[] = [
         CHECK (notify_script_results IN (0, 1));
       ALTER TABLE app_settings ADD COLUMN notify_dns_changes INTEGER NOT NULL DEFAULT 1
         CHECK (notify_dns_changes IN (0, 1));
+    `);
+  },
+  // v11 -- plan identity is independent of the script; historical origin survives plan deletion.
+  (db) => {
+    db.exec(`
+      CREATE TABLE script_schedules_v11 (
+        id                TEXT PRIMARY KEY,
+        script_id         TEXT NOT NULL REFERENCES scripts(id) ON DELETE CASCADE,
+        name              TEXT NOT NULL,
+        target_id         TEXT NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
+        cron              TEXT NOT NULL,
+        time_zone         TEXT NOT NULL,
+        enabled           INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+        retention_days    INTEGER CHECK (retention_days BETWEEN 0 AND 3650),
+        run_input_json    TEXT NOT NULL,
+        next_run_at       TEXT,
+        last_triggered_at TEXT,
+        last_execution_id TEXT REFERENCES executions(id) ON DELETE SET NULL,
+        last_error        TEXT CHECK (last_error IN ('submit_failed', 'invalid_schedule')),
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      INSERT INTO script_schedules_v11
+      SELECT 'sch_' || ss.script_id, ss.script_id, substr(s.display_name, 1, 100), ss.target_id,
+             ss.cron, ss.time_zone, ss.enabled, NULL, ss.run_input_json, ss.next_run_at,
+             ss.last_triggered_at, ss.last_execution_id, ss.last_error, ss.created_at, ss.updated_at
+      FROM script_schedules ss JOIN scripts s ON s.id = ss.script_id;
+      DROP TABLE script_schedules;
+      ALTER TABLE script_schedules_v11 RENAME TO script_schedules;
+      CREATE INDEX idx_script_schedules_due ON script_schedules(enabled, next_run_at);
+      CREATE INDEX idx_script_schedules_script ON script_schedules(script_id);
+
+      ALTER TABLE executions ADD COLUMN schedule_id TEXT;
+      ALTER TABLE executions ADD COLUMN schedule_name TEXT;
+      ALTER TABLE executions ADD COLUMN retention_days INTEGER CHECK (retention_days BETWEEN 0 AND 3650);
+      CREATE INDEX idx_executions_schedule ON executions(schedule_id, queued_at DESC);
+      -- Only the latest run has provable attribution in the old model; manual runs must not be relabeled.
+      UPDATE executions SET
+        schedule_id = (SELECT id FROM script_schedules WHERE last_execution_id = executions.id),
+        schedule_name = (SELECT name FROM script_schedules WHERE last_execution_id = executions.id)
+      WHERE EXISTS (SELECT 1 FROM script_schedules WHERE last_execution_id = executions.id);
     `);
   },
 ];

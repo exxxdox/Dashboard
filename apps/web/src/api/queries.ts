@@ -300,11 +300,19 @@ export function useScriptSchedules() {
   });
 }
 
-export function useScriptSchedule(scriptId: string) {
+export function useScriptSchedule(scheduleId: string | null) {
   return useQuery({
-    queryKey: queryKeys.scriptSchedule(scriptId),
-    queryFn: () => api.scriptSchedule(scriptId),
-    // Trigger times and the latest execution change while the dialog stays open.
+    queryKey: queryKeys.scriptSchedule(scheduleId ?? ''),
+    queryFn: () => api.scriptSchedule(scheduleId ?? ''),
+    enabled: Boolean(scheduleId),
+    refetchInterval: 15_000,
+  });
+}
+
+export function useScriptScheduleExecutions(scheduleId: string, offset: number) {
+  return useQuery({
+    queryKey: queryKeys.scriptScheduleExecutions(scheduleId, offset),
+    queryFn: () => api.scriptScheduleExecutions(scheduleId, { limit: 20, offset }),
     refetchInterval: 15_000,
   });
 }
@@ -312,12 +320,14 @@ export function useScriptSchedule(scriptId: string) {
 export function useSaveScriptSchedule() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ scriptId, input }: { scriptId: string; input: SaveScriptScheduleInput }) =>
-      api.saveScriptSchedule(scriptId, input),
+    mutationFn: ({ scheduleId, input }: { scheduleId?: string; input: SaveScriptScheduleInput }) =>
+      scheduleId ? api.saveScriptSchedule(scheduleId, input) : api.createScriptSchedule(input),
     meta: { success: 'toast.scheduleSaved' },
-    onSuccess: (schedule: ScriptSchedule, { scriptId }) => {
-      client.setQueryData(queryKeys.scriptSchedule(scriptId), schedule);
+    onSuccess: (schedule: ScriptSchedule) => {
+      client.setQueryData(queryKeys.scriptSchedule(schedule.id), schedule);
+      // Retention changes can remove old runs as well as updating this plan.
       void client.invalidateQueries({ queryKey: queryKeys.scriptSchedules() });
+      void client.invalidateQueries({ queryKey: ['executions'] });
     },
   });
 }
@@ -325,10 +335,10 @@ export function useSaveScriptSchedule() {
 export function useDeleteScriptSchedule() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (scriptId: string) => api.deleteScriptSchedule(scriptId),
+    mutationFn: (scheduleId: string) => api.deleteScriptSchedule(scheduleId),
     meta: { success: 'toast.scheduleDeleted' },
-    onSuccess: (_result, scriptId) => {
-      client.setQueryData(queryKeys.scriptSchedule(scriptId), null);
+    onSuccess: (_result, scheduleId) => {
+      client.removeQueries({ queryKey: queryKeys.scriptSchedule(scheduleId) });
       void client.invalidateQueries({ queryKey: queryKeys.scriptSchedules() });
     },
   });

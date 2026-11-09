@@ -193,12 +193,12 @@ test('Cron submissions use the ordinary execution history and runner plan', asyn
   const schedules = createScriptScheduleService({
     db: h.db,
     executions: h.service,
-    config: { defaultTimeoutSec: 60 },
+    config: { defaultTimeoutSec: 60, retentionDays: 30 },
     logger: createLogger({ level: 'silent', pretty: false }),
   });
   cleanups.push(() => schedules.stop());
-  const saved = schedules.save('scr_1', {
-    cron: '* * * * *', timeZone: 'UTC', enabled: true,
+  const saved = schedules.create({
+    scriptId: 'scr_1', name: 'Cron job', retentionDays: 7, cron: '* * * * *', timeZone: 'UTC', enabled: true,
     input: { ...h.input, argv: ['with space'], timeoutSec: 7 },
   });
   expect(saved.input.params).toEqual({ ENV: 'prod', COUNT: '3' });
@@ -206,8 +206,8 @@ test('Cron submissions use the ordinary execution history and runner plan', asyn
   await vi.advanceTimersByTimeAsync(30_000);
   const runs = h.service.list({ limit: 10, offset: 0 });
   expect(runs.total).toBe(1);
-  expect(runs.items[0]).toMatchObject({ status: 'queued', paramValues: saved.input.params, argv: ['with space'] });
-  expect(schedules.get('scr_1')?.lastExecutionId).toBe(runs.items[0]?.id);
+  expect(runs.items[0]).toMatchObject({ scheduleId: saved.id, scheduleName: saved.name, status: 'queued', paramValues: saved.input.params, argv: ['with space'] });
+  expect(schedules.get(saved.id).lastExecutionId).toBe(runs.items[0]?.id);
   // A slow or queued scheduled run cannot accumulate another invocation each minute.
   await vi.advanceTimersByTimeAsync(60_000);
   expect(h.service.list({ limit: 10, offset: 0 }).total).toBe(1);
@@ -216,4 +216,54 @@ test('Cron submissions use the ordinary execution history and runner plan', asyn
   await vi.advanceTimersByTimeAsync(10);
   await drained;
   expect(h.run.mock.calls[0]![0]).toMatchObject({ argv: ['with space'], timeoutMs: 7000, env: { ENV: 'prod', COUNT: '3' } });
+});
+
+
+test('scheduled origin is recorded atomically and history filters one plan from the same script', async () => {
+  const h = setup();
+  const first = await h.service.submit('scr_1', h.input, { scheduleId: 'sch_a', scheduleName: 'Morning', retentionDays: 7 });
+  const second = await h.service.submit('scr_1', h.input, { scheduleId: 'sch_b', scheduleName: 'Evening', retentionDays: 90 });
+  expect(first).toMatchObject({ scheduleId: 'sch_a', scheduleName: 'Morning' });
+  expect(second).toMatchObject({ scheduleId: 'sch_b', scheduleName: 'Evening' });
+  expect(h.service.list({ scheduleId: 'sch_a', limit: 1, offset: 0 })).toEqual({ items: [first], total: 1 });
+  expect(h.service.list({ scheduleId: 'sch_a', limit: 1, offset: 1 })).toEqual({ items: [], total: 1 });
+});
+
+test('each plan retention overrides global cleanup, preserves active runs, and applies changed policy to old records', () => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime('2026-11-10T00:00:00.000Z');
+  const h = setup(30);
+  const old = '2026-10-01T00:00:00.000Z';
+  for (const [id, days] of [['short', 1], ['long', 90], ['forever', 0]] as const) {
+    h.db.prepare(`INSERT INTO script_schedules (id,script_id,name,target_id,cron,time_zone,enabled,retention_days,run_input_json,created_at,updated_at)
+      VALUES (?,'scr_1',?,'tgt_1','0 8 * * *','UTC',0,?,'{}',?,?)`).run(id, id, days, old, old);
+  }
+  h.addRun('manual', 'succeeded', old);
+  for (const [id, plan, days, status, finished] of [
+    ['short-run','short',90,'succeeded',old],
+    ['long-run','long',1,'succeeded',old],
+    ['forever-run','forever',1,'succeeded',old],
+    ['deleted-keep','deleted',90,'succeeded',old],
+    ['deleted-expire','deleted',1,'succeeded',old],
+    ['active-run','short',1,'running',null],
+    ['recent-finish','short',1,'succeeded',new Date().toISOString()],
+  ] as const) {
+    h.addRun(id,status,old);
+    h.db.prepare('UPDATE executions SET schedule_id = ?, schedule_name = ?, retention_days = ?, finished_at = ? WHERE id = ?').run(plan,plan,days,finished,id);
+  }
+  h.addLog('short-run',1);
+  expect(h.service.prune()).toBe(3);
+  expect(h.service.logs('short-run',0)).toEqual([]);
+  expect(h.service.list({limit:50,offset:0}).items.map(x=>x.id).sort()).toEqual(['active-run','deleted-keep','forever-run','long-run','recent-finish']);
+  h.db.prepare("UPDATE script_schedules SET retention_days = 1 WHERE id = 'long'").run();
+  expect(h.service.prune()).toBe(1);
+  expect(h.service.get('forever-run').id).toBe('forever-run');
+});
+
+test('global forever retention does not override a finite plan policy', () => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime('2026-11-10T00:00:00.000Z');
+  const h = setup(0); h.addRun('manual'); h.addRun('scheduled');
+  h.db.prepare("UPDATE executions SET schedule_id = 'deleted', retention_days = 1 WHERE id = 'scheduled'").run();
+  expect(h.service.prune()).toBe(1);
+  expect(h.service.get('manual').scheduleId).toBeNull();
 });

@@ -10,7 +10,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 export type Route =
   | { name: 'overview' }
   | { name: 'scripts'; scriptId: string | null }
-  | { name: 'schedules'; scriptId: string | null }
+  | { name: 'schedules'; scheduleId: string | null }
   | { name: 'runs'; executionId: string | null; search: URLSearchParams }
   | { name: 'targets' }
   | { name: 'sources' }
@@ -37,7 +37,7 @@ export function parseRoute(hash: string): Route {
     case 'scripts':
       return { name: 'scripts', scriptId: tail ? decodeURIComponent(tail) : null };
     case 'schedules':
-      return { name: 'schedules', scriptId: tail ? decodeURIComponent(tail) : null };
+      return { name: 'schedules', scheduleId: tail ? decodeURIComponent(tail) : null };
     case 'runs':
       return { name: 'runs', executionId: tail ? decodeURIComponent(tail) : null, search };
     case 'targets':

@@ -50,6 +50,9 @@ export type ExecutionRow = {
   id: string;
   script_id: string;
   target_id: string;
+  schedule_id: string | null;
+  schedule_name: string | null;
+  retention_days: number | null;
   status: ExecutionStatus;
   exit_code: number | null;
   signal: string | null;
@@ -74,6 +77,8 @@ export function toExecutionSummary(row: ExecutionRow): ExecutionSummary {
     id: row.id,
     scriptId: row.script_id,
     targetId: row.target_id,
+    scheduleId: row.schedule_id,
+    scheduleName: row.schedule_name,
     status: row.status,
     exitCode: row.exit_code,
     signal: row.signal,
@@ -102,6 +107,7 @@ export function getExecution(db: Db, id: string): ExecutionSummary {
 }
 
 export type ExecutionFilters = {
+  scheduleId?: string | undefined;
   scriptId?: string | undefined;
   targetId?: string | undefined;
   status?: ExecutionStatus | undefined;
@@ -164,6 +170,10 @@ export function listExecutions(
   const clauses: string[] = [];
   const params: (string | number)[] = [];
 
+  if (filters.scheduleId) {
+    clauses.push('schedule_id = ?');
+    params.push(filters.scheduleId);
+  }
   if (filters.scriptId) {
     clauses.push('script_id = ?');
     params.push(filters.scriptId);
@@ -221,8 +231,14 @@ export type ExecutionServiceDeps = {
   queue: Queue;
 };
 
+export type ScheduledExecutionOrigin = {
+  scheduleId: string;
+  scheduleName: string;
+  retentionDays: number;
+};
+
 export type ExecutionService = {
-  submit: (scriptId: string, input: ExecuteScriptInput) => Promise<ExecutionSummary>;
+  submit: (scriptId: string, input: ExecuteScriptInput, origin?: ScheduledExecutionOrigin) => Promise<ExecutionSummary>;
   cancel: (executionId: string) => ExecutionSummary;
   get: (executionId: string) => ExecutionSummary;
   list: (filters: ExecutionFilters) => { items: ExecutionSummary[]; total: number };
@@ -307,7 +323,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
   };
 
   return {
-    async submit(scriptId, input): Promise<ExecutionSummary> {
+    async submit(scriptId, input, origin): Promise<ExecutionSummary> {
       const scriptRow = db
         .prepare<[string], ScriptRow>('SELECT * FROM scripts WHERE id = ? AND deleted_at IS NULL')
         .get(scriptId);
@@ -332,8 +348,9 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       db.prepare(
         `INSERT INTO executions (
            id, script_id, target_id, status, command_display, target_name, script_name,
-           script_rel_path, param_values_json, argv_json, work_dir, queued_at
-         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`,
+           script_rel_path, param_values_json, argv_json, work_dir, queued_at,
+           schedule_id, schedule_name, retention_days
+         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         executionId,
         script.id,
@@ -346,6 +363,9 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         JSON.stringify(plan.argv),
         plan.workDir,
         nowIso(),
+        origin?.scheduleId ?? null,
+        origin?.scheduleName ?? null,
+        origin?.retentionDays ?? null,
       );
 
       queue.enqueue({
@@ -428,15 +448,17 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
     },
 
     prune(): number {
-      if (config.retentionDays <= 0) return 0;
-
-      const cutoff = new Date(Date.now() - config.retentionDays * 86_400_000).toISOString();
-      const result = db
-        .prepare("DELETE FROM executions WHERE queued_at < ? AND status NOT IN ('queued','running')")
-        .run(cutoff);
-
+      // Live plan policy overrides its historical snapshot; deleted plans keep their last policy.
+      const result = db.prepare(`WITH candidates AS (
+        SELECT e.id, COALESCE(s.retention_days, e.retention_days, ?) AS days,
+               COALESCE(e.finished_at, e.queued_at) AS recorded_at
+        FROM executions e LEFT JOIN script_schedules s ON s.id = e.schedule_id
+        WHERE e.status NOT IN ('queued','running')
+      ) DELETE FROM executions WHERE id IN (
+        SELECT id FROM candidates WHERE days > 0 AND julianday(recorded_at) < julianday(?) - days
+      )`).run(config.retentionDays, nowIso());
       if (result.changes > 0) {
-        logger.info({ count: result.changes, cutoff }, 'pruned old executions');
+        logger.info({ count: result.changes }, 'pruned old executions');
       }
       return result.changes;
     },
