@@ -19,9 +19,10 @@ export function PageHeader({
 }) {
   return (
     <header className={cn('flex flex-wrap items-end gap-x-6 gap-y-4 pb-6', className)}>
-      <div className="min-w-0 flex-1">
+      {/* Preserve the title’s natural width so crowded actions wrap before squeezing it. */}
+      <div className="min-w-0 flex-auto">
         <p className="label mb-3">{eyebrow}</p>
-        <h1 className="text-ink text-display truncate font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-ink text-display wrap-anywhere font-semibold tracking-tight">{title}</h1>
         {description ? <p className="text-mute text-body mt-3 max-w-2xl">{description}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-3">
