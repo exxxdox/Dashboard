@@ -97,7 +97,7 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **IPv6 probe never through proxy, by doing nothing.** Node `fetch` use undici default agent, honour neither `HTTP_PROXY` nor `NO_PROXY` (Python version: `session.trust_env = False`). Adding `EnvHttpProxyAgent` or `--use-env-proxy` would write proxy's address into record. `services/dns/ipv6.test.ts` assert no dispatcher.
 
-**DNS credential: absent, blank, or replaced — only third or explicit flag change it.** API never return one, form has nothing to send; blank = keep; delete = `clear*` flag. Clearing active provider's required credential refused by validation, field named, not second merge rule. Each credential own nullable column (`NULL` = only "not stored" spelling), so replace/clear one cannot disturb others.
+**DNS uses Cloudflare only.** API never returns the token; blank = keep, explicit clear is rejected while required. Token ciphertext uses a nullable column (`NULL` = not stored). Migration v8 removes retired provider credentials, preserves Cloudflare settings, and disables schedules previously using the retired provider; its historical checks remain with an unknown provider.
 
 **DNS page show state, hide config.** Inline: last look, last run result, newest five history rows. Settings + full history behind buttons: page opened to ask "record right?" not mostly form + table. Two consequences: settings summary in `PageHeader` `hints` slot, so config not invisible once off page; `DnsHistoryTable` paging navigate hash, re-render `DnsPage` without unmount, dialog stays open across pages — key or own route would close it each click.
 

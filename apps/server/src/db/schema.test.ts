@@ -85,7 +85,7 @@ describe('v5 migration', () => {
 
       expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
       expect(columnsOf(db, 'dns_settings')).toContain('cloudflare_token_encrypted');
-      expect(columnsOf(db, 'dns_settings')).toContain('alibaba_access_key_secret_encrypted');
+      expect(columnsOf(db, 'dns_settings')).not.toContain('alibaba_access_key_secret_encrypted');
       // The third secret this migration created has since moved to
       // `app_settings`; the v6 block below is where that is asserted.
       expect(columnsOf(db, 'dns_checks')).toContain('failure_reason');
@@ -97,7 +97,7 @@ describe('v5 migration', () => {
     }
   });
 
-  test('keeps the three secrets nullable, so "not stored" is expressible', () => {
+  test('keeps the remaining secret nullable, so "not stored" is expressible', () => {
     const db = versionFourDatabase();
     try {
       migrate(db);
@@ -105,7 +105,6 @@ describe('v5 migration', () => {
       // NULL is the only value that can mean "no credential"; an empty string
       // would be a second, ambiguous spelling of the same thing.
       expect(notNullOf(db, 'dns_settings', 'cloudflare_token_encrypted')).toBe(0);
-      expect(notNullOf(db, 'dns_settings', 'alibaba_access_key_secret_encrypted')).toBe(0);
       expect(notNullOf(db, 'dns_checks', 'previous_value')).toBe(0);
       // Everything the form has to display is NOT NULL, so the row type carries
       // no nullability the UI would have to invent text for.
@@ -234,14 +233,17 @@ describe('v7 migration', () => {
       db.pragma('user_version = 6');
       const before = db.prepare<[], Record<string, unknown>>('SELECT * FROM dns_settings').get();
 
-      migrate(db);
+      const v7 = MIGRATIONS[6];
+      if (!v7) throw new Error('expected v7 migration');
+      v7(db);
+      db.pragma('user_version = 7');
 
       expect(db.prepare('SELECT * FROM dns_settings').get()).toEqual({
         ...before,
         ipv6_source: 'ipify',
         local_ipv6_interface: '',
       });
-      expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+      expect(db.pragma('user_version', { simple: true })).toBe(7);
       expect(() => db.prepare("UPDATE dns_settings SET ipv6_source = 'unknown'").run()).toThrow(/CHECK/);
       expect(() => db.prepare("UPDATE dns_settings SET ipv6_source = 'local'").run()).not.toThrow();
       expect(() => migrate(db)).not.toThrow();
@@ -319,6 +321,42 @@ describe('v2 migration', () => {
       expect(() => migrate(db)).not.toThrow();
       const target = db.prepare<[], { work_dir: string }>('SELECT work_dir FROM targets').get();
       expect(target?.work_dir).toBe('/srv/scripts');
+    } finally {
+      db.close();
+    }
+  });
+});
+
+describe('v8 migration', () => {
+  test.each(['cloudflare', 'alibaba'])('removes obsolete credentials and safely migrates %s settings', (provider) => {
+    const db = new Database(':memory:');
+    try {
+      for (const migration of MIGRATIONS.slice(0, 7)) migration(db);
+      db.pragma('user_version = 7');
+      db.prepare(`INSERT INTO dns_settings
+        (id, provider, schedule_enabled, cloudflare_zone_id, cloudflare_record_name,
+         cloudflare_token_encrypted, alibaba_access_key_id, alibaba_access_key_secret_encrypted,
+         ipv6_source, local_ipv6_interface, created_at, updated_at)
+        VALUES ('dns', ?, 1, 'zone', 'home.example.com', 'cf-cipher', 'old-id', 'old-cipher',
+                'local', 'eth0', ?, ?)`).run(provider, NOW, NOW);
+      db.prepare(`INSERT INTO dns_checks (id, at, source, ok, action, provider)
+        VALUES ('old', ?, 'manual', 1, 'unchanged', ?)`).run(NOW, provider);
+      const before = db.prepare<[], Record<string, unknown>>('SELECT * FROM dns_settings').get()!;
+      const kept = Object.fromEntries(Object.entries(before).filter(([name]) => !name.startsWith('alibaba_')));
+
+      migrate(db);
+
+      expect(db.prepare('SELECT * FROM dns_settings').get()).toEqual({
+        ...kept, provider: 'cloudflare', schedule_enabled: provider === 'cloudflare' ? 1 : 0,
+      });
+      expect(columnsOf(db, 'dns_settings').some((name) => name.startsWith('alibaba_'))).toBe(false);
+      expect(db.prepare('SELECT provider, action FROM dns_checks').get()).toEqual({
+        provider: provider === 'cloudflare' ? 'cloudflare' : null, action: 'unchanged',
+      });
+      expect(() => db.prepare("UPDATE dns_settings SET provider = 'alibaba'").run()).toThrow(/CHECK/);
+      expect(() => db.prepare("UPDATE dns_checks SET provider = 'alibaba'").run()).toThrow(/CHECK/);
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_dns_checks_at'").get()).toBeDefined();
+      expect(() => migrate(db)).not.toThrow();
     } finally {
       db.close();
     }

@@ -47,7 +47,6 @@ import { createMutex } from '../../lib/mutex.js';
 // notification goes is the dashboard's setting rather than this console's.
 import { redactToken } from '../notifications/gotify.js';
 import type { OutgoingNotification } from '../notifications/service.js';
-import { createAlibabaProvider } from './aliyun.js';
 import {
   clearChecks,
   listChecks,
@@ -135,7 +134,7 @@ export function toUpstreamError(error: unknown): AppError {
 
 export function createDnsService(deps: DnsServiceDeps): DnsService {
   const { db, box, logger } = deps;
-  const createProvider = deps.createProvider ?? defaultProvider;
+  const createProvider = deps.createProvider ?? createCloudflareProvider;
   // Both update entry points and the probe select the same saved source, without silent fallback.
   function detectIpv6(source: DnsSettingsView['ipv6Source'], interfaceName: string, signal?: AbortSignal): Promise<string> {
     return source === 'local'
@@ -376,10 +375,8 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
       const previous = getSettingsView(db);
       const view = writeSettings(db, box, input);
       if (
-        view.provider !== previous?.provider ||
-        (view.provider === 'cloudflare'
-          ? view.cloudflareZoneId !== previous.cloudflareZoneId || view.cloudflareRecordName !== previous.cloudflareRecordName
-          : view.alibabaRecordId !== previous.alibabaRecordId)
+        view.cloudflareZoneId !== previous?.cloudflareZoneId ||
+        view.cloudflareRecordName !== previous?.cloudflareRecordName
       ) {
         // A verdict about the previous record cannot describe the new one, even after an old request finishes.
         recordGeneration += 1;
@@ -403,12 +400,6 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
       return view;
     },
   };
-}
-
-function defaultProvider(settings: ResolvedDnsSettings): DnsProvider {
-  return settings.provider === 'cloudflare'
-    ? createCloudflareProvider(settings)
-    : createAlibabaProvider(settings);
 }
 
 /** A failed run, carrying whatever the run had learned before it stopped. */

@@ -25,8 +25,7 @@ vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string) => key }), us
 const settings: DnsSettingsView = {
   provider: 'cloudflare', ipv6Source: 'local', localIpv6Interface: 'enp1s0', scheduleEnabled: false, intervalMinutes: 10,
   cloudflareZoneId: 'zone', cloudflareRecordName: 'home.example.com', hasCloudflareToken: true,
-  alibabaAccessKeyId: '', alibabaRecordId: '', alibabaRecordType: 'AAAA',
-  hasAlibabaAccessKeySecret: false, updatedAt: '2026-11-04T00:00:00Z',
+  updatedAt: '2026-11-04T00:00:00Z',
 };
 
 // Opening settings must preserve the source shared by manual and scheduled updates.
@@ -89,4 +88,12 @@ test('shows an interface loading error with retry', () => {
   } finally {
     hooks.interfaceError = false;
   }
+});
+
+// A single provider needs no selector and must not expose removed credentials.
+test('only renders Cloudflare credentials without a provider selector', () => {
+  const html = renderToStaticMarkup(<DnsSettingsForm settings={settings} />);
+  expect(html).not.toContain('dns.form.provider');
+  expect(html).not.toContain('alibaba');
+  expect(html).toContain('dns.form.cloudflareToken');
 });

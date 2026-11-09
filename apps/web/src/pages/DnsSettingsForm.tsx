@@ -12,7 +12,7 @@
  */
 
 import { useState, type FormEvent } from 'react';
-import type { DnsProviderName, DnsSettingsView, UpdateDnsSettingsInput } from '@dashboard/shared';
+import type { DnsSettingsView, UpdateDnsSettingsInput } from '@dashboard/shared';
 import { Save } from 'lucide-react';
 
 import { Button } from '../components/Button';
@@ -21,11 +21,9 @@ import { ErrorBanner } from '../components/Feedback';
 import { errorMessage } from '../api/client';
 import { SecretField } from '../components/SecretField';
 import { useDnsInterfaces, useSaveDnsSettings } from '../api/queries';
-import { providerLabel } from '../lib/dns';
 import { useI18n } from '../lib/i18n';
 
 type FormState = {
-  provider: DnsProviderName;
   ipv6Source: DnsSettingsView['ipv6Source'];
   localIpv6Interface: string;
   scheduleEnabled: boolean;
@@ -33,13 +31,9 @@ type FormState = {
   cloudflareZoneId: string;
   cloudflareRecordName: string;
   cloudflareToken: string;
-  alibabaAccessKeyId: string;
-  alibabaRecordId: string;
-  alibabaAccessKeySecret: string;
 };
 
 const EMPTY: FormState = {
-  provider: 'cloudflare',
   ipv6Source: 'ipify',
   localIpv6Interface: '',
   scheduleEnabled: false,
@@ -47,9 +41,6 @@ const EMPTY: FormState = {
   cloudflareZoneId: '',
   cloudflareRecordName: '',
   cloudflareToken: '',
-  alibabaAccessKeyId: '',
-  alibabaRecordId: '',
-  alibabaAccessKeySecret: '',
 };
 
 /** Secrets are never sent back, so they start blank on every load. */
@@ -57,15 +48,12 @@ function toFormState(settings: DnsSettingsView | null): FormState {
   if (!settings) return EMPTY;
   return {
     ...EMPTY,
-    provider: settings.provider,
     ipv6Source: settings.ipv6Source,
     localIpv6Interface: settings.localIpv6Interface,
     scheduleEnabled: settings.scheduleEnabled,
     intervalMinutes: String(settings.intervalMinutes),
     cloudflareZoneId: settings.cloudflareZoneId,
     cloudflareRecordName: settings.cloudflareRecordName,
-    alibabaAccessKeyId: settings.alibabaAccessKeyId,
-    alibabaRecordId: settings.alibabaRecordId,
   };
 }
 
@@ -79,8 +67,6 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
   // Keep disconnected saved interfaces selectable so loading the list cannot silently change settings.
   const interfaceNames = [...new Set([state.localIpv6Interface, ...(interfaces.data ?? [])])].filter(Boolean);
 
-  const isCloudflare = state.provider === 'cloudflare';
-
   function patch(next: Partial<FormState>): void {
     setState((current) => ({ ...current, ...next }));
   }
@@ -88,21 +74,15 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
   /** Only credentials that say something are sent; blank means "keep". */
   function buildUpdate(extra: UpdateDnsSettingsInput = {}): UpdateDnsSettingsInput {
     const input: UpdateDnsSettingsInput = {
-      provider: state.provider,
       ipv6Source: state.ipv6Source,
       localIpv6Interface: state.localIpv6Interface,
       scheduleEnabled: state.scheduleEnabled,
       intervalMinutes: Number(state.intervalMinutes),
       cloudflareZoneId: state.cloudflareZoneId,
       cloudflareRecordName: state.cloudflareRecordName,
-      alibabaAccessKeyId: state.alibabaAccessKeyId,
-      alibabaRecordId: state.alibabaRecordId,
       ...extra,
     };
     if (state.cloudflareToken !== '') input.cloudflareToken = state.cloudflareToken;
-    if (state.alibabaAccessKeySecret !== '') {
-      input.alibabaAccessKeySecret = state.alibabaAccessKeySecret;
-    }
     return input;
   }
 
@@ -117,31 +97,17 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
         setState((current) => ({
           ...current,
           cloudflareToken: '',
-          alibabaAccessKeySecret: '',
         }));
       },
     });
   }
 
-  function clear(flag: 'clearCloudflareToken' | 'clearAlibabaAccessKeySecret'): void {
-    save.mutate(buildUpdate({ [flag]: true }));
+  function clearToken(): void {
+    save.mutate(buildUpdate({ clearCloudflareToken: true }));
   }
 
   return (
     <form onSubmit={submit} className="grid gap-5">
-      <Field label={t('dns.form.provider')} hint={t('dns.form.providerHint')}>
-        {({ id }) => (
-          <Select
-            id={id}
-            value={state.provider}
-            onChange={(event) => patch({ provider: event.target.value as DnsProviderName })}
-          >
-            <option value="cloudflare">{providerLabel(t, 'cloudflare')}</option>
-            <option value="alibaba">{providerLabel(t, 'alibaba')}</option>
-          </Select>
-        )}
-      </Field>
-
       {/* Use one saved source so manual checks and scheduled updates cannot diverge. */}
       <Field label={t('dns.form.ipv6Source')} hint={t('dns.form.ipv6SourceHint')}>
         {({ id, describedBy }) => (
@@ -184,15 +150,13 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
       <details>
         <summary className="focus-ring cursor-pointer font-semibold">{t('dns.form.credentials')}</summary>
         <div className="mt-4 grid gap-5">
-      {isCloudflare ? (
-        <>
           <SecretField
             label={t('dns.form.cloudflareToken')}
             hint={t('dns.form.cloudflareTokenHint')}
             saved={settings?.hasCloudflareToken ?? false}
             value={state.cloudflareToken}
             onChange={(value) => patch({ cloudflareToken: value })}
-            onClear={() => clear('clearCloudflareToken')}
+            onClear={clearToken}
             blockedReason={t('dns.form.blockedClear')}
             pending={save.isPending}
           />
@@ -218,44 +182,6 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
               />
             )}
           </Field>
-        </>
-      ) : (
-        <>
-          <Field label={t('dns.form.alibabaAccessKeyId')}>
-            {({ id }) => (
-              <TextInput
-                id={id}
-                className="mono"
-                value={state.alibabaAccessKeyId}
-                autoComplete="off"
-                onChange={(event) => patch({ alibabaAccessKeyId: event.target.value })}
-              />
-            )}
-          </Field>
-          <SecretField
-            label={t('dns.form.alibabaAccessKeySecret')}
-            saved={settings?.hasAlibabaAccessKeySecret ?? false}
-            value={state.alibabaAccessKeySecret}
-            onChange={(value) => patch({ alibabaAccessKeySecret: value })}
-            onClear={() =>
-              clear('clearAlibabaAccessKeySecret')
-            }
-            blockedReason={t('dns.form.blockedClear')}
-            pending={save.isPending}
-          />
-          <Field label={t('dns.form.alibabaRecordId')} hint={t('dns.form.alibabaRecordIdHint')}>
-            {({ id }) => (
-              <TextInput
-                id={id}
-                className="mono"
-                value={state.alibabaRecordId}
-                onChange={(event) => patch({ alibabaRecordId: event.target.value })}
-              />
-            )}
-          </Field>
-        </>
-      )}
-
         </div>
       </details>
 

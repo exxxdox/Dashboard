@@ -71,7 +71,6 @@ describe('copy tables', () => {
       expect(sourceLabel(t, 'manual')).not.toBe('dns.source.manual');
       expect(sourceLabel(t, 'scheduled')).not.toBe('dns.source.scheduled');
       expect(providerLabel(t, 'cloudflare')).not.toBe('dns.provider.cloudflare');
-      expect(providerLabel(t, 'alibaba')).not.toBe('dns.provider.alibaba');
     }
   });
 });

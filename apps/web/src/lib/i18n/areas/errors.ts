@@ -36,9 +36,6 @@ const en = {
   'error.field.cloudflareToken': 'Cloudflare API token',
   'error.field.cloudflareZoneId': 'Cloudflare zone id',
   'error.field.cloudflareRecordName': 'Cloudflare record name',
-  'error.field.alibabaAccessKeyId': 'Alibaba Cloud access key id',
-  'error.field.alibabaAccessKeySecret': 'Alibaba Cloud access key secret',
-  'error.field.alibabaRecordId': 'Alibaba Cloud record id',
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
@@ -64,9 +61,6 @@ const zh: Record<keyof typeof en, string> = {
   'error.field.cloudflareToken': 'Cloudflare API 令牌',
   'error.field.cloudflareZoneId': 'Cloudflare 区域 ID',
   'error.field.cloudflareRecordName': 'Cloudflare 记录名',
-  'error.field.alibabaAccessKeyId': '阿里云 AccessKey ID',
-  'error.field.alibabaAccessKeySecret': '阿里云 AccessKey Secret',
-  'error.field.alibabaRecordId': '阿里云记录 ID',
 };
 
 export const errorMessages = { en, zh };

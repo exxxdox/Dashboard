@@ -34,7 +34,7 @@ const en = {
   'dns.schedule.next': 'next {when}',
 
   'dns.noRecord':
-    'The provider has no AAAA record for this name yet. A check creates one on Cloudflare; Alibaba Cloud is never allowed to create one.',
+    'Cloudflare has no AAAA record for this name yet. Running an update creates one.',
 
   'dns.result.notificationFailed':
     'The record was updated, but the Gotify notification could not be sent.',
@@ -50,23 +50,16 @@ const en = {
   'dns.form.localIpv6Interface': 'Network interface (optional)',
   'dns.form.localIpv6InterfaceAuto': 'Automatic selection',
   'dns.form.localIpv6InterfaceHint': 'Automatic selection uses the only stable public IPv6 address. If multiple interfaces have public addresses, specify an interface with exactly one stable public IPv6.',
-  'dns.form.provider': 'Provider',
-  'dns.form.providerHint': "Only the selected provider's credentials are required.",
   'dns.form.cloudflareToken': 'Cloudflare API token',
   'dns.form.cloudflareTokenHint': 'Needs permission to edit DNS records in this zone.',
   'dns.form.zoneId': 'Zone ID',
   'dns.form.recordName': 'Record name',
   'dns.form.recordNameHint': 'The full name, e.g. home.example.com.',
-  'dns.form.alibabaAccessKeyId': 'Access key ID',
-  'dns.form.alibabaAccessKeySecret': 'Access key secret',
-  'dns.form.alibabaRecordId': 'Record ID',
-  'dns.form.alibabaRecordIdHint':
-    "Alibaba Cloud updates by record id and never creates one, so it has to exist already. Its host record and type come from the provider's own answer, not from here.",
   'dns.form.scheduleEnable': 'Check on a schedule',
   'dns.form.interval': 'Interval (minutes)',
   'dns.form.intervalHint': 'A check that finds the same address writes nothing.',
   'dns.form.save': 'Save settings',
-  'dns.form.blockedClear': 'The selected provider still needs this credential.',
+  'dns.form.blockedClear': 'Cloudflare still needs this credential.',
 
   // -- the settings dialog -------------------------------------------------
   'dns.action.settings': 'Settings',
@@ -107,7 +100,6 @@ const en = {
   'dns.source.scheduled': 'Scheduled',
 
   'dns.provider.cloudflare': 'Cloudflare',
-  'dns.provider.alibaba': 'Alibaba Cloud',
 
   'dns.failure.not_configured': 'Nothing has been configured yet.',
   'dns.failure.invalid_settings':
@@ -157,7 +149,7 @@ const zh: Record<keyof typeof en, string> = {
   'dns.schedule.next': '下次 {when}',
 
   'dns.noRecord':
-    '服务商上还没有这个域名的 AAAA 记录。Cloudflare 会由检查自动创建；阿里云则永远不会创建。',
+    'Cloudflare 上还没有这个域名的 AAAA 记录。运行更新会自动创建。',
 
   'dns.result.notificationFailed': '记录已更新，但 Gotify 通知发送失败。',
 
@@ -171,23 +163,16 @@ const zh: Record<keyof typeof en, string> = {
   'dns.form.localIpv6Interface': '网卡（可选）',
   'dns.form.localIpv6InterfaceAuto': '自动选择',
   'dns.form.localIpv6InterfaceHint': '自动选择时使用唯一的稳定公网 IPv6。多网卡有公网地址时，请指定只有一个稳定公网 IPv6 的网卡。',
-  'dns.form.provider': '服务商',
-  'dns.form.providerHint': '只需填写所选服务商的凭据。',
   'dns.form.cloudflareToken': 'Cloudflare API 令牌',
   'dns.form.cloudflareTokenHint': '需要该区域 DNS 记录的编辑权限。',
   'dns.form.zoneId': '区域 ID',
   'dns.form.recordName': '记录名',
   'dns.form.recordNameHint': '完整域名，例如 home.example.com。',
-  'dns.form.alibabaAccessKeyId': 'AccessKey ID',
-  'dns.form.alibabaAccessKeySecret': 'AccessKey Secret',
-  'dns.form.alibabaRecordId': '记录 ID',
-  'dns.form.alibabaRecordIdHint':
-    '阿里云按记录 ID 更新，且从不创建记录，因此该记录必须已存在。主机记录与记录类型取自服务商的返回结果，不在这里填写。',
   'dns.form.scheduleEnable': '按计划自动检查',
   'dns.form.interval': '检查间隔（分钟）',
   'dns.form.intervalHint': '若检查发现地址未变，则不会写入任何内容。',
   'dns.form.save': '保存设置',
-  'dns.form.blockedClear': '当前选中的服务商仍需要该凭据。',
+  'dns.form.blockedClear': 'Cloudflare 仍需要该凭据。',
 
   'dns.action.settings': '设置',
   'dns.settings.summaryConfigured': '{provider} · 每 {minutes} 分钟',
@@ -224,7 +209,6 @@ const zh: Record<keyof typeof en, string> = {
   'dns.source.scheduled': '自动',
 
   'dns.provider.cloudflare': 'Cloudflare',
-  'dns.provider.alibaba': '阿里云',
 
   'dns.failure.not_configured': '尚未配置任何内容。',
   'dns.failure.invalid_settings': '已保存的设置不完整，因此没有执行检查。',

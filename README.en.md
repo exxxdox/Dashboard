@@ -59,7 +59,7 @@ With MCP network access disabled, only TCP peers on loopback or local interface 
 
 ## IPv6 DNS console
 
-The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare or Alibaba Cloud.
+The DNS page keeps one AAAA record pointed at this host’s public IPv6, using Cloudflare.
 
 - Open Settings from the page header to configure the provider, credentials, IPv6 detection source, check interval and Gotify notifications in a dialog. Credentials and notifications can be collapsed.
 - Use the header actions to detect public IPv6, query the record and check/update manually. Results remain visible until the next action or leaving the page.

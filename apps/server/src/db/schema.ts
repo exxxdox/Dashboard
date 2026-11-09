@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 7;
+const TARGET_VERSION = 8;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -264,6 +264,55 @@ export const MIGRATIONS: Migration[] = [
       DEFAULT 'ipify' CHECK (ipv6_source IN ('ipify', 'local'))`);
     // Multi-interface hosts need an explicit choice instead of an arbitrary address.
     db.exec("ALTER TABLE dns_settings ADD COLUMN local_ipv6_interface TEXT NOT NULL DEFAULT ''");
+  },
+  // v8 -- rebuild provider constraints as well as dropping obsolete credentials.
+  // A former Alibaba schedule must not start writing Cloudflare after upgrade;
+  // old checks remain without being falsely attributed to Cloudflare.
+  (db) => {
+    db.exec(`
+      CREATE TABLE dns_settings_v8 (
+        id                         TEXT PRIMARY KEY,
+        provider                   TEXT NOT NULL CHECK (provider = 'cloudflare'),
+        schedule_enabled           INTEGER NOT NULL DEFAULT 0,
+        interval_minutes           INTEGER NOT NULL DEFAULT 10 CHECK (interval_minutes >= 1),
+        cloudflare_zone_id         TEXT NOT NULL DEFAULT '',
+        cloudflare_record_name     TEXT NOT NULL DEFAULT '',
+        cloudflare_token_encrypted TEXT,
+        created_at                 TEXT NOT NULL,
+        updated_at                 TEXT NOT NULL,
+        ipv6_source                TEXT NOT NULL DEFAULT 'ipify' CHECK (ipv6_source IN ('ipify', 'local')),
+        local_ipv6_interface       TEXT NOT NULL DEFAULT ''
+      );
+      INSERT INTO dns_settings_v8
+      SELECT id, 'cloudflare', CASE WHEN provider = 'cloudflare' THEN schedule_enabled ELSE 0 END,
+             interval_minutes, cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
+             created_at, updated_at, ipv6_source, local_ipv6_interface
+      FROM dns_settings;
+      DROP TABLE dns_settings;
+      ALTER TABLE dns_settings_v8 RENAME TO dns_settings;
+
+      CREATE TABLE dns_checks_v8 (
+        id             TEXT PRIMARY KEY,
+        at             TEXT NOT NULL,
+        source         TEXT NOT NULL CHECK (source IN ('manual','scheduled')),
+        ok             INTEGER NOT NULL,
+        action         TEXT NOT NULL CHECK (action IN ('created','updated','unchanged','failed')),
+        failure_reason TEXT CHECK (failure_reason IN (
+                         'not_configured','invalid_settings','ipv6_detect_failed',
+                         'ipv6_not_global','dns_query_failed','dns_write_failed',
+                         'record_missing','record_identity_missing')),
+        ipv6           TEXT NOT NULL DEFAULT '',
+        previous_value TEXT,
+        provider       TEXT CHECK (provider = 'cloudflare')
+      );
+      INSERT INTO dns_checks_v8
+      SELECT id, at, source, ok, action, failure_reason, ipv6, previous_value,
+             CASE WHEN provider = 'cloudflare' THEN provider ELSE NULL END
+      FROM dns_checks;
+      DROP TABLE dns_checks;
+      ALTER TABLE dns_checks_v8 RENAME TO dns_checks;
+      CREATE INDEX idx_dns_checks_at ON dns_checks(at DESC);
+    `);
   },
 ];
 

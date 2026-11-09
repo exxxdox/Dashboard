@@ -59,8 +59,4 @@ export type ResolvedDnsSettings = {
   cloudflareToken: string;
   cloudflareZoneId: string;
   cloudflareRecordName: string;
-  alibabaAccessKeyId: string;
-  alibabaAccessKeySecret: string;
-  alibabaRecordId: string;
-  alibabaRecordType: string;
 };

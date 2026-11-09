@@ -163,21 +163,18 @@ describe('updateDnsSettingsSchema', () => {
     expect(updateDnsSettingsSchema.safeParse({ intervalMinutes: '10' }).success).toBe(false);
   });
 
-  test('restricts the provider to the two implementations that exist', () => {
+  test('accepts Cloudflare and rejects removed providers', () => {
     expect(updateDnsSettingsSchema.safeParse({ provider: 'cloudflare' }).success).toBe(true);
-    expect(updateDnsSettingsSchema.safeParse({ provider: 'alibaba' }).success).toBe(true);
+    expect(updateDnsSettingsSchema.safeParse({ provider: 'alibaba' }).success).toBe(false);
     expect(updateDnsSettingsSchema.safeParse({ provider: 'route53' }).success).toBe(false);
   });
 
   test('carries the clear flags as their own fields', () => {
     const parsed = updateDnsSettingsSchema.parse({
       clearCloudflareToken: true,
-      clearAlibabaAccessKeySecret: false,
     });
     expect(parsed.clearCloudflareToken).toBe(true);
-    // False is not the same as absent: absent leaves the decision to the
-    // service, false is an explicit "do not clear".
-    expect(parsed.clearAlibabaAccessKeySecret).toBe(false);
+    expect(updateDnsSettingsSchema.parse({ clearCloudflareToken: false }).clearCloudflareToken).toBe(false);
   });
 
   test('has no field for a notification credential', () => {

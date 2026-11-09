@@ -59,7 +59,7 @@ docker compose up -d --build
 
 ## IPv6 DNS 控制台
 
-「DNS」页把一条 AAAA 记录保持指向本机的公网 IPv6，服务商支持 Cloudflare 与阿里云。
+「DNS」页把一条 AAAA 记录保持指向本机的公网 IPv6，服务商支持 Cloudflare。
 
 - 顶部「设置」打开弹窗，配置服务商、凭据、IPv6 检测来源、检查间隔与 Gotify 通知；凭据和通知区可折叠。
 - 顶部操作按钮用于探测公网 IPv6、查询记录、手动检查并更新；操作结果持续显示到下次操作或离开页面。

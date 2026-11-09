@@ -20,13 +20,6 @@ const FULL_CLOUDFLARE = {
   cloudflareRecordName: 'home.example.com',
 };
 
-const FULL_ALIBABA = {
-  provider: 'alibaba' as const,
-  alibabaAccessKeyId: 'key-id',
-  alibabaAccessKeySecret: 'key-secret',
-  alibabaRecordId: 'record-1',
-};
-
 function setup(): { db: Db; box: SecretBox } {
   return { db: openDatabase(':memory:'), box: createSecretBox(randomBytes(32)) };
 }
@@ -76,12 +69,15 @@ describe('saving settings', () => {
         cloudflareZoneId: 'zone-1',
         cloudflareRecordName: 'home.example.com',
         hasCloudflareToken: true,
-        hasAlibabaAccessKeySecret: false,
       });
       // The discipline is structural rather than remembered: there is no key a
       // credential could be hiding under.
+      expect(Object.keys(view).sort()).toEqual([
+        'provider', 'ipv6Source', 'localIpv6Interface', 'scheduleEnabled',
+        'intervalMinutes', 'cloudflareZoneId', 'cloudflareRecordName',
+        'hasCloudflareToken', 'updatedAt',
+      ].sort());
       expect(Object.keys(view)).not.toContain('cloudflareToken');
-      expect(Object.keys(view)).not.toContain('alibabaAccessKeySecret');
     } finally {
       db.close();
     }
@@ -153,28 +149,10 @@ describe('saving settings', () => {
     }
   });
 
-  test('clears the credential of a provider that is no longer selected', () => {
-    const { db, box } = setup();
-    try {
-      saveSettings(db, box, FULL_CLOUDFLARE);
-      saveSettings(db, box, { ...FULL_ALIBABA, clearCloudflareToken: true });
-
-      const row = readSettingsRow(db);
-      expect(row?.cloudflare_token_encrypted).toBeNull();
-      expect(row?.provider).toBe('alibaba');
-      expect(box.decrypt(row?.alibaba_access_key_secret_encrypted ?? '')).toBe('key-secret');
-    } finally {
-      db.close();
-    }
-  });
-
   test('refuses a save that would leave the selected provider without its fields', () => {
     const { db, box } = setup();
     try {
       expect(() => saveSettings(db, box, { intervalMinutes: 5 })).toThrow(/Cloudflare API token/);
-      expect(() => saveSettings(db, box, { provider: 'alibaba' })).toThrow(
-        /Alibaba Cloud access key id/,
-      );
       expect(getSettingsView(db)).toBeNull();
     } finally {
       db.close();
@@ -196,33 +174,8 @@ describe('saving settings', () => {
 });
 
 describe('validate', () => {
-  test('requires only the selected provider fields', () => {
-    // Both providers' non-secret fields are always present in the real shapes --
-    // the form holds them whether or not the provider is selected. What this
-    // checks is that their *values* do not matter unless they are in use.
-    const both = {
-      intervalMinutes: 10,
-      cloudflareToken: 'cf-token',
-      cloudflareZoneId: 'zone-1',
-      cloudflareRecordName: 'home.example.com',
-      alibabaAccessKeyId: 'key-id',
-      alibabaAccessKeySecret: 'key-secret',
-      alibabaRecordId: 'record-1',
-    };
-
-    expect(validate({ ...both, provider: 'cloudflare' })).toBeNull();
-    expect(validate({ ...both, provider: 'alibaba' })).toBeNull();
-    // Keeping the other provider's credentials is what makes switching back
-    // cheap, but having stored none is not an error either.
-    expect(
-      validate({
-        ...both,
-        provider: 'alibaba',
-        cloudflareToken: null,
-        cloudflareZoneId: '',
-        cloudflareRecordName: '',
-      }),
-    ).toBeNull();
+  test('accepts complete Cloudflare settings', () => {
+    expect(validate({ ...FULL_CLOUDFLARE, intervalMinutes: 10 })).toBeNull();
   });
 
   test('lists everything missing at once, in both the forms it has to take', () => {
@@ -232,9 +185,6 @@ describe('validate', () => {
       cloudflareToken: '',
       cloudflareZoneId: '',
       cloudflareRecordName: '',
-      alibabaAccessKeyId: '',
-      alibabaAccessKeySecret: null,
-      alibabaRecordId: '',
     });
 
     expect(problem?.message).toMatch(
@@ -258,9 +208,6 @@ describe('validate', () => {
       cloudflareToken: 'cf-token',
       cloudflareZoneId: 'zone-1',
       cloudflareRecordName: 'home.example.com',
-      alibabaAccessKeyId: '',
-      alibabaAccessKeySecret: null,
-      alibabaRecordId: '',
     });
 
     expect(tooSmall?.i18n).toEqual({

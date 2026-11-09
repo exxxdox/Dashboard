@@ -39,10 +39,6 @@ function settings(overrides: Partial<ResolvedDnsSettings> = {}): ResolvedDnsSett
     cloudflareToken: 'token',
     cloudflareZoneId: 'zone-1',
     cloudflareRecordName: 'home.example.com',
-    alibabaAccessKeyId: '',
-    alibabaAccessKeySecret: '',
-    alibabaRecordId: '',
-    alibabaRecordType: 'AAAA',
     ...overrides,
   };
 }

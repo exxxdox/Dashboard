@@ -215,7 +215,7 @@ export type ExecutionStream = z.infer<typeof executionStreamSchema>;
 // IPv6 DNS console
 // ---------------------------------------------------------------------------
 
-export const dnsProviderSchema = z.enum(['cloudflare', 'alibaba']);
+export const dnsProviderSchema = z.enum(['cloudflare']);
 export type DnsProviderName = z.infer<typeof dnsProviderSchema>;
 
 export const dnsIpv6SourceSchema = z.enum(['ipify', 'local']);
@@ -272,11 +272,7 @@ export const updateDnsSettingsSchema = z.object({
   cloudflareZoneId: z.string().max(200).optional(),
   cloudflareRecordName: z.string().max(255).optional(),
   cloudflareToken: z.string().max(500).optional(),
-  alibabaAccessKeyId: z.string().max(200).optional(),
-  alibabaRecordId: z.string().max(200).optional(),
-  alibabaAccessKeySecret: z.string().max(500).optional(),
   clearCloudflareToken: z.boolean().optional(),
-  clearAlibabaAccessKeySecret: z.boolean().optional(),
 });
 export type UpdateDnsSettingsInput = z.infer<typeof updateDnsSettingsSchema>;
 
@@ -467,11 +463,6 @@ export type DnsSettingsView = {
   cloudflareZoneId: string;
   cloudflareRecordName: string;
   hasCloudflareToken: boolean;
-  alibabaAccessKeyId: string;
-  alibabaRecordId: string;
-  /** Fixed: updating an IPv6 record is updating an AAAA record. */
-  alibabaRecordType: 'AAAA';
-  hasAlibabaAccessKeySecret: boolean;
   updatedAt: string;
 };
 
@@ -492,11 +483,7 @@ export type AppSettingsView = {
 
 export type DnsRecord = {
   provider: DnsProviderName;
-  /**
-   * Cloudflare reports the full name; Alibaba reports the host record (`rr`)
-   * because that is what its update call needs back. The two are not
-   * interchangeable, so neither is normalised into the other.
-   */
+  /** The full DNS record name reported by Cloudflare. */
   recordName: string;
   recordType: string;
   value: string;

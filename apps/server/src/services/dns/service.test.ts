@@ -404,26 +404,9 @@ describe('update', () => {
 });
 
 describe('detect and queryRecord', () => {
-  test('clears the cache when only the Alibaba record id changes', async () => {
-    const h = setup();
-    try {
-      h.service.saveSettings({
-        provider: 'alibaba', alibabaAccessKeyId: 'key',
-        alibabaAccessKeySecret: 'secret', alibabaRecordId: 'rec-1',
-      });
-      await h.service.detect();
-      await h.service.queryRecord();
-      expect(h.service.consistency().state).toBe('consistent');
-      h.service.saveSettings({ alibabaRecordId: 'rec-2' });
-      expect(h.service.state()).toMatchObject({ record: null, recordCheckedAt: null });
-      expect(h.service.consistency().state).toBe('unknown');
-    } finally { h.db.close(); }
-  });
-
   test.each([
     { cloudflareRecordName: 'new.example.com' },
     { cloudflareZoneId: 'zone-2' },
-    { provider: 'alibaba' as const, alibabaAccessKeyId: 'key', alibabaAccessKeySecret: 'secret', alibabaRecordId: 'rec-2' },
   ])('clears the old record when its identity changes: %j', async input => {
     const h = setup();
     try {

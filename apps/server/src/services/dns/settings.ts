@@ -1,6 +1,5 @@
 /**
- * The DNS settings row: one row, three encrypted credentials, and the rules
- * about which of them may be empty.
+ * The DNS settings row: one row, one encrypted credential, and its validation rules.
  *
  * Two shapes come out of here and they are not interchangeable:
  *
@@ -44,9 +43,6 @@ import type { ResolvedDnsSettings } from './types.js';
  */
 const SETTINGS_ID = 'dns';
 
-/** The record type this whole feature exists to maintain. */
-const ALIBABA_RECORD_TYPE = 'AAAA';
-
 export type DnsSettingsRow = {
   id: string;
   provider: DnsProviderName;
@@ -57,10 +53,6 @@ export type DnsSettingsRow = {
   cloudflare_zone_id: string;
   cloudflare_record_name: string;
   cloudflare_token_encrypted: string | null;
-  alibaba_access_key_id: string;
-  alibaba_record_id: string;
-  alibaba_record_type: string;
-  alibaba_access_key_secret_encrypted: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -79,9 +71,6 @@ export type MutableSettings = {
   cloudflareZoneId: string;
   cloudflareRecordName: string;
   cloudflareToken: string | null;
-  alibabaAccessKeyId: string;
-  alibabaRecordId: string;
-  alibabaAccessKeySecret: string | null;
 };
 
 /** What a fresh install has, before anything has been saved. */
@@ -95,9 +84,6 @@ function defaults(): MutableSettings {
     cloudflareZoneId: '',
     cloudflareRecordName: '',
     cloudflareToken: null,
-    alibabaAccessKeyId: '',
-    alibabaRecordId: '',
-    alibabaAccessKeySecret: null,
   };
 }
 
@@ -134,10 +120,6 @@ export function toSettingsView(row: DnsSettingsRow): DnsSettingsView {
     // The presence of an encrypted value is the whole answer: nothing is ever
     // stored as an empty string, so a non-null column means a real credential.
     hasCloudflareToken: row.cloudflare_token_encrypted !== null,
-    alibabaAccessKeyId: row.alibaba_access_key_id,
-    alibabaRecordId: row.alibaba_record_id,
-    alibabaRecordType: ALIBABA_RECORD_TYPE,
-    hasAlibabaAccessKeySecret: row.alibaba_access_key_secret_encrypted !== null,
     updatedAt: row.updated_at,
   };
 }
@@ -156,10 +138,6 @@ export function resolveSettings(db: Db, box: SecretBox): ResolvedDnsSettings | n
     cloudflareToken: settings.cloudflareToken ?? '',
     cloudflareZoneId: settings.cloudflareZoneId,
     cloudflareRecordName: settings.cloudflareRecordName,
-    alibabaAccessKeyId: settings.alibabaAccessKeyId,
-    alibabaAccessKeySecret: settings.alibabaAccessKeySecret ?? '',
-    alibabaRecordId: settings.alibabaRecordId,
-    alibabaRecordType: ALIBABA_RECORD_TYPE,
   };
 }
 
@@ -190,9 +168,8 @@ export function saveSettings(
     `INSERT INTO dns_settings (
        id, provider, ipv6_source, local_ipv6_interface, schedule_enabled, interval_minutes,
        cloudflare_zone_id, cloudflare_record_name, cloudflare_token_encrypted,
-       alibaba_access_key_id, alibaba_record_id, alibaba_record_type,
-       alibaba_access_key_secret_encrypted, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        provider = excluded.provider,
        ipv6_source = excluded.ipv6_source,
@@ -202,10 +179,6 @@ export function saveSettings(
        cloudflare_zone_id = excluded.cloudflare_zone_id,
        cloudflare_record_name = excluded.cloudflare_record_name,
        cloudflare_token_encrypted = excluded.cloudflare_token_encrypted,
-       alibaba_access_key_id = excluded.alibaba_access_key_id,
-       alibaba_record_id = excluded.alibaba_record_id,
-       alibaba_record_type = excluded.alibaba_record_type,
-       alibaba_access_key_secret_encrypted = excluded.alibaba_access_key_secret_encrypted,
        updated_at = excluded.updated_at`,
   ).run(
     SETTINGS_ID,
@@ -217,10 +190,6 @@ export function saveSettings(
     merged.cloudflareZoneId,
     merged.cloudflareRecordName,
     encryptSecret(merged.cloudflareToken, box),
-    merged.alibabaAccessKeyId,
-    merged.alibabaRecordId,
-    ALIBABA_RECORD_TYPE,
-    encryptSecret(merged.alibabaAccessKeySecret, box),
     timestamp,
     timestamp,
   );
@@ -264,13 +233,6 @@ function merge(
       input.clearCloudflareToken,
       base.cloudflareToken,
     ),
-    alibabaAccessKeyId: textField(input.alibabaAccessKeyId, base.alibabaAccessKeyId),
-    alibabaRecordId: textField(input.alibabaRecordId, base.alibabaRecordId),
-    alibabaAccessKeySecret: mergeSecret(
-      input.alibabaAccessKeySecret,
-      input.clearAlibabaAccessKeySecret,
-      base.alibabaAccessKeySecret,
-    ),
   };
 }
 
@@ -284,13 +246,6 @@ function fromRow(row: DnsSettingsRow, box: SecretBox): MutableSettings {
     cloudflareZoneId: row.cloudflare_zone_id,
     cloudflareRecordName: row.cloudflare_record_name,
     cloudflareToken: decryptOptionalSecret(row.cloudflare_token_encrypted, box, 'Cloudflare token'),
-    alibabaAccessKeyId: row.alibaba_access_key_id,
-    alibabaRecordId: row.alibaba_record_id,
-    alibabaAccessKeySecret: decryptOptionalSecret(
-      row.alibaba_access_key_secret_encrypted,
-      box,
-      'Alibaba Cloud access key secret',
-    ),
   };
 }
 
@@ -306,9 +261,6 @@ export type ValidatableSettings = {
   cloudflareToken: string | null;
   cloudflareZoneId: string;
   cloudflareRecordName: string;
-  alibabaAccessKeyId: string;
-  alibabaAccessKeySecret: string | null;
-  alibabaRecordId: string;
 };
 
 /**
@@ -337,10 +289,6 @@ type MissingField = {
  *
  * Returns the problem rather than throwing, so a caller can ask "is this
  * runnable" without a failure being the shape of the answer.
- *
- * Only the active provider's credentials are required: an operator switching
- * from Cloudflare to Alibaba Cloud should not have to keep the old token alive,
- * and keeping it is what makes switching back cheap.
  */
 export function validate(settings: ValidatableSettings): SettingsProblem | null {
   if (settings.intervalMinutes < MIN_DNS_INTERVAL_MINUTES) {
@@ -357,26 +305,14 @@ export function validate(settings: ValidatableSettings): SettingsProblem | null 
   }
 
   const missing: MissingField[] = [];
-  if (settings.provider === 'cloudflare') {
-    if (isBlank(settings.cloudflareToken)) {
-      missing.push({ field: 'cloudflareToken', label: 'Cloudflare API token' });
-    }
-    if (isBlank(settings.cloudflareZoneId)) {
-      missing.push({ field: 'cloudflareZoneId', label: 'Cloudflare zone id' });
-    }
-    if (isBlank(settings.cloudflareRecordName)) {
-      missing.push({ field: 'cloudflareRecordName', label: 'Cloudflare record name' });
-    }
-  } else {
-    if (isBlank(settings.alibabaAccessKeyId)) {
-      missing.push({ field: 'alibabaAccessKeyId', label: 'Alibaba Cloud access key id' });
-    }
-    if (isBlank(settings.alibabaAccessKeySecret)) {
-      missing.push({ field: 'alibabaAccessKeySecret', label: 'Alibaba Cloud access key secret' });
-    }
-    if (isBlank(settings.alibabaRecordId)) {
-      missing.push({ field: 'alibabaRecordId', label: 'Alibaba Cloud record id' });
-    }
+  if (isBlank(settings.cloudflareToken)) {
+    missing.push({ field: 'cloudflareToken', label: 'Cloudflare API token' });
+  }
+  if (isBlank(settings.cloudflareZoneId)) {
+    missing.push({ field: 'cloudflareZoneId', label: 'Cloudflare zone id' });
+  }
+  if (isBlank(settings.cloudflareRecordName)) {
+    missing.push({ field: 'cloudflareRecordName', label: 'Cloudflare record name' });
   }
 
   if (missing.length > 0) {
