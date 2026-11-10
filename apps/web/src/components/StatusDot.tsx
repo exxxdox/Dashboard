@@ -1,4 +1,4 @@
-import type { ExecutionStatus, SyncStatus } from '@dashboard/shared';
+import type { ExecutionStatus, SourceKind, SyncStatus } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import { useT } from '../lib/i18n';
 import {
@@ -50,13 +50,13 @@ export function ExecutionStatusLabel({
   );
 }
 
-export function SyncStatusLabel({ status, className }: { status: SyncStatus; className?: string }) {
+export function SyncStatusLabel({ status, sourceKind, className }: { status: SyncStatus; sourceKind?: SourceKind; className?: string }) {
   const t = useT();
   const meta = SYNC_STATUS_META[status];
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
       <StatusDot tone={meta.tone} live={status === 'syncing'} />
-      <span className={cn('text-body', TONE_TEXT[meta.tone])}>{syncStatusLabel(t, status)}</span>
+      <span className={cn('text-body', TONE_TEXT[meta.tone])}>{syncStatusLabel(t, status, sourceKind)}</span>
     </span>
   );
 }

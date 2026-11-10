@@ -1,4 +1,4 @@
-import type { ExecutionStatus, SyncStatus } from '@dashboard/shared';
+import type { ExecutionStatus, SourceKind, SyncStatus } from '@dashboard/shared';
 
 import type { MessageKey, Translate } from './i18n';
 
@@ -43,8 +43,8 @@ export function executionStatusLabel(t: Translate, status: ExecutionStatus): str
   return t(EXECUTION_STATUS_META[status].labelKey);
 }
 
-export function syncStatusLabel(t: Translate, status: SyncStatus): string {
-  return t(SYNC_STATUS_META[status].labelKey);
+export function syncStatusLabel(t: Translate, status: SyncStatus, sourceKind: SourceKind = 'github'): string {
+  return t(sourceKind === 'local' ? `sources.scan.${status}` : SYNC_STATUS_META[status].labelKey);
 }
 
 export const TONE_DOT: Record<Tone, string> = {

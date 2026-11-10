@@ -14,7 +14,7 @@
  * operation means and not a decision the caller is in a position to make.
  */
 
-import type { DnsIpv6Probe, DnsRecordProbe, DnsUpdateResult, SyncResult, TargetCheckResult } from '@dashboard/shared';
+import type { DnsIpv6Probe, DnsRecordProbe, DnsUpdateResult, SourceKind, SyncResult, TargetCheckResult } from '@dashboard/shared';
 
 import { describeUpdate } from './dns';
 import type { Translate } from './i18n';
@@ -76,7 +76,7 @@ export function targetCheckOutcome(t: Translate, result: TargetCheckResult): Out
 
 /* ----------------------------------------------------------------- sources */
 
-export function syncOutcome(t: Translate, result: SyncResult): Outcome {
+export function syncOutcome(t: Translate, result: SyncResult, sourceKind: SourceKind = 'github'): Outcome {
   const counts = [
     `${t('sources.sync.added')} ${result.added}`,
     `${t('sources.sync.updated')} ${result.updated}`,
@@ -87,7 +87,7 @@ export function syncOutcome(t: Translate, result: SyncResult): Outcome {
   // A sync that got through but complained is not a failure; it is a
   // confirmation with something to say, which is what the warning tone is.
   return {
-    message: t('toast.sourceSynced'),
+    message: t(sourceKind === 'local' ? 'toast.sourceScanned' : 'toast.sourceSynced'),
     tone: result.warnings.length === 0 ? 'success' : 'warning',
     detail: lines([counts, ...result.warnings]),
   };

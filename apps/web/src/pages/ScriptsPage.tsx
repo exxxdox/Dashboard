@@ -126,7 +126,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   );
 }
 
-function SourceSyncButton({ sourceId }: { sourceId: string }) {
+function SourceSyncButton({ source }: { source: SourceSummary }) {
   const t = useT();
   const sync = useSyncSource();
   return (
@@ -135,9 +135,9 @@ function SourceSyncButton({ sourceId }: { sourceId: string }) {
       variant="ghost"
       icon={<RefreshCw className="size-4" aria-hidden />}
       loading={sync.isPending}
-      onClick={() => sync.mutate(sourceId)}
+      onClick={() => sync.mutate(source.id)}
     >
-      {t('scripts.sync')}
+      {t(source.kind === 'local' ? 'sources.rescan' : 'scripts.sync')}
     </Button>
   );
 }
@@ -179,12 +179,15 @@ function SourceTreePane({
       // carries its own.
       aside={
         <div className="flex flex-wrap items-center gap-3">
-          <SyncStatusLabel status={source.syncStatus} />
+          <SyncStatusLabel status={source.syncStatus} sourceKind={source.kind} />
           {source.kind === 'local' ? <CreateScriptButton key={source.id} sourceId={source.id} /> : null}
-          <SourceSyncButton sourceId={source.id} />
+          <SourceSyncButton source={source} />
         </div>
       }
     >
+      {source.kind === 'local' ? (
+        <p className="text-mute text-meta px-3 py-2">{i18n.t('sources.localScanHint')}</p>
+      ) : null}
       {tree.isPending ? (
         <LoadingBlock label={i18n.t('scripts.loadingTree')} />
       ) : tree.isError ? (

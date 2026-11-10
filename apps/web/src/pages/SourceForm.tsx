@@ -221,9 +221,13 @@ export function SourceForm({
 
       {isEdit ? (
         <p className="text-mute text-meta">
-          {i18n.t('sources.form.editNote.before')}{' '}
-          <span className="text-ink">{i18n.t('sources.neverSynced')}</span>{' '}
-          {i18n.t('sources.form.editNote.after')}
+          {state.kind === 'local' ? i18n.t('sources.form.localEditNote') : (
+            <>
+              {i18n.t('sources.form.editNote.before')}{' '}
+              <span className="text-ink">{i18n.t('sources.neverSynced')}</span>{' '}
+              {i18n.t('sources.form.editNote.after')}
+            </>
+          )}
         </p>
       ) : null}
 

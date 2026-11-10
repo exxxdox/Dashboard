@@ -159,3 +159,10 @@ describe('updateOutcome', () => {
     expect(outcome.detail).toBe(t('dns.result.notificationFailed'));
   });
 });
+
+it('reports a local directory scan separately from a GitHub sync', () => {
+  const result: SyncResult = { sourceId: 'local', added: 1, updated: 0, removed: 0, total: 1, warnings: [] };
+  expect(syncOutcome(t, result, 'local').message).toBe('Source scanned');
+  expect(syncOutcome(zh, result, 'local').message).toBe('脚本源已扫描');
+  expect(syncOutcome(t, result, 'github').message).toBe('Source synced');
+});

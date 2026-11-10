@@ -19,6 +19,7 @@ import type {
   SaveScriptScheduleInput,
   ScriptSchedule,
   ScriptSummary,
+  SourceSummary,
   TargetSummary,
   TestNotificationInput,
   UpdateAppSettingsInput,
@@ -219,7 +220,7 @@ export function useSyncSource() {
       void client.invalidateQueries({ queryKey: ['scripts'] });
       // What a sync did is a count and whatever it complained about; the counts
       // are the answer to "did it work", so they travel with the message.
-      report(syncOutcome(globalTranslate, result));
+      report(syncOutcome(globalTranslate, result, client.getQueryData<SourceSummary[]>(queryKeys.sources())?.find(source => source.id === id)?.kind));
     },
   });
 }

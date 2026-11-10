@@ -122,7 +122,7 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Icon className="text-faint size-4 shrink-0" aria-hidden />
             <span className="text-ink text-lead font-medium">{source.name}</span>
-            <SyncStatusLabel status={source.syncStatus} />
+            <SyncStatusLabel status={source.syncStatus} sourceKind={source.kind} />
             <span className="text-faint text-meta">
               {i18n.t(
                 source.scriptCount === 1 ? 'sources.scriptCount.one' : 'sources.scriptCount.many',
@@ -148,12 +148,15 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             </div>
             <p className="text-faint text-meta">
               {source.lastSyncAt === null
-                ? i18n.t('sources.neverSynced')
-                : i18n.t('sources.lastSynced', {
+                ? i18n.t(source.kind === 'local' ? 'sources.neverScanned' : 'sources.neverSynced')
+                : i18n.t(source.kind === 'local' ? 'sources.lastScanned' : 'sources.lastSynced', {
                     when: formatRelative(source.lastSyncAt, i18n.t),
                     at: formatDateTime(source.lastSyncAt, i18n.locale),
                   })}
             </p>
+            {source.kind === 'local' ? (
+              <p className="text-mute text-meta">{i18n.t('sources.localScanHint')}</p>
+            ) : null}
           </div>
         </div>
 
@@ -164,7 +167,7 @@ function SourceRow({ source, onEdit }: { source: SourceSummary; onEdit: () => vo
             loading={sync.isPending}
             onClick={() => sync.mutate(source.id)}
           >
-            {i18n.t('sources.syncNow')}
+            {i18n.t(source.kind === 'local' ? 'sources.rescan' : 'sources.syncNow')}
           </Button>
           <IconButton label={i18n.t('sources.editTitle', { name: source.name })} onClick={onEdit}>
             <Pencil className="size-4" aria-hidden />

@@ -62,3 +62,16 @@ describe('status metadata', () => {
     expect(EXECUTION_STATUS_META.succeeded.tone).not.toBe(EXECUTION_STATUS_META.failed.tone);
   });
 });
+
+it('describes local discovery as scanning while keeping GitHub sync wording', async () => {
+  const { syncStatusLabel } = await import('./status');
+  const { translate } = await import('./i18n');
+  for (const locale of ['en', 'zh'] as const) {
+    const t: import('./i18n').Translate = (key, params) => translate(locale, key, params);
+    expect(syncStatusLabel(t, 'ok', 'local')).toBe(locale === 'zh' ? '已扫描' : 'Scanned');
+    expect(syncStatusLabel(t, 'syncing', 'local')).toBe(locale === 'zh' ? '扫描中' : 'Scanning');
+    expect(syncStatusLabel(t, 'never', 'local')).toBe(locale === 'zh' ? '未扫描' : 'Not scanned');
+    expect(syncStatusLabel(t, 'error', 'local')).toBe(locale === 'zh' ? '扫描失败' : 'Scan failed');
+    expect(syncStatusLabel(t, 'ok', 'github')).toBe(syncStatusLabel(t, 'ok'));
+  }
+});

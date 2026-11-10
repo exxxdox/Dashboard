@@ -18,7 +18,7 @@ const en = {
   'scripts.file.deleteHint': 'This permanently deletes the local script file and disables its schedules. Execution history is kept.',
   'scripts.file.deleteConfirm': 'Delete file',
   'scripts.file.readOnly': 'Read-only source',
-  'scripts.error.syncing': 'Wait for the source sync to finish before editing files.',
+  'scripts.error.syncing': 'Wait for the source refresh to finish before editing files.',
   'scripts.error.encoding': 'Only UTF-8 text scripts can be edited online.',
   'scripts.error.readOnly': 'GitHub scripts are read-only. Edit the repository and sync the source.',
   'scripts.error.invalidPath': 'Use a relative .sh or .ps1 path without hidden folders, symbolic links, or parent directory references.',
@@ -52,7 +52,7 @@ const en = {
   // The three buttons in the identity bar open these; the titles above are what
   // the dialogs are called, and these say what is inside them.
   'scripts.dialog.facts.description':
-    'Everything the last sync recorded for this file: its size, where it came from, and which content hash it was read at.',
+    'The latest recorded file details: its size, source path, and content hash.',
   'scripts.dialog.metadata.description':
     'How this script is listed and run. Changes apply to the next run, not to past ones.',
   'scripts.dialog.run.description':
@@ -62,7 +62,7 @@ const en = {
   'scripts.unsavedChanges': 'Unsaved changes',
   'scripts.unreadable.title': 'File is not readable',
   'scripts.unreadable.description':
-    'The script is registered but its content could not be read from the shared directory. Re-sync the source, or check that the directory is mounted.',
+    'The script is registered but its content could not be read from the shared directory. Rescan or sync the source, or check that the directory is mounted.',
   'scripts.field.format': 'Format',
   'scripts.field.size': 'Size',
   'scripts.field.interpreter': 'Interpreter',
@@ -104,7 +104,7 @@ const zh: Record<keyof typeof en, string> = {
   'scripts.file.deleteHint': '这会永久删除本地脚本文件并停用它的定时计划，执行历史将保留。',
   'scripts.file.deleteConfirm': '删除文件',
   'scripts.file.readOnly': '只读脚本源',
-  'scripts.error.syncing': '脚本源正在同步，请等待同步完成后再修改文件。',
+  'scripts.error.syncing': '脚本源正在刷新，请等待完成后再修改文件。',
   'scripts.error.encoding': '在线编辑仅支持 UTF-8 文本脚本。',
   'scripts.error.readOnly': 'GitHub 脚本为只读，请在仓库中修改后同步脚本源。',
   'scripts.error.invalidPath': '请使用 .sh 或 .ps1 相对路径，不包含隐藏目录、符号链接或上级目录引用。',
@@ -133,7 +133,7 @@ const zh: Record<keyof typeof en, string> = {
   'scripts.panel.facts': '基本信息',
   'scripts.panel.metadata': '元数据',
   'scripts.dialog.facts.description':
-    '上次同步为该文件记录的完整信息：大小、来源路径，以及读取时对应的内容哈希。',
+    '最近记录的文件信息：大小、来源路径，以及内容哈希。',
   'scripts.dialog.metadata.description': '脚本的展示方式与运行方式。改动只影响之后的运行，不影响历史记录。',
   'scripts.dialog.run.description':
     '选择目标主机，填写脚本需要的参数，然后启动。填过的值会为下次记住。',
@@ -142,7 +142,7 @@ const zh: Record<keyof typeof en, string> = {
   'scripts.unsavedChanges': '有未保存的改动',
   'scripts.unreadable.title': '文件读不出来',
   'scripts.unreadable.description':
-    '脚本已经登记，但无法从共享目录读取其内容。请重新同步脚本源，或确认该目录已挂载。',
+    '脚本已经登记，但无法从共享目录读取其内容。请重新扫描或同步脚本源，或确认该目录已挂载。',
   'scripts.field.format': '格式',
   'scripts.field.size': '大小',
   'scripts.field.interpreter': '解释器',

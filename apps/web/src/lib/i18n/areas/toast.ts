@@ -25,6 +25,7 @@ const en = {
   'toast.sourceSaved': 'Source saved',
   'toast.sourceDeleted': 'Source removed',
   'toast.sourceSynced': 'Source synced',
+  'toast.sourceScanned': 'Source scanned',
 
   'toast.scriptSaved': 'Script metadata saved',
   'toast.scriptCreated': 'Script created',
@@ -59,6 +60,7 @@ const zh: Record<keyof typeof en, string> = {
   'toast.sourceSaved': '脚本源已保存',
   'toast.sourceDeleted': '脚本源已删除',
   'toast.sourceSynced': '脚本源已同步',
+  'toast.sourceScanned': '脚本源已扫描',
 
   'toast.scriptSaved': '脚本信息已保存',
   'toast.scriptCreated': '脚本已创建',
