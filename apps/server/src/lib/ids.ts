@@ -13,7 +13,8 @@ export function newId(prefix: string): string {
 export const newTargetId = (): string => newId('tgt');
 export const newSourceId = (): string => newId('src');
 export const newScriptId = (): string => newId('scr');
-export const newExecutionId = (): string => newId('run');
+// Runs use bare random IDs; other entities retain their type prefixes.
+export const newExecutionId = (): string => randomBytes(12).toString('base64url');
 export const newDnsCheckId = (): string => newId('dnsc');
 
 export const newScriptScheduleId = (): string => newId('sch');
