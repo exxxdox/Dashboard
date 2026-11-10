@@ -28,9 +28,8 @@ const { Client } = ssh2;
 const KILL_GRACE_MS = 5_000;
 
 /**
- * How long the pid marker may take to appear before we stop holding stderr back.
- * The wrapper prints it as its first statement, so anything beyond this means it
- * will never arrive.
+ * Buffer a small initial stderr window, then stream shell banners while keeping
+ * enough trailing bytes to recognize a later pid marker.
  */
 const PID_MARKER_WINDOW_BYTES = 512;
 
@@ -128,18 +127,22 @@ export function createSshTransport(config: SshTransportConfig): Transport {
       });
 
       try {
-        await connect(client, toConnectConfig(config));
-        const channel = await openChannel(client, options.command);
+        await connect(client, toConnectConfig(config), options.signal);
+        if (options.signal.aborted) return { exitCode: null, signal: 'TERM', canceled: true, timedOut: false, stdinError: null };
+        const channel = await openChannel(client, options.command, options.signal);
 
-        // Started but not awaited: the remote end cannot drain the channel
-        // until we are reading it, so awaiting the write first would deadlock
-        // on anything larger than the channel's window.
-        const writing = writeStdin(channel, options.stdin ?? Buffer.alloc(0), {
-          giveUp: commandSettled,
-        });
-
+        // A payload is released only after the wrapper reports its killable
+        // process group. The confirmation newline prevents EOF after cancellation
+        // from invoking a custom interpreter against an empty file.
+        let writing = Promise.resolve<string | null>(null);
+        if (options.stdin === undefined) {
+          writing = writeStdin(channel, Buffer.alloc(0), { giveUp: commandSettled });
+        }
         const outcome = await pump(channel, options, (pid) => {
           remotePid = pid;
+          if (options.stdin !== undefined && !options.signal.aborted) {
+            writing = writeStdin(channel, Buffer.concat([Buffer.from('\n'), options.stdin]), { giveUp: commandSettled });
+          }
         });
         releaseWriter();
 
@@ -161,6 +164,11 @@ export function createSshTransport(config: SshTransportConfig): Transport {
         const stdinError = await writing;
 
         return { ...outcome, stdinError };
+      } catch (error) {
+        if (options.signal.aborted) {
+          return { exitCode: null, signal: 'TERM', canceled: true, timedOut: false, stdinError: null };
+        }
+        throw error;
       } finally {
         releaseWriter();
         client.end();
@@ -275,13 +283,12 @@ function pump(
         return;
       }
 
-      // No marker yet. Past the window in which it could appear it never will,
-      // so stop buffering and let stderr stream from here on.
+      // Shell banners can precede the marker. Stream their bytes while retaining
+      // only enough tail to recognize a marker split across SSH chunks.
       if (stderrSeen > PID_MARKER_WINDOW_BYTES) {
-        pidResolved = true;
-        const pending = stderrBuffer;
-        stderrBuffer = '';
-        emitStderr(pending);
+        const tail = PID_MARKER.length - 1;
+        emitStderr(stderrBuffer.slice(0, -tail));
+        stderrBuffer = stderrBuffer.slice(-tail);
       }
     });
 
@@ -307,7 +314,7 @@ function pump(
       options.signal.addEventListener('abort', onAbort, { once: true });
     }
 
-    if (options.timeoutMs !== null) {
+    if (!settled && options.timeoutMs !== null) {
       timer = setTimeout(() => {
         timedOut = true;
         settle({ exitCode: null, signal: 'TERM', canceled: false, timedOut: true });
@@ -317,16 +324,27 @@ function pump(
 }
 
 /** Wrap ssh2's callback-based connect in a promise, guarding double settle. */
-function connect(client: SshClient, config: ConnectConfig): Promise<void> {
+function connect(client: SshClient, config: ConnectConfig, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
 
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('SSH connection canceled'));
+    };
+    if (signal?.aborted) { onAbort(); return; }
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     client.once('ready', () => {
+      signal?.removeEventListener('abort', onAbort);
+      if (settled) return;
       settled = true;
       resolve();
     });
 
     client.once('error', (error: Error) => {
+      signal?.removeEventListener('abort', onAbort);
       if (settled) return;
       settled = true;
       reject(error);
@@ -335,6 +353,7 @@ function connect(client: SshClient, config: ConnectConfig): Promise<void> {
     try {
       client.connect(config);
     } catch (error) {
+      signal?.removeEventListener('abort', onAbort);
       if (settled) return;
       settled = true;
       reject(error instanceof Error ? error : new Error(String(error)));
@@ -342,10 +361,15 @@ function connect(client: SshClient, config: ConnectConfig): Promise<void> {
   });
 }
 
-function openChannel(client: SshClient, command: string): Promise<ClientChannel> {
+function openChannel(client: SshClient, command: string, signal: AbortSignal): Promise<ClientChannel> {
   return new Promise((resolve, reject) => {
+    const onAbort = (): void => reject(new Error('SSH channel canceled'));
+    if (signal.aborted) { onAbort(); return; }
+    signal.addEventListener('abort', onAbort, { once: true });
     client.exec(command, (error: Error | undefined, channel: ClientChannel) => {
+      signal.removeEventListener('abort', onAbort);
       if (error) reject(error);
+      else if (signal.aborted) onAbort();
       else resolve(channel);
     });
   });

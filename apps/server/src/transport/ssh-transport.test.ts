@@ -5,14 +5,14 @@ const output = vi.hoisted(() => ({
   signal: null as string | null, connectError: null as Error | null, connectThrow: false,
   commandError: null as Error | null, cleanupError: false,
   commands: [] as string[], ended: 0, config: {} as Record<string, unknown>,
-  callbackErrors: [] as unknown[], channelError: false,
+  callbackErrors: [] as unknown[], channelError: false, writes: 0, connectDelay: 0, earlyPid: false, channelDelay: 0, earlyBanner: false, backpressure: false, payloads: [] as Buffer[],
 }));
 
 vi.mock('ssh2', async () => {
   const { EventEmitter } = await import('node:events');
   class Channel extends EventEmitter {
     stderr = new EventEmitter();
-    write() { return true; }
+    write(chunk: Buffer) { output.writes++; output.payloads.push(chunk); return !output.backpressure; }
     end() {
       queueMicrotask(() => {
         for (let index = 0; index < Math.max(output.stdout.length, output.stderr.length); index++) {
@@ -31,13 +31,19 @@ vi.mock('ssh2', async () => {
     connect(config: Record<string, unknown>) {
       output.config = config;
       if (output.connectThrow) throw new Error('bad connection config');
-      queueMicrotask(() => output.connectError ? this.emit('error', output.connectError) : this.emit('ready'));
+      const ready = () => output.connectError ? this.emit('error', output.connectError) : this.emit('ready');
+      if (output.connectDelay) setTimeout(ready, output.connectDelay); else queueMicrotask(ready);
     }
     exec(command: string, callback: (error: Error | undefined, channel: Channel) => void) {
       output.commands.push(command);
       const channel = new Channel();
       const error = command === 'unused' ? output.commandError : output.cleanupError ? new Error('cleanup failed') : null;
+      if (command === 'unused' && output.channelDelay) { setTimeout(() => callback(error ?? undefined, channel), output.channelDelay); return; }
       callback(error ?? undefined, channel);
+      if (command === 'unused' && output.earlyPid) setTimeout(() => {
+        if (output.earlyBanner) channel.stderr.emit('data', Buffer.from('x'.repeat(513)));
+        channel.stderr.emit('data', Buffer.from('__SD_PID__=123\n'));
+      });
       // Probe and cleanup channels have no stdin writer to trigger their output.
       if (command !== 'unused' && !error) queueMicrotask(() => {
         for (const chunk of output.stdout) channel.emit('data', chunk);
@@ -55,7 +61,7 @@ beforeEach(() => {
   Object.assign(output, {
     stdout: [], stderr: [], close: true, code: 0, signal: null, connectError: null,
     connectThrow: false, commandError: null, cleanupError: false, commands: [], ended: 0, config: {},
-    callbackErrors: [], channelError: false,
+    callbackErrors: [], channelError: false, writes: 0, connectDelay: 0, earlyPid: false, channelDelay: 0, earlyBanner: false, backpressure: false, payloads: [],
   });
 });
 afterEach(() => vi.useRealTimers());
@@ -98,7 +104,6 @@ test('flushes unfinished UTF-8 bytes and stderr without a pid marker on close', 
   expect(chunks).toEqual({ stdout: '�', stderr: 'warning �' });
 });
 
-
 test('returns a nonzero remote exit and still removes staging on the same connection', async () => {
   output.code = 23;
   expect(await execute()).toMatchObject({ exitCode: 23, canceled: false, timedOut: false });
@@ -132,12 +137,12 @@ test('treats cleanup failure as best effort without replacing the script outcome
   expect(output.ended).toBe(1);
 });
 
-test('stops an already aborted run even without a PID marker', async () => {
+test('never starts an already aborted run', async () => {
   output.close = false;
   const controller = new AbortController();
   controller.abort();
   expect(await execute(controller.signal)).toMatchObject({ canceled: true, timedOut: false, signal: 'TERM' });
-  expect(output.commands).toEqual(['unused', 'remove staging']);
+  expect(output.commands).toEqual([]);
 });
 
 test.each(['cancel', 'timeout'])('terminates the remote process group before cleanup on %s', async (reason) => {
@@ -176,7 +181,7 @@ test('streams long stderr without waiting forever for a missing PID marker', asy
     command: 'unused', signal: new AbortController().signal, timeoutMs: null,
     onChunk: (chunk) => chunks.push(chunk.data),
   });
-  expect(chunks).toEqual(['x'.repeat(513), 'tail']);
+  expect(chunks.join('')).toBe('x'.repeat(513) + 'tail');
 });
 
 test('reports probe metadata and sends private-key settings with host verification', async () => {
@@ -207,7 +212,6 @@ test('returns an unreachable check result instead of throwing an authentication 
   expect(output.ended).toBe(1);
 });
 
-
 test('rejects a broken stream and closes its connection', async () => {
   output.channelError = true;
   await expect(execute()).rejects.toThrow('stream disconnected');
@@ -224,4 +228,84 @@ test.each(['stdout', 'stderr'] as const)('keeps reading when the %s consumer thr
   expect(onChunk).toHaveBeenCalledTimes(2);
   expect(result).toMatchObject({ exitCode: 0, canceled: false, timedOut: false });
   expect(output.ended).toBe(1);
+});
+
+test('does not send a command when canceled during authentication', async () => {
+  vi.useFakeTimers();
+  output.connectDelay = 100;
+  const controller = new AbortController();
+  const pending = execute(controller.signal);
+  controller.abort();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(await pending).toMatchObject({ canceled: true });
+  expect(output.commands).toEqual([]);
+});
+
+test.each(['cancel', 'timeout'])('withholds the script until its PID is known on %s', async (reason) => {
+  vi.useFakeTimers();
+  output.close = false;
+  output.backpressure = true;
+  const controller = new AbortController();
+  const pending = transport().exec({
+    command: 'unused', stdin: Buffer.from('echo DANGEROUS'), signal: controller.signal,
+    timeoutMs: reason === 'timeout' ? 100 : null, onChunk: () => undefined,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  if (reason === 'cancel') controller.abort();
+  await vi.advanceTimersByTimeAsync(100);
+  expect(await pending).toMatchObject({ canceled: reason === 'cancel', timedOut: reason === 'timeout' });
+  expect(output.writes).toBe(0);
+});
+
+test('delivers the script after receiving its PID', async () => {
+  output.earlyPid = true;
+  await transport().exec({
+    command: 'unused', stdin: Buffer.from('echo SAFE'), signal: new AbortController().signal,
+    timeoutMs: 1000, onChunk: () => undefined,
+  });
+  expect(output.writes).toBe(1);
+  expect(Buffer.concat(output.payloads).toString()).toBe('\necho SAFE');
+});
+
+test.each(['cancel', 'timeout'])('kills a known group when %s interrupts script delivery', async (reason) => {
+  vi.useFakeTimers();
+  output.earlyPid = true;
+  output.close = false;
+  output.backpressure = true;
+  const controller = new AbortController();
+  const pending = transport().exec({
+    command: 'unused', stdin: Buffer.from('echo DANGEROUS'), signal: controller.signal,
+    timeoutMs: reason === 'timeout' ? 100 : null, onChunk: () => undefined,
+    cleanupCommand: 'remove staging',
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(output.writes).toBe(1);
+  if (reason === 'cancel') controller.abort();
+  await vi.advanceTimersByTimeAsync(5100);
+  expect(await pending).toMatchObject({ canceled: reason === 'cancel', timedOut: reason === 'timeout' });
+  expect(output.commands[1]).toContain('kill -TERM -123');
+  expect(output.commands[2]).toContain('kill -KILL -123');
+  expect(output.commands[3]).toBe('remove staging');
+});
+
+test('cancels while the server delays the exec channel callback', async () => {
+  vi.useFakeTimers();
+  output.channelDelay = 10000;
+  const controller = new AbortController();
+  const pending = execute(controller.signal);
+  await vi.advanceTimersByTimeAsync(0);
+  controller.abort();
+  await expect(pending).resolves.toMatchObject({ canceled: true });
+  expect(output.writes).toBe(0);
+});
+
+test('accepts the PID after a long shell banner', async () => {
+  output.earlyPid = true;
+  output.earlyBanner = true;
+  const result = await transport().exec({
+    command: 'unused', stdin: Buffer.from('echo SAFE'), signal: new AbortController().signal,
+    timeoutMs: 100, onChunk: () => undefined,
+  });
+  expect(result.exitCode).toBe(0);
+  expect(output.writes).toBe(1);
 });

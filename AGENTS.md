@@ -83,7 +83,7 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Command assembly in `shared/shell.ts`, not server.** Pure string work with injection risk, unit-testable without DB or SSH. All user input quoted; env names validated — `A; rm -rf /` would escape assignment.
 
-**Cancel need process group.** SSH give channel, not process handle. Run under `setsid`, pid printed on stderr before `exec`; runner later `kill -TERM -<pgid>`. `setsid` probed at runtime, not assumed — host without util-linux would fail every script with command-not-found. Fallback still publish pid: cancel degrade to process alone.
+**Cancel need process group.** SSH give channel, not process handle. Run the delivery wrapper under `setsid`, publish its pid before reading stdin, and release script bytes only after that handshake; runner later `kill -TERM -<pgid>`. `setsid` probed at runtime, not assumed — host without util-linux would fail every script with command-not-found. Fallback still publish pid: cancel degrade to process alone.
 
 **`TargetCheckResult.workDirOk` + `stagingOk` = load-bearing check.** Target answering SSH but unable to `cd` into workDir or create staging dir look healthy until first run. One probe establish both; writes under staging root, never inside `workDir`, so check can't litter data. Failed check does not block execution: `last_check_ok` = cached fact, host recover without button.
 

@@ -97,7 +97,8 @@ describe('buildCommand', () => {
     // `cat` short-circuits the whole `&&` chain, so a failed or partial write
     // means the interpreter is never reached.
     const command = buildCommand(base).command;
-    expect(command).toMatch(/cat > [^)]*\) && if command -v setsid/);
+    expect(command.indexOf(PID_MARKER)).toBeLessThan(command.indexOf('cat >'));
+    expect(command).toContain(') && cd /srv/scripts && exec bash');
   });
 
   test('runs in the configured working directory, not the staging directory', () => {
@@ -141,8 +142,8 @@ describe('buildCommand', () => {
   test('quotes a staging path that would otherwise split or inject', () => {
     const built = buildCommand({ ...base, stagingDir: "/tmp/it's here", scriptPath: "/tmp/it's here/a b.sh" });
     const command = built.command;
-    expect(command).toContain(`mkdir -p '/tmp/it'\\''s here'`);
-    expect(command).toContain(`cat > '/tmp/it'\\''s here/a b.sh'`);
+    expect(command).toContain(quote(`mkdir -p ${quote("/tmp/it's here")}`).slice(1, -1));
+    expect(command).toContain(quote(`cat > ${quote("/tmp/it's here/a b.sh")}`).slice(1, -1));
     // No bare quote can end the quoted string early and start a command.
     expect(command).not.toContain("; rm -rf");
   });

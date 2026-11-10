@@ -9,7 +9,7 @@
  * up a node-only import.
  */
 
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -26,7 +26,7 @@ type Run = { status: number | null; stdout: string; stderr: string };
 
 /** Run the assembled command the way the transport does: payload on stdin. */
 function run(command: string, stdin: string, env: NodeJS.ProcessEnv = process.env): Run {
-  const result = spawnSync('bash', ['-c', command], { input: stdin, encoding: 'utf8', env });
+  const result = spawnSync('bash', ['-c', command], { input: `\n${stdin}`, encoding: 'utf8', env });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -184,7 +184,7 @@ describe('assembled remote command', () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');
-    expect(result.stderr).not.toContain(PID_MARKER);
+    expect(result.stderr).toContain(PID_MARKER);
   });
 
   test('falls back to a plain shell when the host has no setsid', () => {
@@ -236,4 +236,47 @@ describe('assembled remote command', () => {
       rmSync(box.root, { recursive: true, force: true });
     }
   });
+});
+
+test('publishes a killable process group before accepting script bytes', async () => {
+  const box = sandbox();
+  const resultFile = join(box.workDir, 'ran');
+  const built = buildCommand({ interpreter: resolveInterpreter('.sh'), scriptPath: box.scriptPath,
+    stagingDir: box.stagingDir, cwd: box.workDir });
+  const child = spawn('bash', ['-c', built.command], { stdio: ['pipe', 'ignore', 'pipe'] });
+  let pid: number | undefined;
+  try {
+    const marker = await new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('PID must arrive before any stdin bytes')), 500);
+      let stderr = '';
+      child.stderr.on('data', (chunk: Buffer) => {
+        stderr += chunk.toString();
+        if (stderr.includes('\n')) { clearTimeout(timeout); resolve(stderr); }
+      });
+    });
+    pid = Number(marker.match(/__SD_PID__=(\d+)/)?.[1]);
+    expect(pid).toBeGreaterThan(0);
+    // A partial upload must remain inside the same cancellable process group.
+    child.stdin.write(`\necho RAN > '${resultFile}'\n`);
+    const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
+    process.kill(-pid!, 'SIGKILL');
+    await closed;
+    expect(existsSync(resultFile)).toBe(false);
+  } finally {
+    if (pid) { try { process.kill(-pid, 'SIGKILL'); } catch { /* Already stopped. */ } }
+    child.kill('SIGKILL');
+    rmSync(box.root, { recursive: true, force: true });
+  }
+});
+
+test('EOF before delivery confirmation never invokes a custom interpreter', () => {
+  const box = sandbox();
+  const resultFile = join(box.workDir, 'ran');
+  try {
+    const built = buildCommand({ interpreter: { argv: ['sh', '-c', `echo RAN > '${resultFile}'`], label: 'custom' },
+      scriptPath: box.scriptPath, stagingDir: box.stagingDir, cwd: box.workDir });
+    const result = spawnSync('bash', ['-c', built.command], { input: '', encoding: 'utf8', timeout: 1000 });
+    expect(result.status).not.toBe(0);
+    expect(existsSync(resultFile)).toBe(false);
+  } finally { rmSync(box.root, { recursive: true, force: true }); }
 });

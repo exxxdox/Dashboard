@@ -83,7 +83,8 @@ export type BuildCommandInput = {
   interpreter: InterpreterSpec;
   /**
    * Absolute path on the host the interpreter is given. The script's bytes are
-   * written here from stdin, so the host does not have the file beforehand.
+   * written here from stdin after a confirmation newline, so the host does not
+   * have the file beforehand.
    */
   scriptPath: string;
   /**
@@ -138,29 +139,20 @@ export function buildCommand(input: BuildCommandInput): BuiltCommand {
 
   const display = `${envPrefixDisplay(env)}${invoke}`;
 
-  // Echo the pid on stderr, then exec so the shell is replaced in place and the
-  // pid we published stays valid for the lifetime of the script.
-  const inner = `printf '%s%s\\n' ${quote(PID_MARKER)} "$$" >&2; ${invoke}`;
+  // Publish the group before reading stdin: the transport withholds all script
+  // bytes until this handshake, so cancellation can never race an unknown pid.
+  const inner =
+    `printf '%s%s\\n' ${quote(PID_MARKER)} "$$" >&2; ` +
+    // EOF before confirmation must never invoke even a custom interpreter.
+    `(IFS= read -r _sd_delivery) && ` +
+    `(umask 077 && mkdir -p ${quote(stagingDir)}) && ` +
+    `(umask 077 && cat > ${quote(scriptPath)}) && ${invoke}`;
   const quotedInner = quote(inner);
 
-  // Assignments may only prefix a *simple* command, so they cannot go in front
-  // of the `if` probe: `ENV=prod if ...; then` is a syntax error in every POSIX
-  // shell, and the script would never start. Each branch therefore carries the
-  // prefix on its own command word; the variables reach `sh`, and through it the
-  // exec'd interpreter.
+  // The delivery process and script share one group, so cancellation also stops
+  // an upload waiting on stdin. Keep the guarded write before the interpreter.
   const assignments = envPrefix(env);
   const command =
-    // The script arrives on stdin and has to be on disk before it can be run.
-    // `cat` deliberately sits *outside* the setsid branch: delivery must not
-    // depend on how the target's util-linux handles stdio. The `&&` chain is
-    // load-bearing -- a failed or partial write short-circuits the whole
-    // command, so a truncated script is never executed and `cat`'s status
-    // becomes the run's.
-    //
-    // umask in a subshell because script content routinely carries secrets, and
-    // a `chmod` after the write would leave a world-readable window.
-    `(umask 077 && mkdir -p ${quote(stagingDir)}) && ` +
-    `(umask 077 && cat > ${quote(scriptPath)}) && ` +
     `if command -v setsid >/dev/null 2>&1; ` +
     `then ${assignments}setsid -w sh -c ${quotedInner}; ` +
     `else ${assignments}sh -c ${quotedInner}; fi`;
