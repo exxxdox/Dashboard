@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, Pencil, Plus, Trash } from 'lucide-react';
+import { Clock, History, Pencil, Plus, Trash } from 'lucide-react';
 import { useDeleteScriptSchedule, useScriptSchedule, useScriptSchedules, useScripts } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { PageBody } from '../components/AppShell';
@@ -24,6 +24,8 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
   const schedules = useScriptSchedules();
   const remove = useDeleteScriptSchedule();
   const [creating, setCreating] = useState(false);
+  // History belongs to the row action, independently of the editable plan route.
+  const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const query = useScriptSchedule(scheduleId);
   const [chosenScriptId, setChosenScriptId] = useState('');
   const saved = scheduleId ? query.data : null;
@@ -65,7 +67,8 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                       {schedule.enabled ? t('schedule.nextAt', { when: formatDateTime(schedule.nextRunAt, locale) }) : t('schedule.paused')}
                     </span>
                   </a>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" icon={<History className="size-4" aria-hidden />} onClick={() => setHistory({ id: schedule.id, name: schedule.name })}>{t('schedule.history.title')}</Button>
                     <Button size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setCreating(false); navigate(`/schedules/${encodeURIComponent(schedule.id)}`); }}>{t('schedule.edit')}</Button>
                     <Button size="sm" variant="danger" icon={<Trash className="size-4" aria-hidden />} disabled={remove.isPending} onClick={() => remove.mutate(schedule.id, { onSuccess: () => { if (scheduleId === schedule.id) closeEditor(); } })}>{t('schedule.delete')}</Button>
                   </div>
@@ -97,7 +100,9 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
               </>
             )}
           </div>
-          {scheduleId && saved ? <div className="mt-5"><ScheduleExecutions key={scheduleId} scheduleId={scheduleId} /></div> : null}
+        </Modal> : null}
+        {history ? <Modal open onClose={() => setHistory(null)} title={t('schedule.history.title')} description={history.name} size="lg">
+          <ScheduleExecutions key={history.id} scheduleId={history.id} />
         </Modal> : null}
       </div>
     </PageBody>

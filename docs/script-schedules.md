@@ -2,7 +2,7 @@
 
 The independent Scheduled runs page (`#/schedules`) manages named plans. Multiple plans can run the same script with different Cron rules, time zones, targets, arguments and retention policies. Each plan has its own stable ID; selecting a script never overwrites another plan.
 
-New schedule opens a settings dialog. Saved plans have inline edit and delete actions; editing opens the same dialog, including execution history. The script picker shows the display name once, adding the path only when it differs.
+New schedule opens a settings dialog. Saved plans have inline execution history, edit and delete actions. Editing opens the settings dialog; execution history opens a separate dialog for that plan. The script picker shows the display name once, adding the path only when it differs.
 
 The editor saves a snapshot of the selected target, environment parameters, positional arguments and resolved timeout. Editing a plan never reads or writes the manual run draft. Saved plans keep their script; create another plan to schedule a different script.
 

@@ -4,13 +4,13 @@ import type { ScriptSchedule, ScriptSummary } from '@dashboard/shared';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { SchedulesPage } from './SchedulesPage';
 
-const queryState = vi.hoisted(() => ({ failed: false, direct: false, remove: vi.fn(), navigate: vi.fn() }));
+const queryState = vi.hoisted(() => ({ failed: false, direct: false, history: null as { id: string; name: string } | null, setHistory: vi.fn(), remove: vi.fn(), navigate: vi.fn() }));
 vi.mock('react', async (original) => {
   const actual = await original<typeof import('react')>();
-  return { ...actual, useState: (initial: unknown) => queryState.direct ? [initial, vi.fn()] : actual.useState(initial) };
+  return { ...actual, useState: (initial: unknown) => initial === null ? (queryState.direct ? [queryState.history, queryState.setHistory] : actual.useState(queryState.history)) : queryState.direct ? [initial, vi.fn()] : actual.useState(initial) };
 });
 vi.mock('../lib/router', () => ({ href: (path: string) => `#${path}`, navigate: queryState.navigate }));
-beforeEach(() => { queryState.failed = false; queryState.direct = false; queryState.remove.mockReset(); queryState.navigate.mockReset(); });
+beforeEach(() => { queryState.history = null; queryState.setHistory.mockReset(); queryState.failed = false; queryState.direct = false; queryState.remove.mockReset(); queryState.navigate.mockReset(); });
 
 const script = { id: 'scr_1', displayName: 'Daily backup', relPath: 'backup.sh', params: [] } as unknown as ScriptSummary;
 const saved = { id: 'sch_1', name: 'Morning backup', retentionDays: 7, scriptId: 'scr_1', cron: '0 8 * * *', timeZone: 'UTC', enabled: true, targetName: 'edge', nextRunAt: null,
@@ -31,6 +31,7 @@ test('shows inline actions and keeps the editor off the page until opened', () =
   expect(html).toContain('schedule.page.title');
   expect(html).not.toContain('<select');
   expect(html).not.toContain('<dialog');
+  expect(html.match(/schedule.history.title/g)).toHaveLength(2);
   expect(html.match(/schedule.edit/g)).toHaveLength(2);
   expect(html.match(/schedule.delete/g)).toHaveLength(2);
   expect(html).toContain('#/schedules/sch_1');
@@ -45,6 +46,7 @@ test('editing an existing plan seeds the shared run editor from its saved invoca
   const html = renderToStaticMarkup(<SchedulesPage scheduleId="sch_1" />);
   expect(html).toContain('<dialog');
   expect(html).toContain('data-mode="schedule"');
+  expect(html).not.toContain('schedule.history.empty');
   expect(html).toContain('stored');
   expect(html).toContain('KEEP');
 });
@@ -76,6 +78,16 @@ test('row actions edit or delete the corresponding saved plan', () => {
   const rows = elements(SchedulesPage({ scheduleId: null }));
   rows.find(el => el.props.children === 'schedule.edit')!.props.onClick!();
   expect(queryState.navigate).toHaveBeenCalledWith('/schedules/sch_1');
+  rows.find(el => el.props.children === 'schedule.history.title')!.props.onClick!();
+  expect(queryState.setHistory).toHaveBeenCalledWith({ id: 'sch_1', name: 'Morning backup' });
   rows.find(el => el.props.children === 'schedule.delete')!.props.onClick!();
   expect(queryState.remove.mock.calls[0]?.[0]).toBe('sch_1');
+});
+
+test('shows execution records in a separate dialog without the editor', () => {
+  queryState.history = { id: 'sch_2', name: 'Evening backup' };
+  const html = renderToStaticMarkup(<SchedulesPage scheduleId={null} />);
+  expect(html).toContain('<dialog');
+  expect(html).toContain('schedule.history.empty');
+  expect(html).not.toContain('<select');
 });
