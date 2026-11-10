@@ -43,10 +43,14 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
 
   return (
     <section aria-label={t('schedule.title')} className="border-line grid gap-4 border-t pt-5">
-      <h3 className="text-ink flex items-center gap-2 font-semibold">
-        <Clock className="text-accent size-4" aria-hidden />
-        {t('schedule.title')}
-      </h3>
+      {/* Keep saving within reach while scrolling through the schedule settings. */}
+      <div className="bg-panel sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 py-3">
+        <h3 className="text-ink flex items-center gap-2 font-semibold">
+          <Clock className="text-accent size-4" aria-hidden />
+          {t('schedule.title')}
+        </h3>
+        <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>
+      </div>
           <p className="text-mute text-meta">{t('schedule.snapshotHint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('schedule.name')} hint={t('schedule.nameHint')}>
@@ -78,12 +82,10 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
               {schedule.lastError ? <p className="text-danger" role="alert">{t(`schedule.error.${schedule.lastError}`)}</p> : null}
             </div>
           ) : null}
-          {/* Validation must remain visible above the modal’s controls, beyond the global toast layer. */}
+          {/* Validation stays inside the modal because the global toast is behind its top layer. */}
           {save.isError ? <ErrorBanner message={errorMessage(save.error, i18n)} /> : null}
           <p className="text-faint text-meta">{t('schedule.behaviorHint')}</p>
-          <div className="flex flex-wrap gap-3">
-            <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>
-          </div>
+
     </section>
   );
 }

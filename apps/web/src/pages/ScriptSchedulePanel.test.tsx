@@ -123,3 +123,9 @@ test('closes the editor only after the save succeeds', () => {
   hooks.save.mock.calls[0]?.[1].onSuccess();
   expect(onSaved).toHaveBeenCalledOnce();
 });
+
+test('places the save action before the settings fields and saved snapshot', () => {
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={saved} defaultName="New plan" getInput={() => input} />);
+  expect(html.indexOf('schedule.save</button>')).toBeLessThan(html.indexOf('schedule.name</label>'));
+  expect(html.match(/schedule.save<\/button>/g)).toHaveLength(1);
+});
