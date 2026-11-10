@@ -171,7 +171,6 @@ function SourceTreePane({
       className="min-w-0 max-w-[520px] xl:max-w-none"
       flush
       title={source.name}
-      bodyClassName="p-1.5"
       // The sync state, and the button that changes it, belong to the source, so
       // they live in the panel's own header. As a row of their own above the
       // panel they pushed the tree out of line with the detail column. No file
@@ -186,7 +185,7 @@ function SourceTreePane({
       }
     >
       {source.kind === 'local' ? (
-        <p className="text-mute text-meta px-3 py-2">{i18n.t('sources.localScanHint')}</p>
+        <p className="text-mute text-meta px-5 py-2">{i18n.t('sources.localScanHint')}</p>
       ) : null}
       {tree.isPending ? (
         <LoadingBlock label={i18n.t('scripts.loadingTree')} />

@@ -78,7 +78,7 @@ export function ScriptTree({
 
   return (
     <div className="min-h-0">
-      <div className="grid gap-0.5">
+      <div className="grid">
         {rows.map(({ node, depth }) => {
           const isDir = node.type === 'dir';
           const isCollapsed = collapsed.has(node.path);
@@ -86,39 +86,32 @@ export function ScriptTree({
           const childCount = node.children?.length ?? 0;
 
           return (
-            <div
+            <button
+              type="button"
+              onClick={() => (isDir ? toggle(node.path) : onSelect(node))}
+              aria-expanded={isDir ? !isCollapsed : undefined}
+              aria-pressed={isDir ? undefined : isSelected}
               key={node.path || node.name}
               className={cn(
-                'group flex h-9 items-center gap-1 rounded-lg pr-2 transition-colors duration-150 ease-out',
+                'focus-ring group flex h-10 w-full min-w-0 items-center gap-1 pr-5 text-left transition-colors duration-150 ease-out',
                 isSelected ? 'bg-accent-soft' : 'hover:bg-panel-2',
               )}
-              // Indent tracks the row height: at 36px rows a 12px step reads as
-              // flat, and the tree is the one place structure has to be visible.
-              style={{ paddingLeft: `${depth * 14 + 8}px` }}
+              // Keep indentation inside the button so hover and keyboard focus cover the whole row.
+              style={{ paddingLeft: `${depth * 14 + 20}px` }}
             >
               {isDir ? (
-                <button
-                  type="button"
-                  onClick={() => toggle(node.path)}
-                  aria-expanded={!isCollapsed}
-                  className="focus-ring text-faint hover:text-ink hover:bg-panel-3 flex size-5 shrink-0 items-center justify-center rounded-md transition-colors duration-150"
-                  aria-label={`${isCollapsed ? t('common.expand') : t('common.collapse')} ${node.name}`}
-                >
+                <span className="text-faint flex size-5 shrink-0 items-center justify-center" aria-hidden>
                   {isCollapsed ? (
                     <ChevronRight className="size-4" aria-hidden />
                   ) : (
                     <ChevronDown className="size-4" aria-hidden />
                   )}
-                </button>
+                </span>
               ) : (
                 <span className="size-5 shrink-0" aria-hidden />
               )}
 
-              <button
-                type="button"
-                onClick={() => (isDir ? toggle(node.path) : onSelect(node))}
-                className="focus-ring flex min-w-0 flex-1 items-center gap-2 rounded-md text-left"
-              >
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 {isDir ? (
                   isCollapsed ? (
                     <Folder className="text-faint size-4 shrink-0" aria-hidden />
@@ -146,8 +139,8 @@ export function ScriptTree({
                 {isDir && childCount > 0 ? (
                   <span className="mono text-faint text-micro ml-auto pl-2">{childCount}</span>
                 ) : null}
-              </button>
-            </div>
+              </span>
+            </button>
           );
         })}
       </div>
@@ -157,7 +150,7 @@ export function ScriptTree({
           that did nothing when pressed, which reads as a broken control rather
           than as an action with no work to do. */}
       {rows.some((row) => row.node.type === 'dir') ? (
-        <div className="border-line mt-3 flex gap-4 border-t px-1.5 pt-2.5">
+        <div className="border-line flex gap-4 border-t px-5 py-3">
           <button
             type="button"
             onClick={expandAll}
