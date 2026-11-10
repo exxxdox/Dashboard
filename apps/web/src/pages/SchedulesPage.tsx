@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Clock, Plus } from 'lucide-react';
-import { useScriptSchedule, useScriptSchedules, useScripts } from '../api/queries';
+import { Clock, Pencil, Plus, Trash } from 'lucide-react';
+import { useDeleteScriptSchedule, useScriptSchedule, useScriptSchedules, useScripts } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
 import { EmptyState, ErrorBanner, LoadingBlock } from '../components/Feedback';
 import { Field, Select } from '../components/Form';
 import { PageHeader } from '../components/PageHeader';
+import { Modal } from '../components/Modal';
 import { Panel } from '../components/Panel';
 import { formatDateTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
@@ -21,15 +22,25 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
   const { t, locale } = i18n;
   const scripts = useScripts();
   const schedules = useScriptSchedules();
+  const remove = useDeleteScriptSchedule();
+  const [creating, setCreating] = useState(false);
   const query = useScriptSchedule(scheduleId);
   const [chosenScriptId, setChosenScriptId] = useState('');
   const saved = scheduleId ? query.data : null;
   const scriptId = saved?.scriptId ?? chosenScriptId;
   const selected = scripts.data?.find((script) => script.id === scriptId);
-  const scriptNames = new Map(scripts.data?.map((script) => [script.id, `${script.displayName} · ${script.relPath}`]));
+  // The scanner uses the file name as the default display name; only add a distinct path.
+  const scriptNames = new Map(scripts.data?.map((script) => [script.id, script.displayName === script.relPath ? script.displayName : `${script.displayName} · ${script.relPath}`]));
+  const editorOpen = creating || Boolean(scheduleId);
+
+  function closeEditor(): void {
+    setCreating(false);
+    navigate('/schedules');
+  }
 
   function create(): void {
     setChosenScriptId('');
+    setCreating(true);
     navigate('/schedules');
   }
 
@@ -42,9 +53,9 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
           {schedules.isError ? <ErrorBanner message={errorMessage(schedules.error, i18n)} onRetry={() => void schedules.refetch()} /> : schedules.isPending ? <LoadingBlock /> : schedules.data?.length ? (
             <ul className="grid gap-2">
               {schedules.data.map((schedule) => (
-                <li key={schedule.id}>
+                <li key={schedule.id} className="border-line grid gap-3 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <a href={href(`/schedules/${encodeURIComponent(schedule.id)}`)} aria-current={schedule.id === scheduleId ? 'page' : undefined}
-                    className="focus-ring border-line hover:border-line-strong grid gap-2 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    className="focus-ring grid min-w-0 gap-2 rounded-lg sm:grid-cols-[minmax(0,1fr)_auto]">
                     <span className="min-w-0">
                       <span className="text-ink block break-all font-semibold">{schedule.name}</span>
                       <span className="text-mute text-meta block break-all">{scriptNames.get(schedule.scriptId) ?? schedule.scriptId}</span>
@@ -54,13 +65,17 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                       {schedule.enabled ? t('schedule.nextAt', { when: formatDateTime(schedule.nextRunAt, locale) }) : t('schedule.paused')}
                     </span>
                   </a>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setCreating(false); navigate(`/schedules/${encodeURIComponent(schedule.id)}`); }}>{t('schedule.edit')}</Button>
+                    <Button size="sm" variant="danger" icon={<Trash className="size-4" aria-hidden />} disabled={remove.isPending} onClick={() => remove.mutate(schedule.id, { onSuccess: () => { if (scheduleId === schedule.id) closeEditor(); } })}>{t('schedule.delete')}</Button>
+                  </div>
                 </li>
               ))}
             </ul>
           ) : <EmptyState title={t('schedule.empty.title')} description={t('schedule.empty.description')} />}
         </Panel>
 
-        <Panel title={t('schedule.editor')}>
+        {editorOpen ? <Modal open onClose={closeEditor} title={t('schedule.editor')} size="lg">
           <div className="grid gap-5">
             {scheduleId && query.isError ? <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} /> : null}
             {scheduleId && !saved ? (query.isPending ? <LoadingBlock /> : null) : scripts.isError ? (
@@ -70,20 +85,20 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                 <Field label={t('schedule.script')} hint={t('schedule.scriptHint')}>
                   {({ id, describedBy }) => <Select id={id} aria-describedby={describedBy} value={scriptId} disabled={Boolean(saved)} onChange={(event) => setChosenScriptId(event.target.value)}>
                     <option value="">{t('schedule.chooseScript')}</option>
-                    {scripts.data?.map((script) => <option key={script.id} value={script.id}>{script.displayName} · {script.relPath}</option>)}
+                    {scripts.data?.map((script) => <option key={script.id} value={script.id}>{scriptNames.get(script.id)}</option>)}
                   </Select>}
                 </Field>
                 {selected ? (
                   // Polling changes status, not this key: unfinished edits survive a failed refresh.
                   <RunPanel key={`${scheduleId ?? 'new'}:${selected.id}`} script={selected} mode="schedule" initialInput={saved?.input}>
-                    {(getInput) => <ScriptSchedulePanel scriptId={selected.id} schedule={saved ?? null} defaultName={selected.displayName} getInput={getInput} />}
+                    {(getInput) => <ScriptSchedulePanel scriptId={selected.id} schedule={saved ?? null} defaultName={selected.displayName} getInput={getInput} onSaved={closeEditor} />}
                   </RunPanel>
                 ) : scriptId ? <EmptyState title={t('schedule.scriptMissing')} description={t('schedule.scriptHint')} /> : null}
               </>
             )}
           </div>
-        </Panel>
-        {scheduleId && saved ? <ScheduleExecutions key={scheduleId} scheduleId={scheduleId} /> : null}
+          {scheduleId && saved ? <div className="mt-5"><ScheduleExecutions key={scheduleId} scheduleId={scheduleId} /></div> : null}
+        </Modal> : null}
       </div>
     </PageBody>
   );

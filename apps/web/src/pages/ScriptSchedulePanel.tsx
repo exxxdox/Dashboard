@@ -1,18 +1,19 @@
 import { useState } from 'react';
 import type { ExecuteScriptInput, ScriptSchedule } from '@dashboard/shared';
-import { Clock, Save, Trash } from 'lucide-react';
-import { useDeleteScriptSchedule, useSaveScriptSchedule } from '../api/queries';
+import { Clock, Save } from 'lucide-react';
+import { useSaveScriptSchedule } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
 import { Field, Switch, TextInput } from '../components/Form';
 import { formatDateTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
-import { href, navigate } from '../lib/router';
+import { href } from '../lib/router';
 
 const DEFAULT_CRON = '*/5 * * * *';
 
-export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput }: {
+export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput, onSaved }: {
+  onSaved?: () => void;
   scriptId: string;
   schedule: ScriptSchedule | null;
   defaultName: string;
@@ -22,13 +23,12 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput 
   const i18n = useI18n();
   const { t, locale } = i18n;
   const save = useSaveScriptSchedule();
-  const remove = useDeleteScriptSchedule();
   const [name, setName] = useState(schedule?.name ?? defaultName);
   const [cron, setCron] = useState(schedule?.cron ?? DEFAULT_CRON);
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC');
   const [retentionDays, setRetentionDays] = useState(String(schedule?.retentionDays ?? 30));
   const [newEnabled, setNewEnabled] = useState(true);
-  const pending = save.isPending || remove.isPending;
+  const pending = save.isPending;
   const enabled = schedule?.enabled ?? newEnabled;
   const retention = Number(retentionDays);
   const validRetention = retentionDays.trim() !== '' && Number.isInteger(retention) && retention >= 0 && retention <= 3650;
@@ -37,7 +37,7 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput 
     const input = getInput();
     if (!input || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention) return;
     save.mutate({ scheduleId: schedule?.id, input: { scriptId, name, retentionDays: retention, cron, timeZone, enabled, input } }, {
-      onSuccess: (saved) => { if (!schedule) navigate(`/schedules/${encodeURIComponent(saved.id)}`); },
+      onSuccess: () => onSaved?.(),
     });
   }
 
@@ -48,10 +48,6 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput 
       scriptId: schedule.scriptId, name: schedule.name, retentionDays: schedule.retentionDays,
       cron: schedule.cron, timeZone: schedule.timeZone, enabled: next, input: schedule.input,
     } });
-  }
-
-  function deleteSchedule(): void {
-    if (schedule) remove.mutate(schedule.id, { onSuccess: () => navigate('/schedules') });
   }
 
   return (
@@ -97,11 +93,9 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput 
           ) : null}
           {/* Validation must remain visible above the modal’s controls, beyond the global toast layer. */}
           {save.isError ? <ErrorBanner message={errorMessage(save.error, i18n)} /> : null}
-          {remove.isError ? <ErrorBanner message={errorMessage(remove.error, i18n)} /> : null}
           <p className="text-faint text-meta">{t('schedule.behaviorHint')}</p>
           <div className="flex flex-wrap gap-3">
             <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>
-            {schedule ? <Button icon={<Trash className="size-4" aria-hidden />} onClick={deleteSchedule} disabled={pending} loading={remove.isPending}>{t('schedule.delete')}</Button> : null}
           </div>
     </section>
   );

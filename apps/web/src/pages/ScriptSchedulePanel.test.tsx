@@ -91,12 +91,6 @@ test('disabling keeps the saved run settings instead of the current form', () =>
   expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scheduleId: 'sch_1', input: { scriptId: 'script', name: 'Morning', retentionDays: 7, cron: saved.cron, timeZone: saved.timeZone, enabled: false, input: saved.input } });
 });
 
-test('deletes the saved schedule', () => {
-  hooks.data = saved;
-  click('schedule.delete');
-  expect(hooks.remove.mock.calls[0]?.[0]).toBe('sch_1');
-});
-
 test('localizes persisted submission errors without rendering raw error details', () => {
   hooks.data = { ...saved, lastError: 'submit_failed' };
   const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={hooks.data ?? null} defaultName="New plan" getInput={() => input} />);
@@ -116,4 +110,14 @@ test('creates a distinct plan with its own name and retention', () => {
   expect(hooks.save.mock.calls[0]?.[0]).toMatchObject({
     scheduleId: undefined, input: { scriptId: 'script', name: 'New plan', retentionDays: 30, input },
   });
+});
+
+test('closes the editor only after the save succeeds', () => {
+  hooks.direct = true;
+  const onSaved = vi.fn();
+  const tree = ScriptSchedulePanel({ scriptId: 'script', schedule: null, defaultName: 'New plan', getInput: () => input, onSaved });
+  elements(tree).find(el => el.props.children === 'schedule.save')!.props.onClick!();
+  expect(onSaved).not.toHaveBeenCalled();
+  hooks.save.mock.calls[0]?.[1].onSuccess();
+  expect(onSaved).toHaveBeenCalledOnce();
 });

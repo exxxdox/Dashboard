@@ -1,6 +1,7 @@
 const en = {
   'schedule.title': 'Scheduled run',
   'schedule.create': 'New schedule',
+  'schedule.edit': 'Edit',
   'schedule.name': 'Schedule name',
   'schedule.retention': 'Keep execution records (days)',
   'schedule.retentionHint': '0 keeps records forever. Changing this also applies to existing records. Queued and running jobs are never removed.',
@@ -17,7 +18,7 @@ const en = {
   'schedule.scriptHint': 'A script can have multiple plans, each with its own time, host and parameters.',
   'schedule.chooseScript': 'Choose a script',
   'schedule.empty.title': 'No schedules yet',
-  'schedule.empty.description': 'Choose a script below to create its schedule.',
+  'schedule.empty.description': 'Click New schedule to choose a script and set when it runs.',
   'schedule.scriptMissing': 'This script is no longer available',
   'schedule.nextAt': 'Next: {when}',
   'schedule.loading': 'Loading schedule…',
@@ -50,6 +51,7 @@ const en = {
 const zh: Record<keyof typeof en, string> = {
   'schedule.title': '定时运行',
   'schedule.create': '新增计划',
+  'schedule.edit': '编辑',
   'schedule.name': '计划名称',
   'schedule.retention': '执行记录保留天数',
   'schedule.retentionHint': '0 表示永久保留。修改后也应用于已有记录，排队和执行中的任务不会被清理。',
@@ -66,7 +68,7 @@ const zh: Record<keyof typeof en, string> = {
   'schedule.scriptHint': '同一脚本可创建多条计划，分别设置时间、主机和运行参数。',
   'schedule.chooseScript': '选择脚本',
   'schedule.empty.title': '暂无定时计划',
-  'schedule.empty.description': '在下方选择脚本，创建它的定时计划。',
+  'schedule.empty.description': '点击“新增计划”，选择脚本并设置运行时间。',
   'schedule.scriptMissing': '此脚本已不可用',
   'schedule.nextAt': '下次：{when}',
   'schedule.loading': '正在读取定时计划…',
