@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Clock, History, Pencil, Plus, Trash } from 'lucide-react';
-import { useDeleteScriptSchedule, useScriptSchedule, useScriptSchedules, useScripts } from '../api/queries';
+import { Clock, History, Pause, Pencil, Play, Plus, Trash } from 'lucide-react';
+import { useDeleteScriptSchedule, useSaveScriptSchedule, useScriptSchedule, useScriptSchedules, useScripts } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
@@ -23,6 +23,8 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
   const scripts = useScripts();
   const schedules = useScriptSchedules();
   const remove = useDeleteScriptSchedule();
+  const save = useSaveScriptSchedule();
+  const pending = save.isPending || remove.isPending;
   const [creating, setCreating] = useState(false);
   // History belongs to the row action, independently of the editable plan route.
   const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
@@ -68,9 +70,14 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                     </span>
                   </a>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* Toggle only the saved snapshot, never the editor's unsaved input. */}
+                    <Button size="sm" icon={schedule.enabled ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />} disabled={pending} onClick={() => save.mutate({ scheduleId: schedule.id, input: {
+                      scriptId: schedule.scriptId, name: schedule.name, retentionDays: schedule.retentionDays,
+                      cron: schedule.cron, timeZone: schedule.timeZone, enabled: !schedule.enabled, input: schedule.input,
+                    } })}>{t(schedule.enabled ? 'schedule.pause' : 'schedule.resume')}</Button>
                     <Button size="sm" icon={<History className="size-4" aria-hidden />} onClick={() => setHistory({ id: schedule.id, name: schedule.name })}>{t('schedule.history.title')}</Button>
                     <Button size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={() => { setCreating(false); navigate(`/schedules/${encodeURIComponent(schedule.id)}`); }}>{t('schedule.edit')}</Button>
-                    <Button size="sm" variant="danger" icon={<Trash className="size-4" aria-hidden />} disabled={remove.isPending} onClick={() => remove.mutate(schedule.id, { onSuccess: () => { if (scheduleId === schedule.id) closeEditor(); } })}>{t('schedule.delete')}</Button>
+                    <Button size="sm" variant="danger" icon={<Trash className="size-4" aria-hidden />} disabled={pending} onClick={() => remove.mutate(schedule.id, { onSuccess: () => { if (scheduleId === schedule.id) closeEditor(); } })}>{t('schedule.delete')}</Button>
                   </div>
                 </li>
               ))}

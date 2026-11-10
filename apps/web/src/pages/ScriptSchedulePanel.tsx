@@ -5,7 +5,7 @@ import { useSaveScriptSchedule } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { Button } from '../components/Button';
 import { ErrorBanner } from '../components/Feedback';
-import { Field, Switch, TextInput } from '../components/Form';
+import { Field, TextInput } from '../components/Form';
 import { formatDateTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 import { href } from '../lib/router';
@@ -27,9 +27,9 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
   const [cron, setCron] = useState(schedule?.cron ?? DEFAULT_CRON);
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC');
   const [retentionDays, setRetentionDays] = useState(String(schedule?.retentionDays ?? 30));
-  const [newEnabled, setNewEnabled] = useState(true);
   const pending = save.isPending;
-  const enabled = schedule?.enabled ?? newEnabled;
+  // Saving settings must not resume a paused plan; new plans start enabled.
+  const enabled = schedule?.enabled ?? true;
   const retention = Number(retentionDays);
   const validRetention = retentionDays.trim() !== '' && Number.isInteger(retention) && retention >= 0 && retention <= 3650;
 
@@ -39,15 +39,6 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
     save.mutate({ scheduleId: schedule?.id, input: { scriptId, name, retentionDays: retention, cron, timeZone, enabled, input } }, {
       onSuccess: () => onSaved?.(),
     });
-  }
-
-  function toggle(next: boolean): void {
-    if (!schedule) { setNewEnabled(next); return; }
-    // Toggling must preserve the saved invocation and policy, even while fields have unsaved edits.
-    save.mutate({ scheduleId: schedule.id, input: {
-      scriptId: schedule.scriptId, name: schedule.name, retentionDays: schedule.retentionDays,
-      cron: schedule.cron, timeZone: schedule.timeZone, enabled: next, input: schedule.input,
-    } });
   }
 
   return (
@@ -70,10 +61,6 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
             <Field label={t('schedule.timeZone')} hint={t('schedule.timeZoneHint')}>
               {({ id, describedBy }) => <TextInput id={id} aria-describedby={describedBy} className="mono" value={timeZone} maxLength={100} placeholder="Asia/Shanghai" onChange={(event) => setTimeZone(event.target.value)} />}
             </Field>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="label">{t('schedule.enabled')}</span>
-            <Switch label={t('schedule.enabled')} checked={enabled} onChange={toggle} disabled={pending} />
           </div>
           {schedule ? (
             <div className="bg-panel-2/50 grid min-w-0 gap-3 rounded-lg p-4 text-meta">

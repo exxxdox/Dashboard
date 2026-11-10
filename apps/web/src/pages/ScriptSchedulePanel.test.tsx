@@ -84,11 +84,13 @@ test('refuses saving when the run form is invalid', () => {
   expect(hooks.save).not.toHaveBeenCalled();
 });
 
-test('disabling keeps the saved run settings instead of the current form', () => {
-  hooks.data = saved;
-  const toggle = elements(render()).find((el) => el.props.label === 'schedule.enabled')!;
-  toggle.props.onChange!(false);
-  expect(hooks.save.mock.calls[0]?.[0]).toEqual({ scheduleId: 'sch_1', input: { scriptId: 'script', name: 'Morning', retentionDays: 7, cron: saved.cron, timeZone: saved.timeZone, enabled: false, input: saved.input } });
+test('editing a paused plan preserves its state and offers no enable switch', () => {
+  hooks.data = { ...saved, enabled: false };
+  const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={hooks.data} defaultName="New plan" getInput={() => input} />);
+  expect(html).not.toContain('schedule.enabled');
+  expect(html).not.toContain('role="switch"');
+  click('schedule.save');
+  expect(hooks.save.mock.calls[0]?.[0].input.enabled).toBe(false);
 });
 
 test('localizes persisted submission errors without rendering raw error details', () => {
@@ -108,7 +110,7 @@ test('shows save validation failures inside the schedule dialog', () => {
 test('creates a distinct plan with its own name and retention', () => {
   click('schedule.save');
   expect(hooks.save.mock.calls[0]?.[0]).toMatchObject({
-    scheduleId: undefined, input: { scriptId: 'script', name: 'New plan', retentionDays: 30, input },
+    scheduleId: undefined, input: { scriptId: 'script', name: 'New plan', retentionDays: 30, enabled: true, input },
   });
 });
 
