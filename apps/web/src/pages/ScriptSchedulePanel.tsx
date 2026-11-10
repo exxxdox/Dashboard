@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ExecuteScriptInput, ScriptSchedule } from '@dashboard/shared';
 import { Clock, Save } from 'lucide-react';
 import { useSaveScriptSchedule } from '../api/queries';
@@ -12,8 +13,9 @@ import { href } from '../lib/router';
 
 const DEFAULT_CRON = '*/5 * * * *';
 
-export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput, onSaved }: {
+export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput, onSaved, saveActionContainer }: {
   onSaved?: () => void;
+  saveActionContainer?: HTMLElement | null;
   scriptId: string;
   schedule: ScriptSchedule | null;
   defaultName: string;
@@ -41,15 +43,18 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
     });
   }
 
+  const saveButton = <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>;
+
   return (
     <section aria-label={t('schedule.title')} className="border-line grid gap-4 border-t pt-5">
-      {/* Keep saving within reach while scrolling through the schedule settings. */}
-      <div className="bg-panel sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 py-3">
+      {/* Portal keeps validation and pending state here while the action stays above all inputs. */}
+      {saveActionContainer ? createPortal(saveButton, saveActionContainer) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-ink flex items-center gap-2 font-semibold">
           <Clock className="text-accent size-4" aria-hidden />
           {t('schedule.title')}
         </h3>
-        <Button icon={<Save className="size-4" aria-hidden />} onClick={submit} disabled={pending || !name.trim() || !cron.trim() || !timeZone.trim() || !validRetention} loading={save.isPending}>{t('schedule.save')}</Button>
+        {saveActionContainer === undefined ? saveButton : null}
       </div>
           <p className="text-mute text-meta">{t('schedule.snapshotHint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">

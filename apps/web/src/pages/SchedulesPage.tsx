@@ -26,6 +26,7 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
   const save = useSaveScriptSchedule();
   const pending = save.isPending || remove.isPending;
   const [creating, setCreating] = useState(false);
+  const [saveActionContainer, setSaveActionContainer] = useState<HTMLDivElement | null>(null);
   // History belongs to the row action, independently of the editable plan route.
   const [history, setHistory] = useState<{ id: string; name: string } | null>(null);
   const query = useScriptSchedule(scheduleId);
@@ -85,7 +86,7 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
           ) : <EmptyState title={t('schedule.empty.title')} description={t('schedule.empty.description')} />}
         </Panel>
 
-        {editorOpen ? <Modal open onClose={closeEditor} title={t('schedule.editor')} size="lg">
+        {editorOpen ? <Modal open onClose={closeEditor} title={t('schedule.editor')} size="lg" actions={<div ref={setSaveActionContainer} />}>
           <div className="grid gap-5">
             {scheduleId && query.isError ? <ErrorBanner message={errorMessage(query.error, i18n)} onRetry={() => void query.refetch()} /> : null}
             {scheduleId && !saved ? (query.isPending ? <LoadingBlock /> : null) : scripts.isError ? (
@@ -101,7 +102,7 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                 {selected ? (
                   // Polling changes status, not this key: unfinished edits survive a failed refresh.
                   <RunPanel key={`${scheduleId ?? 'new'}:${selected.id}`} script={selected} mode="schedule" initialInput={saved?.input}>
-                    {(getInput) => <ScriptSchedulePanel scriptId={selected.id} schedule={saved ?? null} defaultName={selected.displayName} getInput={getInput} onSaved={closeEditor} />}
+                    {(getInput) => <ScriptSchedulePanel scriptId={selected.id} schedule={saved ?? null} defaultName={selected.displayName} getInput={getInput} onSaved={closeEditor} saveActionContainer={saveActionContainer} />}
                   </RunPanel>
                 ) : scriptId ? <EmptyState title={t('schedule.scriptMissing')} description={t('schedule.scriptHint')} /> : null}
               </>

@@ -25,6 +25,7 @@ export function Modal({
   onClose,
   title,
   description,
+  actions,
   size = 'md',
   children,
 }: {
@@ -32,6 +33,7 @@ export function Modal({
   onClose: () => void;
   title: string;
   description?: string;
+  actions?: ReactNode;
   size?: keyof typeof SIZE_CLASS;
   children: ReactNode;
 }) {
@@ -70,9 +72,12 @@ export function Modal({
           </h2>
           {description ? <p className="text-mute text-body">{description}</p> : null}
         </div>
-        <IconButton label={t('common.close')} onClick={onClose}>
-          <X className="size-[18px]" aria-hidden />
-        </IconButton>
+        <div className="flex shrink-0 items-center gap-3">
+          {actions}
+          <IconButton label={t('common.close')} onClick={onClose}>
+            <X className="size-[18px]" aria-hidden />
+          </IconButton>
+        </div>
       </header>
       <div className="max-h-[70vh] overflow-y-auto p-5">{children}</div>
     </dialog>

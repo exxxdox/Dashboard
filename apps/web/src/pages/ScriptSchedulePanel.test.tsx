@@ -4,6 +4,11 @@ import type { ExecuteScriptInput, ScriptSchedule } from '@dashboard/shared';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { ScriptSchedulePanel } from './ScriptSchedulePanel';
 
+vi.mock('react-dom', async (original) => {
+  const actual = await original<typeof import('react-dom')>();
+  return { ...actual, createPortal: (children: unknown) => <div data-header-action>{children as import('react').ReactNode}</div> };
+});
+
 const hooks = vi.hoisted(() => ({
   direct: false, slots: [] as unknown[], index: 0, changed: false,
   data: null as ScriptSchedule | null | undefined, pending: false, error: false,
@@ -128,4 +133,13 @@ test('places the save action before the settings fields and saved snapshot', () 
   const html = renderToStaticMarkup(<ScriptSchedulePanel scriptId="script" schedule={saved} defaultName="New plan" getInput={() => input} />);
   expect(html.indexOf('schedule.save</button>')).toBeLessThan(html.indexOf('schedule.name</label>'));
   expect(html.match(/schedule.save<\/button>/g)).toHaveLength(1);
+});
+
+test('renders the save action in the dialog header target with the same submit handler', () => {
+  hooks.direct = true;
+  const tree = ScriptSchedulePanel({ scriptId: 'script', schedule: saved, defaultName: 'New plan', getInput: () => input, saveActionContainer: {} as HTMLElement });
+  const save = elements(tree).find(el => el.props.children === 'schedule.save')!;
+  save.props.onClick!();
+  expect(hooks.save.mock.calls[0]?.[0].input.input).toEqual(input);
+  expect(elements(tree).some(el => 'data-header-action' in el.props)).toBe(true);
 });
