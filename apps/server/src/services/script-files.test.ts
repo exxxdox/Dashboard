@@ -227,3 +227,75 @@ test.each(['path', 'name', 'delete'] as const)('a running scan prevents source %
   } finally { await syncing; }
   expect(h.db.prepare('SELECT name, mount_path, sync_status FROM sources WHERE id = ?').get(h.source.id)).toEqual({ name: 'scripts', mount_path: 'local', sync_status: 'ok' });
 });
+
+
+test('editing a local name renames its file and preserves identity through a rescan', async () => {
+  const h = setup();
+  const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'folder/old.sh', content: 'echo original' } })).json();
+  chmodSync(join(h.directory, 'folder/old.sh'), 0o755);
+  h.db.prepare("UPDATE scripts SET run_draft_json = ? WHERE id = ?").run('{"interactive":true}', script.id);
+  h.db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,work_dir,created_at,updated_at) VALUES ('target','target','localhost','ops','password','unused','/tmp','','')`).run();
+  h.db.prepare(`INSERT INTO executions (id,script_id,target_id,status,command_display,target_name,script_name,script_rel_path,work_dir,queued_at) VALUES ('execution',?,'target','succeeded','echo original','target','old','folder/old.sh','/tmp','')`).run(script.id);
+  h.db.prepare(`INSERT INTO script_schedules (id,script_id,name,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at) VALUES ('schedule',?,'Daily','target','* * * * *','UTC',1,'{}','2027-01-01','','')`).run(script.id);
+
+  const response = await h.app.inject({ method: 'PATCH', url: `/api/scripts/${script.id}`, payload: { displayName: '新名称', description: 'updated' } });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toMatchObject({ id: script.id, relPath: 'folder/新名称.sh', fileName: '新名称.sh', displayName: '新名称.sh', description: 'updated' });
+  expect(() => readFileSync(join(h.directory, 'folder/old.sh'))).toThrow();
+  expect(readFileSync(join(h.directory, 'folder/新名称.sh'), 'utf8')).toBe('echo original');
+  expect(statSync(join(h.directory, 'folder/新名称.sh')).mode & 0o777).toBe(0o755);
+  expect(h.db.prepare('SELECT script_id, script_rel_path FROM executions').get()).toEqual({ script_id: script.id, script_rel_path: 'folder/old.sh' });
+  expect(h.db.prepare('SELECT script_id, enabled FROM script_schedules').get()).toEqual({ script_id: script.id, enabled: 1 });
+  expect(h.db.prepare('SELECT run_draft_json FROM scripts WHERE id = ?').get(script.id)).toEqual({ run_draft_json: '{"interactive":true}' });
+
+  await syncSource(h.db, h.config, h.source.id, h.logger);
+  expect(h.db.prepare('SELECT id, rel_path FROM scripts WHERE deleted_at IS NULL').all()).toEqual([{ id: script.id, rel_path: 'folder/新名称.sh' }]);
+});
+
+test.each(['../escape.sh', 'folder/escape.sh', '.hidden.sh', 'bad.txt', 'different.ps1'])('local rename refuses invalid filename %s', async (displayName) => {
+  const h = setup();
+  const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'old.sh', content: 'original' } })).json();
+  expect((await h.app.inject({ method: 'PATCH', url: `/api/scripts/${script.id}`, payload: { displayName } })).statusCode).toBe(422);
+  expect(readFileSync(join(h.directory, 'old.sh'), 'utf8')).toBe('original');
+});
+
+test('rename never overwrites files and restores the file if metadata saving fails', async () => {
+  const h = setup();
+  const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'old.sh', content: 'original' } })).json();
+  writeFileSync(join(h.directory, 'taken.sh'), 'keep');
+  const rename = (displayName: string) => h.app.inject({ method: 'PATCH', url: `/api/scripts/${script.id}`, payload: { displayName, description: 'changed' } });
+  expect((await rename('taken.sh')).statusCode).toBe(409);
+  expect(readFileSync(join(h.directory, 'taken.sh'), 'utf8')).toBe('keep');
+  h.db.exec("CREATE TRIGGER refuse_update BEFORE UPDATE ON scripts BEGIN SELECT RAISE(ABORT, 'failure'); END;");
+  expect((await rename('new.sh')).statusCode).toBe(422);
+  expect(readFileSync(join(h.directory, 'old.sh'), 'utf8')).toBe('original');
+  expect(() => readFileSync(join(h.directory, 'new.sh'))).toThrow();
+  expect(h.db.prepare('SELECT rel_path, description FROM scripts WHERE id = ?').get(script.id)).toEqual({ rel_path: 'old.sh', description: null });
+});
+
+
+test('GitHub name edits remain metadata-only and syncing blocks local renames', async () => {
+  const h = setup();
+  const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'old.sh', content: 'original' } })).json();
+  h.db.prepare("UPDATE sources SET sync_status = 'syncing' WHERE id = ?").run(h.source.id);
+  expect((await h.app.inject({ method: 'PATCH', url: `/api/scripts/${script.id}`, payload: { displayName: 'new.sh' } })).statusCode).toBe(409);
+  h.db.prepare("UPDATE sources SET kind = 'github', sync_status = 'ok' WHERE id = ?").run(h.source.id);
+  const response = await h.app.inject({ method: 'PATCH', url: `/api/scripts/${script.id}`, payload: { displayName: 'Friendly name' } });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toMatchObject({ displayName: 'Friendly name', relPath: 'old.sh' });
+  expect(readFileSync(join(h.directory, 'old.sh'), 'utf8')).toBe('original');
+});
+
+test('rename refuses symlink originals and paths retained for deleted scripts', async () => {
+  const h = setup();
+  const create = async (relPath: string) => (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath, content: 'original' } })).json();
+  const old = await create('old.sh');
+  const deleted = await create('deleted.sh');
+  await h.app.inject({ method: 'DELETE', url: `/api/scripts/${deleted.id}`, payload: { expectedHash: deleted.contentHash } });
+  expect((await h.app.inject({ method: 'PATCH', url: `/api/scripts/${old.id}`, payload: { displayName: 'deleted.sh' } })).statusCode).toBe(409);
+  writeFileSync(join(h.root, 'outside.sh'), 'private');
+  rmSync(join(h.directory, 'old.sh'));
+  symlinkSync(join(h.root, 'outside.sh'), join(h.directory, 'old.sh'));
+  expect((await h.app.inject({ method: 'PATCH', url: `/api/scripts/${old.id}`, payload: { displayName: 'new.sh' } })).statusCode).toBe(422);
+  expect(readFileSync(join(h.root, 'outside.sh'), 'utf8')).toBe('private');
+});

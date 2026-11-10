@@ -15,7 +15,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { NotFoundError } from '../lib/errors.js';
 import { joinRoot } from '../lib/paths.js';
-import { createScriptFile, deleteScriptFile, getScriptContent, updateScriptContent } from '../services/script-files.js';
+import { createScriptFile, deleteScriptFile, getScriptContent, updateScriptContent, updateScriptMetadata } from '../services/script-files.js';
 import { getExecution } from '../services/executions.js';
 import { getRunPrefill, saveRunDraft } from '../services/run-draft.js';
 import {
@@ -158,27 +158,9 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: AppContext): voi
     saveRunDraft(ctx.db, request.params.id, runDraftSchema.parse(request.body)),
   );
 
-  app.patch<{ Params: { id: string } }>('/api/scripts/:id', (request) => {
-    const input = updateScriptSchema.parse(request.body);
-    const existing = loadScript(ctx, request.params.id);
-
-    ctx.db
-      .prepare(
-        `UPDATE scripts SET
-           display_name = ?, description = ?, timeout_sec = ?, interpreter_override_json = ?, updated_at = ?
-         WHERE id = ?`,
-      )
-      .run(
-        input.displayName ?? existing.displayName,
-        input.description === undefined ? existing.description : input.description,
-        input.timeoutSec === undefined ? existing.timeoutSec : input.timeoutSec,
-        serializeOverride(input, existing),
-        new Date().toISOString(),
-        existing.id,
-      );
-
-    return loadScript(ctx, existing.id);
-  });
+  app.patch<{ Params: { id: string } }>('/api/scripts/:id', (request) =>
+    updateScriptMetadata(ctx.db, ctx.config, request.params.id, updateScriptSchema.parse(request.body)),
+  );
 
   // ---------------------------------------------------------------------
   // Overview
@@ -227,21 +209,5 @@ function loadScript(ctx: AppContext, id: string): ScriptSummary {
     .get(id);
   if (!row) throw new NotFoundError('Script');
   return toScriptSummary(row);
-}
-
-/**
- * Resolve the interpreter override for an update.
- *
- * `undefined` means "leave as-is" and `null` means "clear it", which are
- * different intentions that a plain `??` would collapse.
- */
-function serializeOverride(
-  input: z.infer<typeof updateScriptSchema>,
-  existing: ScriptSummary,
-): string | null {
-  if (input.interpreterOverride === undefined) {
-    return existing.interpreterOverride ? JSON.stringify(existing.interpreterOverride) : null;
-  }
-  return input.interpreterOverride ? JSON.stringify(input.interpreterOverride) : null;
 }
 

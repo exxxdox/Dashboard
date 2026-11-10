@@ -191,3 +191,66 @@ export function deleteScriptFile(db: Db, config: AppConfig, id: string, expected
     unlinkSync(temporary);
   });
 }
+
+
+export function updateScriptMetadata(db: Db, config: AppConfig, id: string, input: {
+  displayName?: string;
+  description?: string | null;
+  timeoutSec?: number | null;
+  interpreterOverride?: string[] | null;
+}): ScriptSummary {
+  return fileOperation(() => {
+    const row = scriptRow(db, id);
+    const source = getSourceRow(db, row.source_id);
+    let name = input.displayName ?? row.display_name;
+    let relPath = row.rel_path;
+    let originalPath: string | undefined;
+    let destination: string | undefined;
+    if (source.kind === 'local' && input.displayName !== undefined) {
+      name = input.displayName.trim();
+      if (!name || name.includes('/') || name.includes('\\')) invalidPath();
+      if (!extname(name)) name += extname(row.file_name);
+      // A name edit must not silently switch the interpreter or move directories.
+      if (extname(name).toLowerCase() !== extname(row.file_name).toLowerCase()) invalidPath();
+      relPath = safePath(row.rel_dir ? `${row.rel_dir}/${name}` : name);
+      if (relPath !== row.rel_path) {
+        sourceForWrite(db, row.source_id);
+        originalPath = filePath(db, config, source, row.rel_path);
+        readBytes(originalPath);
+        destination = filePath(db, config, source, relPath);
+        // Soft-deleted paths still own history; never replace their identity.
+        if (db.prepare('SELECT id FROM scripts WHERE source_id = ? AND rel_path = ? AND id != ?').get(row.source_id, relPath, id)) {
+          throw new ConflictError('A script already exists at this path', { key: 'scripts.error.exists' });
+        }
+      }
+    }
+    let linked = false;
+    let removed = false;
+    try {
+      return db.transaction(() => {
+        if (originalPath && destination) {
+          // Exclusive publication preserves permissions and refuses to overwrite even an unscanned file.
+          linkSync(originalPath, destination);
+          linked = true;
+          unlinkSync(originalPath);
+          removed = true;
+        }
+        db.prepare(`UPDATE scripts SET display_name = ?, rel_path = ?, file_name = ?, description = ?, timeout_sec = ?, interpreter_override_json = ?, updated_at = ? WHERE id = ?`).run(
+          name, relPath, relPath.split('/').at(-1)!,
+          input.description === undefined ? row.description : input.description,
+          input.timeoutSec === undefined ? row.timeout_sec : input.timeoutSec,
+          input.interpreterOverride === undefined ? row.interpreter_override_json : input.interpreterOverride === null ? null : JSON.stringify(input.interpreterOverride),
+          nowIso(), id,
+        );
+        return toScriptSummary(scriptRow(db, id));
+      })();
+    } catch (error) {
+      // SQLite failures must restore the old file path together with the old metadata.
+      if (linked && originalPath && destination) {
+        if (removed) linkSync(destination, originalPath);
+        unlinkSync(destination);
+      }
+      throw error;
+    }
+  });
+}

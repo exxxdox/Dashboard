@@ -3,11 +3,11 @@ import { Save } from 'lucide-react';
 import type { ScriptSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
 import { Field, TextArea, TextInput } from '../components/Form';
-import { useUpdateScript } from '../api/queries';
+import { useSources, useUpdateScript } from '../api/queries';
 import { useI18n } from '../lib/i18n';
 
 /**
- * Display name, description, timeout and interpreter override.
+ * Local filename or GitHub display name, plus execution metadata.
  *
  * The whole thing is a form: nothing is sent until Save, so a half-typed name
  * never reaches the server. It draws no frame of its own, because the dialog it
@@ -17,8 +17,10 @@ import { useI18n } from '../lib/i18n';
 export function ScriptMetadataForm({ script }: { script: ScriptSummary }) {
   const i18n = useI18n();
   const update = useUpdateScript();
+  const sources = useSources();
+  const local = sources.data?.find((source) => source.id === script.sourceId)?.kind === 'local';
 
-  const [displayName, setDisplayName] = useState(script.displayName);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [description, setDescription] = useState(script.description ?? '');
   const [timeout, setTimeoutSec] = useState(
     script.timeoutSec === null ? '' : String(script.timeoutSec),
@@ -32,24 +34,27 @@ export function ScriptMetadataForm({ script }: { script: ScriptSummary }) {
       {
         id: script.id,
         input: {
-          displayName: displayName.trim() || script.displayName,
+          displayName: (displayName ?? '').trim() || (local ? script.fileName : script.displayName),
           description: description.trim() === '' ? null : description.trim(),
           timeoutSec: timeout.trim() === '' ? null : Number(timeout),
           // A shell-split string is the honest input: an override is argv, not one path.
           interpreterOverride: trimmedInterpreter === '' ? null : trimmedInterpreter.split(/\s+/),
         },
       },
-      { onSuccess: () => setTouched(false) },
+      { onSuccess: (saved) => {
+        setDisplayName(local ? saved.fileName : saved.displayName);
+        setTouched(false);
+      } },
     );
   }
 
   return (
     <div className="grid gap-4">
-      <Field label={i18n.t('scripts.field.displayName')}>
+      <Field label={i18n.t(local ? 'scripts.file.name' : 'scripts.field.displayName')} hint={local ? i18n.t('scripts.file.renameHint') : undefined}>
         {({ id }) => (
           <TextInput
             id={id}
-            value={displayName}
+            value={displayName ?? (local ? script.fileName : script.displayName)}
             onChange={(event) => {
               setDisplayName(event.target.value);
               setTouched(true);
