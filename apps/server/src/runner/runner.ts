@@ -137,7 +137,9 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
 
         if (truncated) return;
 
-        if (persistedBytes + data.length > maxLogBytes) {
+        // Storage limits count encoded bytes, not UTF-16 code units (Chinese and emoji differ).
+        const bytes = Buffer.byteLength(data, 'utf8');
+        if (persistedBytes + bytes > maxLogBytes) {
           truncated = true;
           const notice =
             `\n[output truncated: this run exceeded the ${Math.round(maxLogBytes / 1024 / 1024)} MB capture limit; ` +
@@ -149,15 +151,15 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
             chunk: { executionId, seq, stream: 'system', data: notice, ts: noticeTs },
           });
           buffer.push({ seq, stream: 'system', data: notice, ts: noticeTs });
-          bufferedBytes += notice.length;
+          bufferedBytes += Buffer.byteLength(notice, 'utf8');
           flush();
           markTruncated.run(executionId);
           return;
         }
 
-        persistedBytes += data.length;
+        persistedBytes += bytes;
         buffer.push({ seq, stream, data, ts });
-        bufferedBytes += data.length;
+        bufferedBytes += bytes;
 
         if (bufferedBytes >= FLUSH_BYTES) {
           flush();

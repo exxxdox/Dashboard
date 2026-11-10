@@ -348,6 +348,23 @@ describe('createExecutionRunner', () => {
     expect(summary.logBytes).toBeLessThan(500);
   });
 
+  test('counts UTF-8 bytes in retained output', async () => {
+    await h.run([{ match: SCRIPT_PATH, stdout: '中文😀', exitCode: 0 }]);
+    // The ASCII header is 14 bytes; the output is 6 Chinese bytes plus 4 emoji bytes.
+    expect(getExecution(h.db, EXECUTION_ID).logBytes).toBe(24);
+  });
+
+  test('truncates multibyte output at the byte limit while keeping it live', async () => {
+    const small = buildHarness(120);
+    const output = '中'.repeat(40);
+    await small.run([{ match: SCRIPT_PATH, stdout: output, exitCode: 0 }]);
+    expect(getExecution(small.db, EXECUTION_ID).truncated).toBe(true);
+    expect(readLogs(small.db).some((row) => row.data === output)).toBe(false);
+    expect(small.messages).toContainEqual(expect.objectContaining({
+      type: 'log', chunk: expect.objectContaining({ data: output }),
+    }));
+  });
+
   test('keeps streaming to live subscribers even after the capture limit', async () => {
     const small = buildHarness(120);
     await small.run([{ match: SCRIPT_PATH, stdout: 'x'.repeat(500), exitCode: 0 }]);
