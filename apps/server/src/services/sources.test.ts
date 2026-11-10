@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,7 +8,7 @@ import { loadConfig, type AppConfig } from '../config.js';
 import { openDatabase, type Db } from '../db/client.js';
 import { ConflictError, ValidationError } from '../lib/errors.js';
 import { createLogger } from '../lib/logger.js';
-import { createSource, gitProxyArgs, syncSource, updateSource } from './sources.js';
+import { createSource, deleteSource, gitProxyArgs, syncSource, updateSource } from './sources.js';
 
 /** Roots created by `setup`, removed after each test. */
 const roots: string[] = [];
@@ -200,6 +200,49 @@ describe('updateSource', () => {
  * a container rebuild, not as a precondition the host has to satisfy first.
  */
 describe('local directories', () => {
+  test.each([['ops', 'ops/child'], ['ops/child', 'ops']])('rejects overlapping source directories %s and %s', (first, second) => {
+    const { db, config } = setup();
+    createSource(db, config, { name: 'first', kind: 'local', subPath: first });
+    expect(() => createSource(db, config, { name: 'second', kind: 'local', subPath: second })).toThrow(ConflictError);
+  });
+
+  test('allows separate directories that only share a text prefix', () => {
+    const { db, config } = setup();
+    createSource(db, config, { name: 'first', kind: 'local', subPath: 'ops' });
+    expect(() => createSource(db, config, { name: 'second', kind: 'local', subPath: 'ops2' })).not.toThrow();
+  });
+
+  test('rejects moving a source inside another source', () => {
+    const { db, config } = setup();
+    createSource(db, config, { name: 'first', kind: 'local', subPath: 'ops' });
+    const second = createSource(db, config, { name: 'second', kind: 'local', subPath: 'other' });
+    expect(() => updateSource(db, config, second.id, { subPath: 'ops/child' })).toThrow(ConflictError);
+  });
+
+  test('keeps legacy overlapping files and rows when deleting their parent with files', () => {
+    const { db, config, root } = setup();
+    const parent = createSource(db, config, { name: 'parent', kind: 'local', subPath: 'ops' });
+    const child = createSource(db, config, { name: 'child', kind: 'local', subPath: 'other' });
+    db.prepare('UPDATE sources SET mount_path = ?, sub_path = ? WHERE id = ?').run('ops/child', 'ops/child', child.id);
+    writeFileSync(join(root, 'ops', 'test.sh'), 'echo keep');
+    expect(() => deleteSource(db, config, parent.id, true)).toThrow(ConflictError);
+    expect(db.prepare('SELECT id FROM sources WHERE id = ?').get(parent.id)).toBeDefined();
+    expect(existsSync(join(root, 'ops', 'test.sh'))).toBe(true);
+    // Forgetting a row without touching shared files remains the recovery path.
+    expect(() => deleteSource(db, config, parent.id, false)).not.toThrow();
+  });
+
+  test('refuses a legacy overlapping GitHub sync before changing files or sync status', async () => {
+    const { db, config, root } = setup();
+    const github = createSource(db, config, { name: 'github', kind: 'github', repoUrl: 'https://github.com/example/scripts' });
+    const local = createSource(db, config, { name: 'local', kind: 'local', subPath: 'other' });
+    db.prepare('UPDATE sources SET mount_path = ?, sub_path = ? WHERE id = ?').run(`${github.mountPath}/personal`, `${github.mountPath}/personal`, local.id);
+    // An incomplete checkout avoids making a network call if the ownership guard regresses.
+    mkdirSync(join(root, github.mountPath, '.git'), { recursive: true });
+    await expect(syncSource(db, config, github.id, logger)).rejects.toThrow(ConflictError);
+    expect(db.prepare('SELECT sync_status FROM sources WHERE id = ?').get(github.id)).toEqual({ sync_status: 'never' });
+  });
+
   test('creates the directory when a local source is added', () => {
     const { db, config, root } = setup();
 

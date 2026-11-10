@@ -266,7 +266,20 @@ function ensureLocalDirectory(config: AppConfig, mountPath: string): void {
   }
 }
 
-/** Two sources may not share a name, and may not share a directory. */
+function assertDirectoryExclusive(db: Db, id: string | null, mountPath: string): void {
+  // Recursive deletion and git clean own the whole checkout, including nested directories.
+  const overlap = db
+    .prepare<[string | null], Pick<SourceRow, 'mount_path'>>('SELECT mount_path FROM sources WHERE id IS NOT ?')
+    .all(id)
+    .find((row) => isInside(row.mount_path, mountPath) || isInside(mountPath, row.mount_path));
+  if (overlap) {
+    throw new ConflictError(
+      `Another source uses the overlapping directory "${overlap.mount_path}". Pick a separate subdirectory.`,
+    );
+  }
+}
+
+/** Two sources may not share a name or any part of a directory tree. */
 function assertUnique(db: Db, id: string | null, name: string, mountPath: string): void {
   // `IS NOT` rather than `!=` so a null id (create) compares as "no row is
   // excluded" while a real id excludes itself, without a second query shape.
@@ -277,16 +290,7 @@ function assertUnique(db: Db, id: string | null, name: string, mountPath: string
     .get(name, id);
   if (nameClash) throw new ConflictError(`A source named ${JSON.stringify(name)} already exists`);
 
-  const mountClash = db
-    .prepare<[string, string | null], { id: string }>(
-      'SELECT id FROM sources WHERE mount_path = ? AND id IS NOT ?',
-    )
-    .get(mountPath, id);
-  if (mountClash) {
-    throw new ConflictError(
-      `Another source already uses the directory "${mountPath}". Pick a different subdirectory.`,
-    );
-  }
+  assertDirectoryExclusive(db, id, mountPath);
 }
 
 export function createSource(db: Db, config: AppConfig, input: CreateSourceInput): SourceSummary {
@@ -397,6 +401,7 @@ export function updateSource(
 export function deleteSource(db: Db, config: AppConfig, id: string, removeFiles: boolean): void {
   const row = getSourceRow(db, id);
   assertSourceNotSyncing(db, id);
+  if (removeFiles) assertDirectoryExclusive(db, id, row.mount_path);
 
   // Scripts cascade with the source, taking their executions with them. Say so
   // rather than letting the caller discover it from a vanished history.
@@ -512,6 +517,8 @@ export async function syncSource(
   logger: Logger,
 ): Promise<SyncResult> {
   const row = getSourceRow(db, id);
+  // Stored sources from older versions may already overlap; stop before touching their files.
+  assertDirectoryExclusive(db, id, row.mount_path);
   const absolute = sourceDirectory(config, row);
   const warnings: string[] = [];
   let syncing = activeSyncs.get(db);

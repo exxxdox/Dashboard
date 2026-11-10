@@ -69,6 +69,8 @@ apps/web/src
 
 Two consequences: only entry script uploaded (`source` sibling fail unless live in `workDir`); all runs on target share one workDir, per-target concurrency 2, two runs writing same output clash.
 
+**Source directory ownership is exclusive.** Creation and updates reject equal or ancestor/descendant source paths. Sync and file deletion also reject legacy overlaps before touching files; deleting only the source record remains a recovery path. This protects local files from another source’s recursive deletion or Git cleanup.
+
 **Local source dir created, not required.** Mount exist so files outlive container, not so host prepare first. `createSource`, `updateSource` (path move only), `syncSource` all call `ensureLocalDirectory`: create if missing. GitHub source already did before first clone. Sync = repair point: dir can vanish on host without row change; failure there = path genuinely unusable (read-only mount, file where dir must go) = `ValidationError`, not 500. Metadata edit never delete old dir, so source move leave previous behind.
 
 **Run param bounded by name, not header.** `validateParams` forward any valid shell identifier, so script declaring nothing still runnable; declared value overridable once. Guard = env namespace: `RUN_ENV_NAMES` (`shared/run-env.ts`) list what runner inject; `executions.ts` type env `Record<RunEnvName, string>`, so drift fail typecheck. Param on such name refused with message (runner else spreads its vars over it). Not deny-list: submitter already hold target creds + can run any script, so `PATH`/`LD_PRELOAD` = operator's business. `MAX_PARAM_COUNT` + `MAX_PARAM_NAME_LENGTH` bound request body.
