@@ -170,7 +170,12 @@ export function OverviewPage() {
           )}
         </Panel>
 
-        <Panel title={isBlank ? t('overview.gettingStarted') : t('overview.jumpTo')}>
+        <Panel
+          title={isBlank ? t('overview.gettingStarted') : t('overview.jumpTo')}
+          className="flex flex-col"
+          bodyClassName={isBlank ? undefined : 'flex flex-1'}
+          flush={!isBlank}
+        >
           {isBlank ? (
             <ol className="grid gap-4">
               <SetupStep
@@ -193,7 +198,7 @@ export function OverviewPage() {
               />
             </ol>
           ) : (
-            <div className="grid gap-1">
+            <div className="grid flex-1 auto-rows-fr">
               <QuickLink
                 href="/scripts"
                 label={t('overview.quickScripts')}
@@ -368,12 +373,12 @@ function SetupStep({
   );
 }
 
-// Panel already supplies the horizontal gutter; another inset misaligns labels with its heading.
+// Put the gutter inside the link so its hover and click target cover the entire row.
 function QuickLink({ href: target, label, hint }: { href: string; label: string; hint: string }) {
   return (
     <a
       href={href(target)}
-      className="focus-ring hover:bg-panel-2 group flex items-center justify-between gap-3 rounded-lg py-1.5 whitespace-nowrap transition-colors duration-150 ease-out"
+      className="focus-ring hover:bg-panel-2 group flex items-center justify-between gap-3 px-5 py-1.5 whitespace-nowrap transition-colors duration-150 ease-out"
     >
       <span className="text-ink text-body group-hover:text-accent shrink-0 transition-colors duration-150">
         {label}
