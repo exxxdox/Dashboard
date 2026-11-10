@@ -38,6 +38,13 @@ describe('parseRoute', () => {
     expect(route).toMatchObject({ name: 'runs', executionId: 'ex/odd id' });
   });
 
+  it.each(['scripts', 'schedules', 'runs'])('rejects malformed encoded ids in %s without crashing', (page) => {
+    for (const id of ['%', '%E0%A4%A']) {
+      const path = `/${page}/${id}`;
+      expect(parseRoute(`#${path}`)).toEqual({ name: 'notFound', path });
+    }
+  });
+
   it('ignores a trailing slash', () => {
     expect(parseRoute('#/targets/').name).toBe('targets');
     expect(parseRoute('#/scripts/')).toEqual({ name: 'scripts', scriptId: null });

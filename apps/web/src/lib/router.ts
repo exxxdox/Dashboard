@@ -31,15 +31,25 @@ export function parseRoute(hash: string): Route {
   const search = new URLSearchParams(queryAt === -1 ? '' : raw.slice(queryAt + 1));
   const [head, tail] = path.split('/').filter((segment) => segment !== '');
 
+  let detailId: string | null = null;
+  if (tail && (head === 'scripts' || head === 'schedules' || head === 'runs')) {
+    try {
+      detailId = decodeURIComponent(tail);
+    } catch {
+      // A damaged URL must reach the existing 404 view instead of throwing during render.
+      return { name: 'notFound', path };
+    }
+  }
+
   switch (head) {
     case undefined:
       return { name: 'overview' };
     case 'scripts':
-      return { name: 'scripts', scriptId: tail ? decodeURIComponent(tail) : null };
+      return { name: 'scripts', scriptId: detailId };
     case 'schedules':
-      return { name: 'schedules', scheduleId: tail ? decodeURIComponent(tail) : null };
+      return { name: 'schedules', scheduleId: detailId };
     case 'runs':
-      return { name: 'runs', executionId: tail ? decodeURIComponent(tail) : null, search };
+      return { name: 'runs', executionId: detailId, search };
     case 'targets':
       return { name: 'targets' };
     case 'sources':
