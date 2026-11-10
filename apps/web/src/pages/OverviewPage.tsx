@@ -48,7 +48,8 @@ export function OverviewPage() {
   }
 
   const counts = overview.data?.counts;
-  const recent = overview.data?.recent ?? [];
+  // The overview is a snapshot; the full history remains on the runs page.
+  const recent = (overview.data?.recent ?? []).slice(0, 3);
   const isBlank =
     overview.isSuccess && counts !== undefined && counts.targets === 0 && counts.sources === 0;
 
@@ -65,7 +66,7 @@ export function OverviewPage() {
       <PageHeader
         eyebrow={t('overview.eyebrow')}
         title={t('overview.title')}
-        description={t('overview.description')}
+        className="pb-3"
         actions={
           <Button
             variant="primary"
@@ -79,10 +80,10 @@ export function OverviewPage() {
 
       {/* One strip, hairline-divided, rather than five floating cards: the counts
           are a single line of the ledger, not five separate things. */}
-      <div className="card divide-line mt-6 grid grid-cols-2 divide-x overflow-hidden sm:grid-cols-3 lg:grid-cols-5">
+      <div className="card divide-line mt-4 grid grid-cols-2 divide-x overflow-hidden sm:grid-cols-3 lg:grid-cols-5">
         {overview.isPending
           ? Array.from({ length: 5 }, (_, index) => (
-              <div key={index} className="px-4 py-4">
+              <div key={index} className="px-4 py-3">
                 <div className="bg-panel-3 h-2.5 w-16 animate-pulse rounded" />
                 <div className="bg-panel-3 mt-4 h-6 w-10 animate-pulse rounded" />
               </div>
@@ -96,7 +97,7 @@ export function OverviewPage() {
                   href={href(tile.href)}
                   // The underline carries the hover here: it grows from the
                   // centre, so the tile reacts without moving the grid lines.
-                  className="focus-ring group hover:bg-panel-2 relative px-4 py-4 transition-colors duration-150 ease-out"
+                  className="focus-ring group hover:bg-panel-2 relative px-4 py-3 transition-colors duration-150 ease-out"
                 >
                   <span
                     aria-hidden
@@ -114,7 +115,7 @@ export function OverviewPage() {
                     />
                   </div>
                   <p
-                    className={`mono text-stat mt-3 ${
+                    className={`mono text-stat mt-2 ${
                       alarming
                         ? 'text-danger'
                         : 'text-ink group-hover:text-accent transition-colors duration-150'
@@ -129,7 +130,7 @@ export function OverviewPage() {
 
       <DnsTile dns={overview.data?.dns} pending={overview.isPending} />
 
-      <div className="mt-6 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
           title={t('overview.recentRuns')}
           flush
@@ -143,7 +144,7 @@ export function OverviewPage() {
           }
         >
           {overview.isPending ? (
-            <LoadingRows rows={5} />
+            <LoadingRows rows={3} />
           ) : recent.length === 0 ? (
             <div className="p-4">
               <EmptyState
@@ -308,6 +309,7 @@ function DnsTile({ dns, pending }: { dns: DnsConsistency | undefined; pending: b
   );
 }
 
+// Reserve narrow screens for status, script and duration so the script stays readable.
 function RecentRunRow({ execution }: { execution: ExecutionSummary }) {
   // Its own translator rather than a prop: the row is where the relative time is
   // rendered, so it is where the question of language is actually asked.
@@ -316,18 +318,18 @@ function RecentRunRow({ execution }: { execution: ExecutionSummary }) {
     <li>
       <a
         href={href(`/runs/${encodeURIComponent(execution.id)}`)}
-        className="focus-ring hover:bg-panel-2 flex items-center gap-4 px-4 py-3 transition-colors duration-150 ease-out"
+        className="focus-ring hover:bg-panel-2 flex items-center gap-3 px-4 py-3 transition-colors duration-150 ease-out"
       >
-        <span className="mono text-faint text-meta w-[72px] shrink-0">{runTag(execution.id)}</span>
-        <ExecutionStatusLabel status={execution.status} className="w-[140px] shrink-0" />
+        <span className="mono text-faint text-meta hidden w-[72px] shrink-0 truncate 2xl:inline">{runTag(execution.id)}</span>
+        <ExecutionStatusLabel status={execution.status} className="w-24 shrink-0" />
         <span className="mono text-ink text-body min-w-0 flex-1 truncate">
           {execution.scriptRelPath}
         </span>
-        <span className="text-mute text-meta hidden shrink-0 sm:inline">{execution.targetName}</span>
+        <span className="text-mute text-meta hidden max-w-28 shrink-0 truncate 2xl:inline">{execution.targetName}</span>
         <span className="mono text-mute text-meta w-[72px] shrink-0 text-right">
           {formatDuration(execution.durationMs)}
         </span>
-        <span className="text-faint text-meta hidden w-[92px] shrink-0 text-right md:inline">
+        <span className="text-faint text-meta hidden w-[92px] shrink-0 text-right 2xl:inline">
           {formatRelative(execution.queuedAt, t)}
         </span>
       </a>
@@ -367,7 +369,7 @@ function QuickLink({ href: target, label, hint }: { href: string; label: string;
   return (
     <a
       href={href(target)}
-      className="focus-ring hover:bg-panel-2 group flex items-center justify-between rounded-lg px-3 py-2 transition-colors duration-150 ease-out"
+      className="focus-ring hover:bg-panel-2 group flex items-center justify-between rounded-lg px-3 py-1.5 transition-colors duration-150 ease-out"
     >
       <span className="text-ink text-body group-hover:text-accent transition-colors duration-150">
         {label}
