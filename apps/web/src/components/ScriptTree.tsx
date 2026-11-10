@@ -99,6 +99,7 @@ export function ScriptTree({
               // Keep indentation inside the button so hover and keyboard focus cover the whole row.
               style={{ paddingLeft: `${depth * 14 + 20}px` }}
             >
+              {/* Files have no expander; an empty slot would add a false nesting level. */}
               {isDir ? (
                 <span className="text-faint flex size-5 shrink-0 items-center justify-center" aria-hidden>
                   {isCollapsed ? (
@@ -107,9 +108,7 @@ export function ScriptTree({
                     <ChevronDown className="size-4" aria-hidden />
                   )}
                 </span>
-              ) : (
-                <span className="size-5 shrink-0" aria-hidden />
-              )}
+              ) : null}
 
               <span className="flex min-w-0 flex-1 items-center gap-2">
                 {isDir ? (
