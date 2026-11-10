@@ -130,10 +130,12 @@ export function OverviewPage() {
 
       <DnsTile dns={overview.data?.dns} pending={overview.isPending} />
 
-      {/* Stretch sibling cards to the same row height without fixing their content height. */}
+      {/* Stretch cards and share their available height between recent rows to avoid bottom whitespace. */}
       <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
           title={t('overview.recentRuns')}
+          className="lg:flex lg:flex-col"
+          bodyClassName="lg:flex lg:flex-1"
           flush
           aside={
             <a
@@ -160,7 +162,7 @@ export function OverviewPage() {
               />
             </div>
           ) : (
-            <ul className="divide-line divide-y">
+            <ul className="divide-line divide-y lg:grid lg:flex-1 lg:auto-rows-fr">
               {recent.map((execution) => (
                 <RecentRunRow key={execution.id} execution={execution} />
               ))}
@@ -316,7 +318,7 @@ function RecentRunRow({ execution }: { execution: ExecutionSummary }) {
   // rendered, so it is where the question of language is actually asked.
   const t = useT();
   return (
-    <li>
+    <li className="lg:grid">
       <a
         href={href(`/runs/${encodeURIComponent(execution.id)}`)}
         className="focus-ring hover:bg-panel-2 flex items-center gap-3 px-4 py-3 transition-colors duration-150 ease-out"
