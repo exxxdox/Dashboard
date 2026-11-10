@@ -130,7 +130,8 @@ export function OverviewPage() {
 
       <DnsTile dns={overview.data?.dns} pending={overview.isPending} />
 
-      <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {/* Stretch sibling cards to the same row height without fixing their content height. */}
+      <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Panel
           title={t('overview.recentRuns')}
           flush
