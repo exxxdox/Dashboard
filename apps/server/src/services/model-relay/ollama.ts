@@ -95,11 +95,26 @@ export async function callOllama(route: ResolvedRoute, imageBase64: string, prom
     if (contentLength > MAX_OLLAMA_RESPONSE_BYTES) {
       throw new OllamaRequestError("OLLAMA_RESPONSE_TOO_LARGE", false);
     }
-    // 先读取文本再解析，避免异常上游用超大 JSON 响应耗尽服务内存。
-    const responseText = await response.text();
-    if (Buffer.byteLength(responseText) > MAX_OLLAMA_RESPONSE_BYTES) {
-      throw new OllamaRequestError("OLLAMA_RESPONSE_TOO_LARGE", false);
+    // Content-Length may be missing or wrong; enforce the limit before buffering the whole body.
+    const reader = response.body?.getReader();
+    if (!reader) throw new OllamaRequestError("OLLAMA_INVALID_RESPONSE", false);
+    const chunks: Uint8Array[] = [];
+    let bytesRead = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytesRead += value.byteLength;
+        if (bytesRead > MAX_OLLAMA_RESPONSE_BYTES) {
+          await reader.cancel().catch(() => undefined);
+          throw new OllamaRequestError("OLLAMA_RESPONSE_TOO_LARGE", false);
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
     }
+    const responseText = Buffer.concat(chunks, bytesRead).toString("utf8");
     let body: OllamaChatResponse;
     try {
       body = JSON.parse(responseText) as OllamaChatResponse;
