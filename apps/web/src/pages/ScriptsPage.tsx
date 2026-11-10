@@ -178,7 +178,7 @@ function SourceTreePane({
       // count here: the picker above already says "(4)", and every directory row
       // carries its own.
       aside={
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <SyncStatusLabel status={source.syncStatus} />
           {source.kind === 'local' ? <CreateScriptButton key={source.id} sourceId={source.id} /> : null}
           <SourceSyncButton sourceId={source.id} />
