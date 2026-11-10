@@ -368,11 +368,12 @@ function SetupStep({
   );
 }
 
+// Panel already supplies the horizontal gutter; another inset misaligns labels with its heading.
 function QuickLink({ href: target, label, hint }: { href: string; label: string; hint: string }) {
   return (
     <a
       href={href(target)}
-      className="focus-ring hover:bg-panel-2 group flex items-center justify-between gap-3 rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors duration-150 ease-out"
+      className="focus-ring hover:bg-panel-2 group flex items-center justify-between gap-3 rounded-lg py-1.5 whitespace-nowrap transition-colors duration-150 ease-out"
     >
       <span className="text-ink text-body group-hover:text-accent shrink-0 transition-colors duration-150">
         {label}
