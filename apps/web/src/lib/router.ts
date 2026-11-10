@@ -96,13 +96,35 @@ export function goBack(fallback: string): void {
   else navigate(fallback, { replace: true });
 }
 
+let navigationGuard: (() => boolean) | null = null;
+let activeHash: string | undefined;
+
+/** The open editor owns the decision; the router owns when a new route becomes visible. */
+export function guardNavigation(allowNavigation: () => boolean): () => void {
+  navigationGuard = allowNavigation;
+  return () => { if (navigationGuard === allowNavigation) navigationGuard = null; };
+}
+
 function subscribe(onChange: () => void): () => void {
-  window.addEventListener('hashchange', onChange);
-  return () => window.removeEventListener('hashchange', onChange);
+  const onHashChange = () => {
+    const nextHash = window.location.hash || DEFAULT_HASH;
+    const previousHash = getHash();
+    if (nextHash === previousHash) return;
+    if (navigationGuard && !navigationGuard()) {
+      const { pathname, search } = window.location;
+      window.history.replaceState(window.history.state, '', `${pathname}${search}${previousHash}`);
+      return;
+    }
+    activeHash = nextHash;
+    onChange();
+  };
+  window.addEventListener('hashchange', onHashChange);
+  return () => window.removeEventListener('hashchange', onHashChange);
 }
 
 function getHash(): string {
-  return window.location.hash || DEFAULT_HASH;
+  // React may read the snapshot before hashchange; raw location would bypass the unsaved-work guard.
+  return activeHash ??= window.location.hash || DEFAULT_HASH;
 }
 
 function getServerHash(): string {

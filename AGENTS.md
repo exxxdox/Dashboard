@@ -93,6 +93,8 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Queue in-process.** Global limit (SSH connections) + per-target (one busy host can't consume all slots). Restart loses queued + running, so `markInterrupted()` at boot: non-terminal rows from dead process reconciled, not shown running.
 
+**Local script files writable; GitHub files read-only.** `services/script-files.ts` owns complete UTF-8 reads, local-only create/save/delete, hash conflict checks and safe filesystem access. Source previews stay bounded; the editor reads `/api/scripts/:id/content` separately. File writes reconcile one script through `syncScripts` with `removeMissing: false`, retaining unseen siblings. Deletion preserves execution history and disables schedules before a path can be recreated. Source syncs are mutually exclusive per source and block source updates/deletion. The hash router owns the editor navigation guard, so React cannot read an unapproved route before discard confirmation. `docs/script-editing.md` describes the user flow and boundaries.
+
 **Script ids soft-deleted.** Resync missing file set `deleted_at`, not row removal: history stays readable, returning file recognised. `syncScripts` rewrite metadata only on content-hash change, so display-name edits survive.
 
 **Failed DNS query never read as "no record".** `services/dns/service.ts` order: validate, detect, query, write, notify, record; query failure abort before any write. Cloudflare "no record" mean "create one", so misread duplicate record = worst outcome here; why query not folded into write. Second invariant: address not moved = no write request, no trace in provider audit log.

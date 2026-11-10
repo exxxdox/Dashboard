@@ -1,6 +1,10 @@
 import type {
   AuthStatus,
   CreateSourceInput,
+  CreateScriptInput,
+  UpdateScriptContentInput,
+  DeleteScriptInput,
+  ScriptContent,
   LoginInput,
   CreateTargetInput,
   AppSettingsView,
@@ -217,6 +221,14 @@ export const api = {
   // per run, so there is nothing stable to name here.
   getScript: (id: string) =>
     apiRequest<ScriptSummary & { content: string | null }>(`/scripts/${encodeURIComponent(id)}`),
+  createScript: (sourceId: string, body: CreateScriptInput) =>
+    apiRequest<ScriptSummary>(`/sources/${encodeURIComponent(sourceId)}/scripts`, { method: 'POST', body }),
+  scriptContent: (id: string) =>
+    apiRequest<ScriptContent>(`/scripts/${encodeURIComponent(id)}/content`),
+  saveScriptContent: (id: string, body: UpdateScriptContentInput) =>
+    apiRequest<ScriptSummary>(`/scripts/${encodeURIComponent(id)}/content`, { method: 'PUT', body }),
+  deleteScript: (id: string, body: DeleteScriptInput) =>
+    apiRequest<void>(`/scripts/${encodeURIComponent(id)}`, { method: 'DELETE', body }),
   updateScript: (id: string, body: UpdateScriptInput) =>
     apiRequest<ScriptSummary>(`/scripts/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
   // What the run form held last time, and where that came from.

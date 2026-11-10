@@ -14,6 +14,7 @@ import { errorMessage } from '../api/client';
 import { useI18n, useT } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import { ScriptDetail, ScriptIdentityBar } from './ScriptDetail';
+import { CreateScriptButton } from './ScriptFileEditor';
 
 export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   const i18n = useI18n();
@@ -28,7 +29,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   // as a derived value rather than via an effect: an effect that sets state after
   // paint renders one frame with no source selected, which flashes the "choose a
   // source" panel on every visit.
-  const selectedSourceId = chosenSourceId || (sources.data?.[0]?.id ?? '');
+  const selectedSourceId = chosenSourceId || script.data?.sourceId || (sources.data?.[0]?.id ?? '');
 
   const activeSource: SourceSummary | undefined = sources.data?.find(
     (source) => source.id === selectedSourceId,
@@ -116,7 +117,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
                 description={i18n.t('scripts.noSelection.description')}
               />
             ) : (
-              <ScriptDetail scriptId={scriptId} />
+              <ScriptDetail key={scriptId} scriptId={scriptId} />
             )}
           </div>
         </div>
@@ -179,6 +180,7 @@ function SourceTreePane({
       aside={
         <div className="flex items-center gap-3">
           <SyncStatusLabel status={source.syncStatus} />
+          {source.kind === 'local' ? <CreateScriptButton key={source.id} sourceId={source.id} /> : null}
           <SourceSyncButton sourceId={source.id} />
         </div>
       }

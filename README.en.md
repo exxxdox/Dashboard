@@ -44,6 +44,8 @@ Remove `SCRIPT_ROOT_HOST` from the old `.env` and any custom `/workspace` mount.
 
 ## Writing scripts
 
+Local sources support creating, viewing, editing and deleting scripts in the browser, including paths in subdirectories. Saving refreshes parameter declarations immediately. GitHub script files remain read-only; edit them in the repository and sync. Deleting a local script removes its file, preserves execution history and disables its schedules. Conflicting edits are rejected, and closing an editor with unsaved changes asks for confirmation. See [local script management](docs/script-editing.md).
+
 Any `.sh` / `.ps1` file in source picked up (run with `bash` / `pwsh`; `pwsh` must be installed on target). **Leading** comment block become form in UI:
 
 ```bash

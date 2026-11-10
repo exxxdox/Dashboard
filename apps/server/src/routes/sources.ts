@@ -3,6 +3,9 @@ import { readFile } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import {
   createSourceSchema,
+  createScriptSchema,
+  updateScriptContentSchema,
+  deleteScriptSchema,
   runDraftSchema,
   updateSourceSchema,
   type ScriptSummary,
@@ -12,6 +15,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { NotFoundError } from '../lib/errors.js';
 import { joinRoot } from '../lib/paths.js';
+import { createScriptFile, deleteScriptFile, getScriptContent, updateScriptContent } from '../services/script-files.js';
 import { getExecution } from '../services/executions.js';
 import { getRunPrefill, saveRunDraft } from '../services/run-draft.js';
 import {
@@ -85,6 +89,21 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: AppContext): voi
   // ---------------------------------------------------------------------
   // Scripts
   // ---------------------------------------------------------------------
+
+  // JSON escaping can expand a 2 MiB script up to sixfold; the service enforces the byte limit.
+  app.post<{ Params: { id: string } }>('/api/sources/:id/scripts', { bodyLimit: 13 * 1024 * 1024 }, (request, reply) =>
+    reply.code(201).send(createScriptFile(ctx.db, ctx.config, request.params.id, createScriptSchema.parse(request.body))),
+  );
+  app.get<{ Params: { id: string } }>('/api/scripts/:id/content', (request) =>
+    getScriptContent(ctx.db, ctx.config, request.params.id),
+  );
+  app.put<{ Params: { id: string } }>('/api/scripts/:id/content', { bodyLimit: 13 * 1024 * 1024 }, (request) =>
+    updateScriptContent(ctx.db, ctx.config, request.params.id, updateScriptContentSchema.parse(request.body)),
+  );
+  app.delete<{ Params: { id: string } }>('/api/scripts/:id', (request, reply) => {
+    deleteScriptFile(ctx.db, ctx.config, request.params.id, deleteScriptSchema.parse(request.body).expectedHash);
+    return reply.code(204).send();
+  });
 
   app.get('/api/scripts', (request) => {
     const query = listScriptsQuery.parse(request.query);

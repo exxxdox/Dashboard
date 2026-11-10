@@ -18,16 +18,16 @@ import { nowIso } from '../db/client.js';
 import { newScriptId } from '../lib/ids.js';
 
 /** Extensions the dashboard knows how to run. */
-const SUPPORTED_EXTENSIONS = new Set(['.sh', '.ps1']);
+export const SUPPORTED_EXTENSIONS = new Set(['.sh', '.ps1']);
 
 /**
  * Directories never worth walking. `.git` alone can contain thousands of files;
  * `.dashboard` is our own internal state directory.
  */
-const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', '.dashboard', '.idea', '.vscode']);
+export const SKIPPED_DIRECTORIES = new Set(['.git', 'node_modules', '.dashboard', '.idea', '.vscode']);
 
 /** Guardrails so a hostile or accidental layout cannot hang the scan. */
-const MAX_DEPTH = 12;
+export const MAX_DEPTH = 12;
 /** Exported so the submit path enforces the same cap the scanner does. */
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_FILES = 5_000;
@@ -164,7 +164,7 @@ type ExistingScriptRow = {
  * execution history has to stay readable, and a file that returns in a later
  * sync should be recognisable as the same script.
  */
-export function syncScripts(db: Db, sourceId: string, discovered: DiscoveredScript[]): SyncCounts {
+export function syncScripts(db: Db, sourceId: string, discovered: DiscoveredScript[], options: { removeMissing?: boolean } = {}): SyncCounts {
   const existing = db
     .prepare<[string], ExistingScriptRow>(
       'SELECT id, rel_path, content_hash, size_bytes FROM scripts WHERE source_id = ?',
@@ -244,7 +244,7 @@ export function syncScripts(db: Db, sourceId: string, discovered: DiscoveredScri
 
     // Anything the scan did not see is gone from the working tree.
     for (const row of existing) {
-      if (seen.has(row.rel_path)) continue;
+      if (options.removeMissing === false || seen.has(row.rel_path)) continue;
       db.prepare('UPDATE scripts SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL').run(
         timestamp,
         timestamp,
@@ -255,7 +255,7 @@ export function syncScripts(db: Db, sourceId: string, discovered: DiscoveredScri
 
   apply();
 
-  const removed = existing.filter((row) => !seen.has(row.rel_path)).length;
+  const removed = options.removeMissing === false ? 0 : existing.filter((row) => !seen.has(row.rel_path)).length;
 
   return { added, updated, removed, total: discovered.length };
 }

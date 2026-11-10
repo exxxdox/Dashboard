@@ -4,12 +4,13 @@ import type { ScriptSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
 import { EmptyState, ErrorBanner, LoadingBlock } from '../components/Feedback';
 import { Panel } from '../components/Panel';
-import { useScript } from '../api/queries';
+import { useScript, useSources } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
 import { RunNowButton } from './RunNowButton';
 import { ScriptDialogs, type ScriptDialog } from './ScriptDialogs';
 import { ScriptSource } from './ScriptSource';
+import { ScriptFileActions } from './ScriptFileEditor';
 
 /**
  * Which script this is, and everything that acts on it.
@@ -114,6 +115,7 @@ export function ScriptIdentityBar({
 export function ScriptDetail({ scriptId }: { scriptId: string }) {
   const i18n = useI18n();
   const script = useScript(scriptId);
+  const sources = useSources();
 
   // Rendered inside the Scripts page's grid, so it brings no page frame and no
   // title of its own: both belong to the page, and `ScriptIdentityBar` carries
@@ -133,12 +135,20 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
   }
 
   const data = script.data;
+  const sourceKind = sources.data?.find(source => source.id === data.sourceId)?.kind;
 
   // One panel, the full width of the column. It used to share a 360px column
   // with the run form and the facts, which is what made the code pane the
   // narrowest thing on a page whose subject is the code.
   return (
-    <Panel title={i18n.t('scripts.panel.source')}>
+    <Panel
+      title={i18n.t('scripts.panel.source')}
+      aside={sourceKind === 'local' ? (
+        <ScriptFileActions script={data} />
+      ) : sourceKind === 'github' ? (
+        <span className="text-meta text-mute">{i18n.t('scripts.file.readOnly')}</span>
+      ) : null}
+    >
       {data.content === null ? (
         <EmptyState
           icon={<FileCode className="size-5" aria-hidden />}

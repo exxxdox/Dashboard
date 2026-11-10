@@ -7,6 +7,9 @@ import {
 import type {
   AuthStatus,
   CreateSourceInput,
+  CreateScriptInput,
+  UpdateScriptContentInput,
+  DeleteScriptInput,
   LoginInput,
   CreateTargetInput,
   ExecuteScriptInput,
@@ -243,6 +246,58 @@ export function useScript(scriptId: string | null) {
     queryKey: queryKeys.script(scriptId ?? ''),
     queryFn: () => api.getScript(scriptId ?? ''),
     enabled: Boolean(scriptId),
+  });
+}
+
+export function useScriptContent(scriptId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.scriptContent(scriptId ?? ''),
+    queryFn: () => api.scriptContent(scriptId ?? ''),
+    enabled: Boolean(scriptId),
+    // Each editing session starts from disk; background events must not replace typed text.
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  });
+}
+
+function useInvalidateScriptFiles() {
+  const client = useQueryClient();
+  return () => {
+    void client.invalidateQueries({ queryKey: queryKeys.sources() });
+    void client.invalidateQueries({ queryKey: ['scripts'] });
+    void client.invalidateQueries({ queryKey: queryKeys.scriptSchedules() });
+    void client.invalidateQueries({ queryKey: queryKeys.overview() });
+  };
+}
+
+export function useCreateScript() {
+  const invalidate = useInvalidateScriptFiles();
+  return useMutation({
+    mutationFn: ({ sourceId, input }: { sourceId: string; input: CreateScriptInput }) => api.createScript(sourceId, input),
+    meta: { success: 'toast.scriptCreated' },
+    onSuccess: invalidate,
+  });
+}
+
+export function useSaveScriptContent() {
+  const invalidate = useInvalidateScriptFiles();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateScriptContentInput }) => api.saveScriptContent(id, input),
+    meta: { success: 'toast.scriptContentSaved' },
+    onSuccess: invalidate,
+  });
+}
+
+export function useDeleteScript() {
+  const invalidate = useInvalidateScriptFiles();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; sourceId: string; input: DeleteScriptInput }) => api.deleteScript(id, input),
+    meta: { success: 'toast.scriptDeleted' },
+    onSuccess: invalidate,
   });
 }
 

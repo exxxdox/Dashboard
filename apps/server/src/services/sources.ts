@@ -345,6 +345,7 @@ export function updateSource(
   input: UpdateSourceInput,
 ): SourceSummary {
   const current = getSourceRow(db, id);
+  assertSourceNotSyncing(db, id);
 
   if (current.kind === 'local' && (input.repoUrl !== undefined || input.branch !== undefined)) {
     throw new ValidationError('This is a local source: it has no repository URL or branch.');
@@ -395,6 +396,7 @@ export function updateSource(
 
 export function deleteSource(db: Db, config: AppConfig, id: string, removeFiles: boolean): void {
   const row = getSourceRow(db, id);
+  assertSourceNotSyncing(db, id);
 
   // Scripts cascade with the source, taking their executions with them. Say so
   // rather than letting the caller discover it from a vanished history.
@@ -495,6 +497,14 @@ async function ensureGitRepository(
   await runGit(config, ['clean', '-fdx'], absolute);
 }
 
+// A persistent status cannot represent overlapping requests or survive a restart as a lock.
+const activeSyncs = new WeakMap<Db, Set<string>>();
+
+function assertSourceNotSyncing(db: Db, id: string): void {
+  // A scan must finish against the same source configuration and row it started with.
+  if (activeSyncs.get(db)?.has(id)) throw new ConflictError('Wait for source synchronization to finish', { key: 'scripts.error.syncing' });
+}
+
 export async function syncSource(
   db: Db,
   config: AppConfig,
@@ -504,10 +514,14 @@ export async function syncSource(
   const row = getSourceRow(db, id);
   const absolute = sourceDirectory(config, row);
   const warnings: string[] = [];
+  let syncing = activeSyncs.get(db);
+  if (!syncing) { syncing = new Set(); activeSyncs.set(db, syncing); }
+  assertSourceNotSyncing(db, id);
 
   db.prepare(
     "UPDATE sources SET sync_status = 'syncing', sync_error = NULL, updated_at = ? WHERE id = ?",
   ).run(nowIso(), id);
+  syncing.add(id);
 
   try {
     if (row.kind === 'github') {
@@ -544,6 +558,8 @@ export async function syncSource(
       "UPDATE sources SET sync_status = 'error', sync_error = ?, last_sync_at = ?, updated_at = ? WHERE id = ?",
     ).run(message, nowIso(), nowIso(), id);
     throw error;
+  } finally {
+    syncing.delete(id);
   }
 }
 

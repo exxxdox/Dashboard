@@ -17,6 +17,18 @@ import {
 export const scriptFormatSchema = z.enum(['sh', 'ps1']);
 export type ScriptFormat = z.infer<typeof scriptFormatSchema>;
 
+export const createScriptSchema = z.object({
+  relPath: z.string().min(1).max(1000),
+  content: z.string(),
+});
+export type CreateScriptInput = z.infer<typeof createScriptSchema>;
+
+export const deleteScriptSchema = z.object({ expectedHash: z.string().regex(/^[a-f0-9]{64}$/) });
+export type DeleteScriptInput = z.infer<typeof deleteScriptSchema>;
+export const updateScriptContentSchema = deleteScriptSchema.extend({ content: z.string() });
+export type UpdateScriptContentInput = z.infer<typeof updateScriptContentSchema>;
+export type ScriptContent = { content: string; contentHash: string };
+
 export const sourceKindSchema = z.enum(['local', 'github']);
 export type SourceKind = z.infer<typeof sourceKindSchema>;
 

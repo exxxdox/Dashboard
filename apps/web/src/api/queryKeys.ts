@@ -11,6 +11,7 @@ export const queryKeys = {
 
   scripts: (filter: { sourceId?: string; q?: string }) => ['scripts', filter] as const,
   script: (id: string) => ['scripts', id] as const,
+  scriptContent: (id: string) => ['scripts', id, 'content'] as const,
   scriptRunDraft: (id: string) => ['scripts', id, 'run-draft'] as const,
   scriptSchedules: () => ['script-schedules'] as const,
   scriptSchedule: (id: string) => ['script-schedules', id] as const,
