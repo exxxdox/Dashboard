@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     logger.warn(
       { scriptRootContainer: config.scriptRootContainer },
       'SCRIPT_ROOT_CONTAINER is not absolute. That is only correct for local development; ' +
-        'in a container it is the mount point and must be an absolute path such as /workspace.',
+        'in a container it is the mount point and must be an absolute path such as /data/scripts.',
     );
   }
 

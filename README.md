@@ -13,7 +13,7 @@ English: [README.en.md](README.en.md)
 ## 快速开始
 
 ```bash
-cp .env.example .env      # 至少改 SCRIPT_ROOT_HOST
+cp .env.example .env      # 按需设置登录凭据
 docker compose up -d --build
 ```
 
@@ -25,14 +25,20 @@ docker compose up -d --build
 
 ## 环境变量
 
-写 `.env`。需要自己决定的只有两项，其余都有可用默认值：
+写 `.env`。数据默认保存在宿主机 `./data`，脚本源保存在 `./data/scripts`，统一挂载到容器 `/data`。目标主机执行目录仍在界面单独设置。
 
 | 变量 | 含义 |
 |---|---|
-| `SCRIPT_ROOT_HOST` | 脚本宿主机目录，挂载进容器供扫描。**必填** |
+| `DATA_DIR_HOST` | 数据、密钥和脚本的宿主机根目录，默认 `./data` |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | 登录凭据，**要么都设要么都不设**；不设即开放访问（启动告警） |
 
 端口、目录属主、并发上限、超时、日志与保留策略、`SECRET_KEY`、`GIT_PROXY`、构建镜像源等，见 `.env.example` 的逐项说明。
+
+## 旧版脚本目录迁移
+
+升级前停止服务并备份数据，将原 `SCRIPT_ROOT_HOST`（默认 `./workspace`）目录的**内容**完整复制到 `DATA_DIR_HOST/scripts`（默认 `./data/scripts`），包含隐藏文件并保留原子目录结构。目标目录有同名文件时先核对，避免覆盖；确认运行用户有读写权限。来源保存的是相对路径，无需修改数据库。
+
+移除旧 `.env` 中的 `SCRIPT_ROOT_HOST`，以及自定义 Compose 中的 `/workspace` 挂载；如曾显式设置 `SCRIPT_ROOT_CONTAINER`，移除该覆盖以使用新默认值。重新构建并启动后，核对本地来源文件和 GitHub 来源同步，再测试运行。确认前保留原目录和备份；回退时恢复旧配置与旧目录。
 
 ## 写脚本
 

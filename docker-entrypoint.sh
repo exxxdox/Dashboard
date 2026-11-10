@@ -9,7 +9,7 @@
 # on first `docker compose up`. With no entrypoint the process would start as
 # PUID:PGID and die immediately with `EACCES ... open '/data/secret.key'`.
 #
-# So compose starts this container as root, the two mount points are brought in
+# So compose starts this container as root, the data directory is brought in
 # line with PUID:PGID here, and the process drops to that unprivileged uid for
 # the rest of its life.
 set -eu
@@ -17,7 +17,7 @@ set -eu
 PUID="${PUID:-1000}"
 PGID="${PGID:-1000}"
 DATA_DIR="${DATA_DIR:-/data}"
-SCRIPT_ROOT_CONTAINER="${SCRIPT_ROOT_CONTAINER:-/workspace}"
+SCRIPT_ROOT_CONTAINER="${SCRIPT_ROOT_CONTAINER:-${DATA_DIR}/scripts}"
 
 case "${PUID}" in
   '' | *[!0-9]*) echo "entrypoint: PUID must be numeric, got '${PUID}'" >&2; exit 1 ;;
@@ -25,6 +25,12 @@ esac
 case "${PGID}" in
   '' | *[!0-9]*) echo "entrypoint: PGID must be numeric, got '${PGID}'" >&2; exit 1 ;;
 esac
+
+# A single data mount must also work on a fresh install.
+mkdir -p "${DATA_DIR}" "${SCRIPT_ROOT_CONTAINER}"
+# Match find's paths even when an override contains trailing slashes or symlinks.
+DATA_DIR="$(cd "${DATA_DIR}" && pwd -P)"
+SCRIPT_ROOT_CONTAINER="$(cd "${SCRIPT_ROOT_CONTAINER}" && pwd -P)"
 
 if [ "$(id -u)" != "0" ]; then
   # Started unprivileged. Nothing can be fixed from here, so say what is wrong
@@ -36,9 +42,9 @@ if [ "$(id -u)" != "0" ]; then
   exec "$@"
 fi
 
-# The database and the generated key live here, and there are only ever a couple
-# of files, so recursing is cheap and also repairs ownership on a second start.
-chown -R "${PUID}:${PGID}" "${DATA_DIR}"
+# Repair application state ownership without traversing user script repositories.
+find "${DATA_DIR}" -path "${SCRIPT_ROOT_CONTAINER}" -prune -o \
+  -exec chown -h "${PUID}:${PGID}" {} +
 
 # The shared root can hold whole repositories. Only the directory itself is
 # chowned: the container has to be able to create entries in it, but taking

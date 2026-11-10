@@ -120,7 +120,6 @@ RUN pnpm --filter @dashboard/web build
 FROM alpine:3.24 AS runtime
 ENV NODE_ENV=production \
     DATA_DIR=/data \
-    SCRIPT_ROOT_CONTAINER=/workspace \
     PORT=50014 \
     # The config default (/app/web) does not match the workspace layout this
     # image copies. Without this the server starts fine, reports a warning, and
@@ -178,9 +177,8 @@ RUN if [ "$ALPINE_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
 # build does not fail here on a missing binary.
 RUN if command -v git >/dev/null 2>&1; then git config --system --add safe.directory '*'; fi
 
-# The account the app runs as, created with the host directory owner's ids so
-# files cloned here are readable by the SSH target on the other side of the
-# mount. `alpine` ships no `node` user to remap, so it is created outright --
+# The account the app runs as, created with the data directory owner's ids so
+# scripts and application state stay manageable from the host. `alpine` ships no `node` user to remap, so it is created outright --
 # which also means the `shadow` package is not needed in order to rename one.
 #
 # This only affects the image's own /data: a bind mount shadows that layer, which
@@ -193,7 +191,7 @@ ENV PUID=${PUID} \
     PGID=${PGID}
 RUN addgroup -g "$PGID" -S node \
  && adduser -u "$PUID" -S -D -G node -h /home/node -s /sbin/nologin node \
- && mkdir -p /data \
+ && mkdir -p /data/scripts \
  && chown -R node:node /data /home/node
 
 # Only the production dependency tree, the compiled output and the manifests
@@ -230,7 +228,7 @@ EXPOSE 50014
 # stays non-root, and the entrypoint simply passes through in that case.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
-# Only the database and the key live here; scripts live in the bind mount.
+# Database, credentials and script sources share this persisted tree.
 VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

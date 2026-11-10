@@ -2,6 +2,17 @@ import { describe, expect, test } from 'vitest';
 
 import { loadConfig } from './config.js';
 
+describe('script storage', () => {
+  test('defaults to scripts inside the data directory', () => {
+    expect(loadConfig({}).scriptRootContainer).toBe('/data/scripts');
+    expect(loadConfig({ DATA_DIR: '/srv/dashboard' }).scriptRootContainer).toBe('/srv/dashboard/scripts');
+  });
+
+  test('preserves an explicit script root for existing deployments', () => {
+    expect(loadConfig({ SCRIPT_ROOT_CONTAINER: '/workspace' }).scriptRootContainer).toBe('/workspace');
+  });
+});
+
 describe('GIT_PROXY', () => {
   test('is unset when the variable is absent', () => {
     expect(loadConfig({}).gitProxy).toBeUndefined();

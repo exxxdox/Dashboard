@@ -13,7 +13,7 @@ Pull the scripts scattered across your machines into one place you can click, th
 ## Quick start
 
 ```bash
-cp .env.example .env      # change SCRIPT_ROOT_HOST at least
+cp .env.example .env      # configure sign-in credentials as needed
 docker compose up -d --build
 ```
 
@@ -23,16 +23,24 @@ Open `http://<host address>:50014` (or what `DASHBOARD_PORT` say in `.env`). The
 
 Run it on **host networking** (not published ports), and the host needs a **public IPv6 address**. Local detection reads the host interfaces; ipify detection also requires public IPv6 egress. A bridge network exposes the container's own interfaces instead. Everything else is in the header comments of `compose.yaml`.
 
+Scripts now live in `./data/scripts`, persisted together with the database and keys through the single `/data` mount. The target host working directory is configured separately in the UI.
+
 ## Environment variables
 
-Set in `.env`. Two need a decision; everything else ships a working default:
+Set in `.env`. Storage paths have working defaults; configure sign-in credentials as needed:
 
 | Variable | Meaning |
 |---|---|
-| `SCRIPT_ROOT_HOST` | Host dir holding scripts, mounted in for scan. **Required** |
+| `DATA_DIR_HOST` | Host root for data, keys and scripts; defaults to `./data` |
 | `AUTH_USERNAME` / `AUTH_PASSWORD` | Sign-in creds, **set both or neither**; unset = run open (boot warning) |
 
 Port, directory ownership, concurrency caps, timeout, log and retention limits, `SECRET_KEY`, `GIT_PROXY`, build mirrors: see the per-setting notes in `.env.example`.
+
+## Migrating the old script directory
+
+Stop the service and back up data before upgrading. Copy the **contents** of the old `SCRIPT_ROOT_HOST` (default `./workspace`) into `DATA_DIR_HOST/scripts` (default `./data/scripts`), including hidden files and the original directory structure. Check conflicting files before copying and give the runtime user read/write access. Sources store relative paths, so no database rewrite is needed.
+
+Remove `SCRIPT_ROOT_HOST` from the old `.env` and any custom `/workspace` mount. Remove an explicit `SCRIPT_ROOT_CONTAINER` override to use the new default. Rebuild and start, verify local files and GitHub sync, then test execution. Keep the old directory and backup until verified; restore the old configuration and directory to revert.
 
 ## Writing scripts
 

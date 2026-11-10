@@ -39,7 +39,7 @@ const envSchema = z.object({
    * only how scripts get *in* to be scanned and read; it has no relationship to
    * any path on a target, which is why nothing needs to match any more.
    */
-  SCRIPT_ROOT_CONTAINER: z.string().min(1).default('/workspace'),
+  SCRIPT_ROOT_CONTAINER: z.string().min(1).optional(),
 
   /**
    * Directory on the *target host* that a run writes its staged script into,
@@ -167,7 +167,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   // A relative value is accepted because it does work, but it is only ever
   // correct for local development: this is the container's mount point, and in
   // a container that is always absolute. `index.ts` warns when it is not.
-  const scriptRootContainer = normalizePosix(value.SCRIPT_ROOT_CONTAINER);
+  // Keep scripts inside the persisted data tree unless an existing install overrides it.
+  const scriptRootContainer = normalizePosix(value.SCRIPT_ROOT_CONTAINER ?? join(resolve(value.DATA_DIR), 'scripts'));
 
   // These two are used only with local filesystem calls, so resolving them
   // against the working directory is correct -- and required, since

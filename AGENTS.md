@@ -15,7 +15,7 @@ pnpm -r build
 pnpm dev                                       # shared build, then API :8080 + Vite :5173 in parallel
 
 # API alone, without the built UI
-DATA_DIR=./data SCRIPT_ROOT_CONTAINER=./workspace SERVE_WEB=false pnpm --filter @dashboard/server dev
+DATA_DIR=./data SERVE_WEB=false pnpm --filter @dashboard/server dev
 
 # Container
 docker compose up -d --build                   # one service, host networking, port from DASHBOARD_PORT
@@ -62,6 +62,8 @@ apps/web/src
 ## Architecture, and why it is this way
 
 **Execution = `Transport` interface.** `SshTransport` only impl. Callers assume one thing: run command string on machine owning scripts, stream output, stop it. Host agent avoiding sshd = new branch in `createTransportForTarget` (`services/targets.ts`); runner, queue, routes untouched. No SSH assumption leak up.
+
+**Script storage = `DATA_DIR/scripts`.** Compose persists one `/data` mount; sources retain relative paths, so moving the old script root contents into `data/scripts` preserves source records. `SCRIPT_ROOT_CONTAINER` remains an explicit compatibility override. Entrypoint repairs app-state ownership but skips script repository contents.
 
 **Container own script; host run it.** Clone in container into bind-mounted dir; scan = filesystem work. Run uploads script to staging dir on host, runs with target `workDir` as cwd, deletes it. No path mean same thing both sides; old `mappingOk` nonce check gone with the requirement it verified. Replacement = readiness check: working dir enterable, staging dir creatable + removable.
 
