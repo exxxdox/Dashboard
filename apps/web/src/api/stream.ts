@@ -20,6 +20,7 @@ export class LogStream {
   constructor(
     private readonly executionId: string,
     private readonly onChunk: (chunk: ExecutionLogChunk) => void,
+    private readonly onSyncChange?: (syncing: boolean) => void,
   ) {}
 
   /** Highest `seq` handed to the consumer so far. */
@@ -75,6 +76,7 @@ export class LogStream {
   private async fill(fromSeq: number): Promise<void> {
     if (this.filling) return;
     this.filling = true;
+    this.onSyncChange?.(true);
     this.lastFillFrom = fromSeq;
 
     let succeeded = false;
@@ -104,6 +106,7 @@ export class LogStream {
         const buffered = this.pending;
         this.pending = [];
         for (const chunk of buffered) this.push(chunk);
+        if (!this.filling) this.onSyncChange?.(false);
       }
     }
   }

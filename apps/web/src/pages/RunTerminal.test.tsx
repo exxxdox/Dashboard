@@ -10,12 +10,14 @@ const harness = vi.hoisted(() => ({
   stream: undefined as ExecutionStreamOptions | undefined,
   resize: undefined as (() => void) | undefined,
   frame: undefined as (() => void) | undefined,
-  terminal: { open: vi.fn(), loadAddon: vi.fn(), write: vi.fn(), dispose: vi.fn() },
+  data: undefined as ((data: string) => void) | undefined,
+  terminal: { options: { disableStdin: true }, cols: 80, rows: 24, onData: vi.fn(), onResize: vi.fn(), open: vi.fn(), loadAddon: vi.fn(), write: vi.fn(), dispose: vi.fn() },
   fit: vi.fn(), observe: vi.fn(), disconnect: vi.fn(), cancelFrame: vi.fn(),
-  construct: vi.fn(),
+  construct: vi.fn(), send: vi.fn(), state: 'open', onState: vi.fn(),
 }));
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
+  useState: (initial: unknown) => [initial, vi.fn()],
   useRef: (initial: unknown) => {
     const ref = { current: initial };
     harness.refs.push(ref);
@@ -23,6 +25,8 @@ vi.mock('react', async (original) => ({
   },
   useEffect: (effect: () => (() => void) | void) => { harness.effects.push(effect); },
 }));
+vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('../api/ws', () => ({ executionSocket: { getState: () => harness.state, onStateChange: harness.onState, sendTerminal: harness.send } }));
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: unknown) {
   harness.construct(options);
   return harness.terminal;
@@ -37,6 +41,11 @@ beforeEach(() => {
   harness.refs = []; harness.effects = []; harness.stream = undefined;
   harness.resize = undefined; harness.frame = undefined;
   harness.fit.mockReset();
+  harness.send.mockReturnValue(true);
+  harness.onState.mockReturnValue(() => {});
+  harness.terminal.write.mockImplementation((_data: string, done?: () => void) => done?.());
+  harness.terminal.onData.mockImplementation((listener: (data: string) => void) => { harness.data = listener; return { dispose: vi.fn() }; });
+  harness.terminal.onResize.mockReturnValue({ dispose: vi.fn() });
   vi.stubGlobal('ResizeObserver', class {
     constructor(callback: () => void) { harness.resize = callback; }
     observe = harness.observe;
@@ -49,8 +58,8 @@ afterEach(() => vi.unstubAllGlobals());
 function chunk(stream: ExecutionLogChunk['stream'], data: string): ExecutionLogChunk {
   return { executionId: 'run', seq: 1, stream, data, ts: '2026-01-01T00:00:00Z' };
 }
-function mount(live = true, onStatus = vi.fn()): () => void {
-  RunTerminal({ executionId: 'run', live, onStatus });
+function mount(live = true, onStatus = vi.fn(), interactive = false): () => void {
+  RunTerminal({ executionId: 'run', live, onStatus, interactive });
   // React assigns the host ref before running the mount effect.
   harness.refs[0]!.current = {};
   return harness.effects[0]!() || (() => {});
@@ -106,4 +115,36 @@ test('does not create a terminal when its host is missing', () => {
   harness.stream!.onChunk!(chunk('stdout', 'before mount'));
   expect(harness.construct).not.toHaveBeenCalled();
   expect(harness.terminal.write).not.toHaveBeenCalled();
+});
+
+
+test('only forwards keys after replay drains and control is granted; disconnect blocks immediately', () => {
+  const cleanup = mount(true, vi.fn(), true);
+  harness.stream!.onSyncChange!(true);
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'controlling' });
+  harness.data!('secret');
+  expect(harness.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_input' }));
+  let drained: (() => void) | undefined;
+  harness.terminal.write.mockImplementationOnce((_data: string, callback?: () => void) => { drained = callback; });
+  harness.stream!.onSyncChange!(false);
+  harness.data!('before drain');
+  expect(harness.send).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'terminal_input' }));
+  drained!();
+  harness.data!('yes\r');
+  expect(harness.send).toHaveBeenCalledWith({ type: 'terminal_input', executionId: 'run', data: 'yes\r' });
+  const stateChanged = harness.onState.mock.calls[0]![0] as (state: string) => void;
+  stateChanged('reconnecting');
+  harness.send.mockClear(); harness.data!('never');
+  expect(harness.send).not.toHaveBeenCalled();
+  cleanup();
+});
+
+test('a busy viewer waits for an explicit request when the controller releases', () => {
+  const cleanup = mount(true, vi.fn(), true);
+  harness.stream!.onSyncChange!(false);
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'busy' });
+  harness.send.mockClear();
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'available' });
+  expect(harness.send).not.toHaveBeenCalledWith({ type: 'terminal_claim', executionId: 'run' });
+  cleanup();
 });

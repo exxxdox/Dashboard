@@ -15,6 +15,12 @@ export type ExecChunk = {
   data: string;
 };
 
+export type TerminalControl = {
+  /** False means the input was refused; callers must not retry it automatically. */
+  write(data: string): boolean;
+  resize(cols: number, rows: number): void;
+};
+
 export type ExecOptions = {
   /** Raw POSIX shell string, already assembled and quoted by the runner. */
   command: string;
@@ -25,6 +31,8 @@ export type ExecOptions = {
    * deadlock against a channel window the remote end has not started draining.
    */
   stdin?: Buffer;
+  /** A separate upload leaves the PTY input free for the running script. */
+  terminal?: { uploadCommand: string; onReady(control: TerminalControl): void };
   /**
    * Run on the same connection once the command has settled, whatever the
    * outcome. Removes the directory a run staged itself into; issuing it as a

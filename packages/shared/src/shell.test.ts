@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildCommand,
+  buildInteractiveCommand,
   cleanupStagingCommand,
   envPrefix,
   PID_MARKER,
@@ -207,5 +208,26 @@ describe('cleanupStagingCommand', () => {
 
   test('quotes a path that would otherwise be split into several arguments', () => {
     expect(cleanupStagingCommand('/tmp/-rf x')).toBe("rm -rf -- '/tmp/-rf x'");
+  });
+});
+
+
+describe('interactive shell commands', () => {
+  test('keeps default PowerShell interactive without changing explicit overrides', () => {
+    expect(resolveInterpreter('.ps1', null, true).argv).toEqual(['pwsh', '-NoProfile', '-File']);
+    expect(resolveInterpreter('.ps1', ['pwsh', '-NonInteractive', '-File'], true).argv)
+      .toEqual(['pwsh', '-NonInteractive', '-File']);
+  });
+
+  test('stages bytes separately and leaves the terminal attached to the interpreter', () => {
+    const built = buildInteractiveCommand({
+      interpreter: resolveInterpreter('.sh'), scriptPath: '/tmp/staged/a.sh',
+      stagingDir: '/tmp/staged', cwd: '/srv', args: ['two words'], env: { MESSAGE: 'hello' },
+    });
+    expect(built.uploadCommand).toContain('cat > /tmp/staged/a.sh');
+    expect(built.uploadCommand).not.toContain('exec bash');
+    expect(built.command).not.toContain('/dev/null');
+    expect(built.command).not.toContain('setsid');
+    expect(built.display).toBe("MESSAGE=hello cd /srv && exec bash /tmp/staged/a.sh 'two words'");
   });
 });

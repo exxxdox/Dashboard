@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ExecutionLogChunk, ExecutionSummary } from '@dashboard/shared';
+import type { ExecutionLogChunk, ExecutionSummary, ServerMessage } from '@dashboard/shared';
 import { LogStream } from './stream';
 import { executionSocket } from './ws';
 
@@ -8,6 +8,8 @@ export type ExecutionStreamOptions = {
   /** True while the run has not reached a terminal status. */
   live: boolean;
   onChunk: (chunk: ExecutionLogChunk) => void;
+  onTerminal?: (message: Extract<ServerMessage, { type: 'terminal_state' }>) => void;
+  onSyncChange?: (syncing: boolean) => void;
   onStatus?: (execution: ExecutionSummary) => void;
 };
 
@@ -27,19 +29,25 @@ export function useExecutionStream({
   live,
   onChunk,
   onStatus,
+  onTerminal,
+  onSyncChange,
 }: ExecutionStreamOptions): void {
   const [loaded, setLoaded] = useState(false);
 
   // Callbacks are read through refs so a re-render never resubscribes the socket.
   const chunkRef = useRef(onChunk);
   const statusRef = useRef(onStatus);
+  const terminalCallbackRef = useRef(onTerminal);
+  const syncRef = useRef(onSyncChange);
   useEffect(() => {
     chunkRef.current = onChunk;
     statusRef.current = onStatus;
+    terminalCallbackRef.current = onTerminal;
+    syncRef.current = onSyncChange;
   });
 
   const stream = useMemo(
-    () => new LogStream(executionId, (chunk) => chunkRef.current(chunk)),
+    () => new LogStream(executionId, (chunk) => chunkRef.current(chunk), (syncing) => syncRef.current?.(syncing)),
     [executionId],
   );
 
@@ -61,6 +69,7 @@ export function useExecutionStream({
     if (!live || !loaded) return;
 
     const unsubscribe = executionSocket.subscribe(executionId, {
+      onTerminal: (message) => terminalCallbackRef.current?.(message),
       onLog: (chunk) => stream.push(chunk),
       onStatus: (execution) => statusRef.current?.(execution),
       // Fires on connect and on every reconnect.

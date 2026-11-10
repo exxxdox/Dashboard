@@ -12,6 +12,7 @@ import {
 /** Stands in for a WebSocket: nothing is opened, nothing is dialled. */
 class FakeSocket implements SocketLike {
   readyState = 0;
+  bufferedAmount = 0;
   readonly sent: string[] = [];
   closed = false;
 
@@ -346,4 +347,19 @@ describe('ExecutionSocket liveness', () => {
     expect(live.closed).toBe(false);
     expect(socket.getState()).toBe('open');
   });
+});
+
+it('dispatches terminal ownership and never queues input while disconnected or over capacity', () => {
+  const { socket, latest } = harness();
+  const onTerminal = vi.fn();
+  socket.subscribe('r', { onTerminal });
+  expect(socket.sendTerminal({ type: 'terminal_input', executionId: 'r', data: 'no' })).toBe(false);
+  latest().open();
+  latest().receive({ type: 'terminal_state', executionId: 'r', state: 'controlling' });
+  expect(onTerminal).toHaveBeenCalledWith({ type: 'terminal_state', executionId: 'r', state: 'controlling' });
+  expect(socket.sendTerminal({ type: 'terminal_input', executionId: 'r', data: 'yes\r' })).toBe(true);
+  latest().bufferedAmount = 65536;
+  expect(socket.sendTerminal({ type: 'terminal_input', executionId: 'r', data: 'no' })).toBe(false);
+  latest().drop();
+  expect(socket.sendTerminal({ type: 'terminal_input', executionId: 'r', data: 'never' })).toBe(false);
 });

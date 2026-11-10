@@ -154,7 +154,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // Installed before anything can answer, so no response can miss it.
   installSecurityHeaders(app);
 
-  await app.register(fastifyWebsocket);
+  await app.register(fastifyWebsocket, { options: { maxPayload: 64 * 1024 } });
 
   // Sign-in routes first: the hook below must not stand in front of the login
   // that satisfies it.

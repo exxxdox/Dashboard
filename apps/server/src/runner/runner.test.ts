@@ -17,7 +17,7 @@ import {
   type FakeTransport,
 } from '../transport/fake-transport.js';
 import { createExecutionHub } from '../ws/hub.js';
-import { createExecutionRunner, type ExecutionPlan } from './runner.js';
+import { createExecutionRunner, type ExecutionPlan, type ExecutionRunner } from './runner.js';
 
 const STAGING_DIR = '/tmp/sd-run_test';
 const SCRIPT_PATH = `${STAGING_DIR}/api.sh`;
@@ -54,6 +54,7 @@ function seed(db: Db): void {
 }
 
 type Harness = {
+  runner: ExecutionRunner;
   db: Db;
   messages: ServerMessage[];
   notifications: NotificationService;
@@ -95,6 +96,7 @@ function buildHarness(maxLogBytes = 1024 * 1024): Harness {
 
   return {
     db,
+    runner,
     messages,
     notifications,
     notify,
@@ -377,4 +379,37 @@ describe('createExecutionRunner', () => {
 
     expect(delivered).toBeGreaterThan(400);
   });
+});
+
+
+test('interactive controls exist only between PTY ready and execution settlement', async () => {
+  const h = buildHarness();
+  const control = { write: vi.fn(() => true), resize: vi.fn() };
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => { finish = resolve; });
+  const plan: ExecutionPlan = {
+    executionId: EXECUTION_ID, interactive: true, scriptPath: SCRIPT_PATH, stagingDir: STAGING_DIR,
+    workDir: WORK_DIR, interpreter: resolveInterpreter('.sh'), displayCommand: 'bash api.sh',
+    scriptBytes: SCRIPT_BYTES, env: {}, paramValues: {}, argv: [], timeoutMs: null,
+  };
+  const transport = createFakeTransport();
+  const exec = vi.spyOn(transport, 'exec').mockImplementation(async (options) => {
+    expect(h.runner.getTerminal(EXECUTION_ID)).toBeNull();
+    expect(options.terminal?.uploadCommand).toContain(SCRIPT_PATH);
+    options.terminal!.onReady(control);
+    options.onChunk({ stream: 'stdout', data: 'Enter your choice: ' });
+    await pending;
+    return { exitCode: 0, signal: null, canceled: false, timedOut: false, stdinError: null };
+  });
+  const running = h.runner.run(plan, transport, new AbortController().signal);
+  expect(h.runner.getTerminal(EXECUTION_ID)).toBe(control);
+  expect(h.messages).toContainEqual({ type: 'terminal_state', executionId: EXECUTION_ID, state: 'available' });
+  expect(exec.mock.calls[0]![0].stdin).toEqual(SCRIPT_BYTES);
+  h.runner.flushLogs(EXECUTION_ID);
+  expect(readLogs(h.db).at(-1)?.data).toBe('Enter your choice: ');
+  finish();
+  await expect(running).resolves.toBe('succeeded');
+  expect(h.runner.getTerminal(EXECUTION_ID)).toBeNull();
+  expect(h.messages).toContainEqual({ type: 'terminal_state', executionId: EXECUTION_ID, state: 'closed' });
+  h.db.close();
 });

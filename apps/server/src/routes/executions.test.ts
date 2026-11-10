@@ -23,7 +23,10 @@ async function setup() {
     paramValues: {}, argv: [], queuedAt: '2026-01-01T00:00:00.000Z', startedAt: null, finishedAt: null,
     durationMs: null, logBytes: 0, truncated: false, errorMessage: null,
   };
+  const terminalControl = { write: vi.fn(() => true), resize: vi.fn() };
+  let ready = false;
   const executions = {
+    terminal: vi.fn(() => ready ? terminalControl : null),
     submit: vi.fn(async () => summary), get: vi.fn((id: string) => { if (id !== summary.id) throw new NotFoundError('Execution'); return summary; }),
     list: vi.fn(() => ({ items: [summary], total: 1 })), logs: vi.fn(() => []),
     cancel: vi.fn(() => ({ ...summary, status: 'canceled' as const })), remove: vi.fn(),
@@ -46,7 +49,7 @@ async function setup() {
   } as unknown as AppContext);
   cleanups.push(async () => { await app.close(); db.close(); });
   await app.ready();
-  return { app, executions, hub, subscribe, unsubscribe, shutdown: () => { shuttingDown = true; } };
+  return { app, executions, hub, subscribe, unsubscribe, summary, terminalControl, ready: () => { ready = true; }, shutdown: () => { shuttingDown = true; } };
 }
 
 test('execute validates inputs, returns accepted identity, and rejects new work during shutdown', async () => {
@@ -130,4 +133,97 @@ test('websocket validates messages, deduplicates subscriptions, streams events a
   // injectWS uses duplex streams; terminate the server endpoint to model a disconnected peer.
   for (const peer of h.app.websocketServer.clients) peer.terminate();
   socket.terminate(); await vi.waitFor(() => expect(h.unsubscribe).toHaveBeenCalledTimes(2));
+});
+
+
+async function terminalPeer(h: Awaited<ReturnType<typeof setup>>) {
+  const messages: ServerMessage[] = [];
+  const peersBefore = new Set(h.app.websocketServer.clients);
+  const socket = await h.app.injectWS('/api/ws', {}, {
+    onInit: (ws) => ws.on('message', (raw: Buffer) => messages.push(JSON.parse(raw.toString()) as ServerMessage)),
+  });
+  const send = async (message: unknown) => {
+    const count = messages.length;
+    socket.send(JSON.stringify(message));
+    await vi.waitFor(() => expect(messages.length).toBeGreaterThan(count));
+    return messages.at(-1);
+  };
+  cleanups.push(async () => { socket.terminate(); });
+  const serverSocket = [...h.app.websocketServer.clients].find((peer) => !peersBefore.has(peer))!;
+  return { socket, serverSocket, messages, send };
+}
+
+test('terminal input requires a subscription, ready PTY and exclusive control, then releases on disconnect', async () => {
+  const h = await setup();
+  h.summary.interactive = true; h.summary.status = 'running';
+  const first = await terminalPeer(h);
+  expect(await first.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ error: 'not_subscribed' });
+  await first.send({ type: 'subscribe', executionId: 'run_1' });
+  expect(await first.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'waiting' });
+  h.ready();
+  expect(await first.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'controlling' });
+  const second = await terminalPeer(h);
+  await second.send({ type: 'subscribe', executionId: 'run_1' });
+  expect(await second.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'busy' });
+  expect(await second.send({ type: 'terminal_input', executionId: 'run_1', data: 'secret' })).toMatchObject({ error: 'not_controller' });
+  expect(h.terminalControl.write).not.toHaveBeenCalled();
+  first.socket.send(JSON.stringify({ type: 'terminal_input', executionId: 'run_1', data: '\x1b[A' }));
+  await vi.waitFor(() => expect(h.terminalControl.write).toHaveBeenCalledWith('\x1b[A'));
+  first.socket.send(JSON.stringify({ type: 'terminal_resize', executionId: 'run_1', cols: 90, rows: 30 }));
+  await vi.waitFor(() => expect(h.terminalControl.resize).toHaveBeenCalledWith(90, 30));
+  // Explicit release does not stop the execution and permits the watcher to take control.
+  await first.send({ type: 'terminal_release', executionId: 'run_1' });
+  expect(await second.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'controlling' });
+  h.hub.publish('run_1', { type: 'terminal_state', executionId: 'run_1', state: 'closed' });
+  await vi.waitFor(() => expect(second.messages.at(-1)).toMatchObject({ state: 'closed' }));
+  expect(h.executions.cancel).not.toHaveBeenCalled();
+});
+
+test('invalid terminal input and sizes never reach the remote channel, and overflow is reported without echoing input', async () => {
+  const h = await setup(); h.summary.interactive = true; h.summary.status = 'running'; h.ready();
+  const peer = await terminalPeer(h);
+  await peer.send({ type: 'subscribe', executionId: 'run_1' });
+  await peer.send({ type: 'terminal_claim', executionId: 'run_1' });
+  for (const message of [
+    { type: 'terminal_input', data: '密'.repeat(6000) },
+    { type: 'terminal_resize', cols: 0, rows: 20 },
+    { type: 'terminal_resize', cols: 80, rows: 501 },
+  ]) {
+    expect(await peer.send({ ...message, executionId: 'run_1' })).toMatchObject({ type: 'error' });
+  }
+  expect(h.terminalControl.write).not.toHaveBeenCalled();
+  expect(h.terminalControl.resize).not.toHaveBeenCalled();
+  h.terminalControl.write.mockReturnValue(false);
+  const refused = await peer.send({ type: 'terminal_input', executionId: 'run_1', data: 'private-input' });
+  expect(refused).toMatchObject({ type: 'terminal_state', error: 'input_overflow' });
+  expect(JSON.stringify(refused)).not.toContain('private-input');
+  h.summary.status = 'succeeded';
+  expect(await peer.send({ type: 'terminal_input', executionId: 'run_1', data: 'late' })).toMatchObject({ state: 'closed' });
+  expect(h.terminalControl.write).toHaveBeenCalledTimes(1);
+});
+
+test('WebSocket upgrades reject foreign origins even without configured sign-in', async () => {
+  const h = await setup();
+  for (const origin of ['https://evil.example', 'null']) {
+    const response = await h.app.inject({ method: 'GET', url: '/api/ws', headers: {
+      host: 'dashboard.test', origin, connection: 'Upgrade', upgrade: 'websocket',
+      'sec-websocket-version': '13', 'sec-websocket-key': randomBytes(16).toString('base64'),
+    } });
+    expect(response.statusCode).toBe(403);
+  }
+});
+
+
+test('disconnecting the controller releases its lease without cancelling the run', async () => {
+  const h = await setup(); h.summary.interactive = true; h.summary.status = 'running'; h.ready();
+  const first = await terminalPeer(h);
+  await first.send({ type: 'subscribe', executionId: 'run_1' });
+  await first.send({ type: 'terminal_claim', executionId: 'run_1' });
+  const second = await terminalPeer(h);
+  await second.send({ type: 'subscribe', executionId: 'run_1' });
+  expect(await second.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'busy' });
+  first.serverSocket.terminate(); first.socket.terminate();
+  await vi.waitFor(() => expect(second.messages.at(-1)).toMatchObject({ state: 'available' }));
+  expect(await second.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'controlling' });
+  expect(h.executions.cancel).not.toHaveBeenCalled();
 });

@@ -65,7 +65,7 @@ export type InterpreterSpec = {
  * not Windows PowerShell. Users can override per script when their host has a
  * differently named binary.
  */
-export function resolveInterpreter(extension: string, override?: readonly string[] | null): InterpreterSpec {
+export function resolveInterpreter(extension: string, override?: readonly string[] | null, interactive = false): InterpreterSpec {
   if (override && override.length > 0) {
     return { argv: [...override], label: override.join(' ') };
   }
@@ -73,7 +73,7 @@ export function resolveInterpreter(extension: string, override?: readonly string
     case '.sh':
       return { argv: ['bash'], label: 'bash' };
     case '.ps1':
-      return { argv: ['pwsh', '-NoProfile', '-NonInteractive', '-File'], label: 'pwsh' };
+      return { argv: ['pwsh', '-NoProfile', ...(interactive ? [] : ['-NonInteractive']), '-File'], label: 'pwsh' };
     default:
       throw new Error(`Unsupported script extension: ${JSON.stringify(extension)}`);
   }
@@ -158,6 +158,28 @@ export function buildCommand(input: BuildCommandInput): BuiltCommand {
     `else ${assignments}sh -c ${quotedInner}; fi`;
 
   return { command, display };
+}
+
+/** Stage outside the PTY so script bytes never become terminal input or echo. */
+export function buildInteractiveCommand(input: BuildCommandInput): BuiltCommand & { uploadCommand: string } {
+  const { interpreter, scriptPath, args = [], stagingDir, cwd, env = {} } = input;
+  const invoke = `cd ${quote(cwd)} && exec ${quoteAll([...interpreter.argv, scriptPath, ...args])}`;
+  const upload =
+    `printf '%s%s\\n' ${quote(PID_MARKER)} "$$" >&2; ` +
+    `(IFS= read -r _sd_delivery) && ` +
+    `(umask 077 && mkdir -p ${quote(stagingDir)}) && ` +
+    `(umask 077 && cat > ${quote(scriptPath)})`;
+  const uploadCommand = `if command -v setsid >/dev/null 2>&1; ` +
+    `then setsid -w sh -c ${quote(upload)}; else sh -c ${quote(upload)}; fi`;
+  // exec preserves sshd's controlling terminal and process group for terminal signals.
+  const run = `stty -echo && printf '%s%s\\n' ${quote(PID_MARKER)} "$$" >&2; ` +
+    // EOF before confirmation must not invoke even a custom interpreter.
+    `(IFS= read -r _sd_start) && stty echo && ${invoke}`;
+  return {
+    uploadCommand,
+    command: `${envPrefix(env)}exec sh -c ${quote(run)}`,
+    display: `${envPrefixDisplay(env)}${invoke}`,
+  };
 }
 
 /**

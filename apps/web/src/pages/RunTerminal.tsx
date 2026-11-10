@@ -1,13 +1,17 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import type {
   ExecutionLogChunk,
   ExecutionStream as StreamKind,
   ExecutionSummary,
+  TerminalState,
 } from '@dashboard/shared';
 import '@xterm/xterm/css/xterm.css';
 import { useExecutionStream } from '../api/useExecutionStream';
+import { executionSocket } from '../api/ws';
+import { Button } from '../components/Button';
+import { useI18n } from '../lib/i18n';
 
 /**
  * xterm's own palette.
@@ -101,76 +105,169 @@ function paint(chunk: ExecutionLogChunk): string {
 export function RunTerminal({
   executionId,
   live,
+  interactive = false,
   onStatus,
 }: {
   executionId: string;
   live: boolean;
+  interactive?: boolean;
   onStatus?: (execution: ExecutionSummary) => void;
 }) {
+  const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const disposedRef = useRef(false);
+  const modeRef = useRef({ interactive, live });
+  modeRef.current = { interactive, live };
+  const ownerRef = useRef<TerminalState>('waiting');
+  const syncingRef = useRef(true);
+  const syncGeneration = useRef(0);
+  const connectedRef = useRef(executionSocket.getState() === 'open');
+  const wantsControlRef = useRef(true);
+  const [owner, setOwner] = useState<TerminalState>('waiting');
+  const [syncing, setSyncing] = useState(true);
+  const [connected, setConnected] = useState(connectedRef.current);
+  const [inputError, setInputError] = useState(false);
+
+  function canInput(): boolean {
+    return modeRef.current.interactive && modeRef.current.live && connectedRef.current
+      && !syncingRef.current && ownerRef.current === 'controlling';
+  }
+
+  function updateInput(): void {
+    const terminal = terminalRef.current;
+    if (terminal) terminal.options.disableStdin = !canInput();
+  }
+
+  function resize(): void {
+    const terminal = terminalRef.current;
+    if (!terminal || !canInput()) return;
+    executionSocket.sendTerminal({ type: 'terminal_resize', executionId,
+      cols: Math.max(2, Math.min(500, terminal.cols)), rows: Math.max(2, Math.min(500, terminal.rows)) });
+  }
+
+  function claim(): void {
+    wantsControlRef.current = true;
+    if (modeRef.current.interactive && modeRef.current.live && connectedRef.current && !syncingRef.current) {
+      executionSocket.sendTerminal({ type: 'terminal_claim', executionId });
+    }
+  }
+
+  function sendInput(data: string): void {
+    if (!canInput()) return;
+    if (new TextEncoder().encode(data).byteLength > 16384
+      || !executionSocket.sendTerminal({ type: 'terminal_input', executionId, data })) {
+      setInputError(true);
+    } else setInputError(false);
+  }
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-
     disposedRef.current = false;
     const terminal = new Terminal({
-      fontFamily: resolveMonoStack(),
-      fontSize: 14,
-      lineHeight: 1.45,
-      letterSpacing: 0,
-      cursorBlink: false,
-      // Output is read, never typed into: a script has no stdin to give.
-      disableStdin: true,
-      convertEol: true,
-      scrollback: 10_000,
-      theme: terminalTheme(),
+      fontFamily: resolveMonoStack(), fontSize: 14, lineHeight: 1.45, letterSpacing: 0,
+      cursorBlink: interactive, disableStdin: true,
+      // A PTY already emits CRLF; translating again changes full-screen cursor movement.
+      convertEol: !interactive, scrollback: 10_000, theme: terminalTheme(),
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     terminal.open(host);
     fit.fit();
     terminalRef.current = terminal;
-
-    // Refitting on every resize event would thrash; one frame is enough.
+    const keyboard = terminal.onData(sendInput);
+    const dimensions = terminal.onResize(resize);
+    const unwatch = executionSocket.onStateChange((state) => {
+      connectedRef.current = state === 'open';
+      setConnected(connectedRef.current);
+      if (state !== 'open') {
+        ownerRef.current = 'waiting'; setOwner('waiting');
+        syncingRef.current = true; setSyncing(true);
+        syncGeneration.current += 1;
+      }
+      updateInput();
+    });
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        try {
-          fit.fit();
-        } catch {
-          // A fit against a zero-sized container throws; the next resize fixes it.
-        }
+        try { fit.fit(); } catch { /* A hidden terminal is fitted on the next resize. */ }
       });
     });
     observer.observe(host);
-
     return () => {
       disposedRef.current = true;
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      terminal.dispose();
+      if (interactive) executionSocket.sendTerminal({ type: 'terminal_release', executionId });
+      keyboard.dispose(); dimensions.dispose(); unwatch();
+      cancelAnimationFrame(frame); observer.disconnect(); terminal.dispose();
       terminalRef.current = null;
     };
-  }, []);
+  }, [executionId, interactive]);
+
+  useEffect(() => { updateInput(); }, [live]);
 
   useExecutionStream({
-    executionId,
-    live,
-    onStatus,
+    executionId, live, onStatus,
+    onTerminal: (message) => {
+      ownerRef.current = message.state; setOwner(message.state);
+      if (message.state === 'busy') wantsControlRef.current = false;
+      if (message.error && message.error !== 'not_ready') setInputError(true);
+      updateInput();
+      if (message.state === 'controlling') resize();
+      if (message.state === 'available' && wantsControlRef.current) claim();
+    },
+    onSyncChange: (next) => {
+      const generation = ++syncGeneration.current;
+      if (next) {
+        syncingRef.current = true; setSyncing(true); updateInput();
+      } else {
+        // write() is asynchronous: wait until all replay bytes have been parsed so
+        // an old terminal query cannot send an automatic response into the script.
+        terminalRef.current?.write('', () => {
+          if (disposedRef.current || generation !== syncGeneration.current) return;
+          syncingRef.current = false; setSyncing(false); updateInput();
+          if (wantsControlRef.current && ownerRef.current !== 'controlling' && ownerRef.current !== 'busy') claim();
+          else resize();
+        });
+      }
+    },
     onChunk: (chunk) => {
-      // The stream can deliver a final chunk after the terminal is gone.
       if (disposedRef.current) return;
+      // Dashboard notices must not overwrite a full-screen application's cursor state.
+      if (interactive && chunk.stream === 'system') return;
       terminalRef.current?.write(paint(chunk));
     },
   });
 
+  const enabled = interactive && live && connected && !syncing && owner === 'controlling';
+  const status = !live ? 'closed' : !connected ? 'offline' : syncing ? 'restoring' : owner;
+  const statusKey = {
+    waiting: 'runs.terminal.waiting', available: 'runs.terminal.available',
+    controlling: 'runs.terminal.controlling', busy: 'runs.terminal.busy', closed: 'runs.terminal.closed',
+    offline: 'runs.terminal.offline', restoring: 'runs.terminal.restoring',
+  } as const;
   return (
     <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
-      <div ref={hostRef} className="h-[clamp(320px,58vh,780px)] w-full px-4 py-3" />
+      {interactive ? (
+        <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
+          <span role="status" className="text-mute text-meta mr-auto">{t(statusKey[status])}</span>
+          {owner === 'controlling' ? (
+            <Button size="sm" disabled={!connected || !live} onClick={() => {
+              wantsControlRef.current = false;
+              ownerRef.current = 'available'; setOwner('available'); updateInput();
+              executionSocket.sendTerminal({ type: 'terminal_release', executionId });
+            }}>{t('runs.terminal.release')}</Button>
+          ) : (
+            <Button size="sm" disabled={!connected || !live || syncing} onClick={claim}>{t('runs.terminal.claim')}</Button>
+          )}
+          <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x03')}>{t('runs.terminal.interrupt')}</Button>
+          <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x04')}>{t('runs.terminal.eof')}</Button>
+          {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
+        </div>
+      ) : null}
+      <div ref={hostRef} aria-label={interactive ? t('runs.terminal.label') : undefined}
+        className="h-[clamp(320px,58vh,780px)] w-full px-4 py-3" />
     </div>
   );
 }

@@ -174,3 +174,26 @@ test('schedule editing restores its saved invocation without touching the manual
   expect(hooks.save).not.toHaveBeenCalled();
   expect(elements(render(props)).some((element) => element.props.children === 'runs.submit')).toBe(false);
 });
+
+
+test('restores interactive mode for manual execution and hides it in schedule mode', () => {
+  hooks.prefill!.draft.interactive = true;
+  render();
+  const tree = render();
+  const toggle = elements(tree).find((element) => element.props.label === 'runs.interactive.label');
+  expect(toggle?.props).toMatchObject({ checked: true });
+  const submit = elements(tree).find((element) => element.props.children === 'runs.submit')!;
+  submit.props.onClick!();
+  expect(hooks.execute).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ interactive: true }) }), expect.anything());
+  expect(elements(render({ mode: 'schedule' })).some((element) => element.props.label === 'runs.interactive.label')).toBe(false);
+});
+
+test('autosaves explicit terminal disable even when every other field is empty', () => {
+  hooks.prefill!.draft = { params: {}, custom: [], timeoutSec: '', interactive: true };
+  render();
+  const toggle = elements(render()).find((element) => element.props.label === 'runs.interactive.label')!;
+  (toggle.props as unknown as { onChange: (checked: boolean) => void }).onChange(false);
+  render();
+  unmount();
+  expect(hooks.save).toHaveBeenCalledWith({ id: 'script', draft: expect.objectContaining({ interactive: false }) });
+});

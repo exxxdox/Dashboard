@@ -69,3 +69,9 @@ describe('toRunInput', () => {
     expect(input.argv).toEqual([]);
   });
 });
+
+
+test('forwards the saved terminal mode used by both run entry points', () => {
+  expect(toRunInput(state({ interactive: true }), 'target-1').interactive).toBe(true);
+  expect(toRunInput(state(), 'target-1').interactive ?? false).toBe(false);
+});

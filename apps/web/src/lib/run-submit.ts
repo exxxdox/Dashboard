@@ -18,6 +18,7 @@ export function toRunInput(state: RunFormState, targetId: string): ExecuteScript
 
   return {
     targetId,
+    ...(state.interactive ? { interactive: true } : {}),
     // Custom rows come last, so a row shadows nothing: a row repeating a
     // declared name is refused by the form before it can get here.
     params: { ...state.values, ...collectParams(state.rows) },

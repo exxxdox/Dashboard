@@ -42,6 +42,12 @@ Stop the service and back up data before upgrading. Copy the **contents** of the
 
 Remove `SCRIPT_ROOT_HOST` from the old `.env` and any custom `/workspace` mount. Remove an explicit `SCRIPT_ROOT_CONTAINER` override to use the new default. Rebuild and start, verify local files and GitHub sync, then test execution. Keep the old directory and backup until verified; restore the old configuration and directory to revert.
 
+## Interactive runs
+
+Enable **Interactive terminal** in the manual run settings to type into the run detail page, use arrow-key menus, answer password prompts, and send Ctrl+C / Ctrl+D. Closing the page leaves the task running; reopen it to reconnect. One page controls a run at a time while others can watch. Cancellation and timeouts still apply; scheduled runs remain non-interactive.
+
+Input is not stored separately, but anything the script echoes becomes captured output. Truncated logs and terminal resizing can prevent exact screen restoration.
+
 ## Writing scripts
 
 Local sources support creating, viewing, editing and deleting scripts in the browser, including paths in subdirectories. Saving refreshes parameter declarations immediately. GitHub script files remain read-only; edit them in the repository and sync. Deleting a local script removes its file, preserves execution history and disables its schedules. Conflicting edits are rejected, and closing an editor with unsaved changes asks for confirmation. See [local script management](docs/script-editing.md).

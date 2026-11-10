@@ -17,10 +17,12 @@ export type RunFormState = {
   /** The custom rows, ids and all. */
   rows: CustomParamRow[];
   timeoutSec: string;
+  interactive?: boolean;
 };
 
 export function draftFromForm(state: RunFormState): RunDraft {
   return {
+    ...(state.interactive === undefined ? {} : { interactive: state.interactive }),
     params: state.values,
     // Ids are the form's own bookkeeping; a restored row gets a fresh one.
     custom: state.rows.map(({ name, value, mode }) => ({ name, value, mode })),
@@ -60,7 +62,7 @@ export function formFromDraft(draft: RunDraft, declared: ScriptParam[]): RunForm
     rows = updateRow(rows, added.id, { name: row.name, value: row.value, mode: row.mode });
   }
 
-  return { values, rows, timeoutSec: draft.timeoutSec };
+  return { values, rows, timeoutSec: draft.timeoutSec, ...(draft.interactive === undefined ? {} : { interactive: draft.interactive }) };
 }
 
 /** Two drafts are the same if they would produce the same run. */

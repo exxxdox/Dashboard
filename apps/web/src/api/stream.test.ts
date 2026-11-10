@@ -222,3 +222,14 @@ it('retries a failed gap only when another live chunk arrives', async () => {
   await stream.resync();
   expect(received).toEqual([1, 2, 3, 4]);
 });
+
+it('holds terminal input during history fills, including reconnect and failed resync', async () => {
+  const states: boolean[] = [];
+  const stream = new LogStream('ex-1', () => {}, (syncing) => states.push(syncing));
+  getExecutionLogs.mockResolvedValueOnce([chunk(1)]).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([]);
+  await stream.loadHistory();
+  await stream.resync();
+  expect(states).toEqual([true, false, true]);
+  await stream.resync();
+  expect(states).toEqual([true, false, true, true, false]);
+});

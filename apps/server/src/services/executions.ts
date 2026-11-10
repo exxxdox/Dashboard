@@ -43,6 +43,7 @@ import {
   type ScriptRow,
   type SourceRow,
 } from './sources.js';
+import type { TerminalControl } from '../transport/types.js';
 import { createTransportForTarget, getTargetRow, type TargetRow } from './targets.js';
 
 /** Row shape for an execution, mirroring the `executions` table. */
@@ -53,6 +54,7 @@ export type ExecutionRow = {
   schedule_id: string | null;
   schedule_name: string | null;
   retention_days: number | null;
+  interactive: number;
   status: ExecutionStatus;
   exit_code: number | null;
   signal: string | null;
@@ -80,6 +82,7 @@ export function toExecutionSummary(row: ExecutionRow): ExecutionSummary {
     scheduleId: row.schedule_id,
     scheduleName: row.schedule_name,
     status: row.status,
+    interactive: row.interactive === 1,
     exitCode: row.exit_code,
     signal: row.signal,
     commandDisplay: row.command_display,
@@ -239,6 +242,7 @@ export type ScheduledExecutionOrigin = {
 
 export type ExecutionService = {
   submit: (scriptId: string, input: ExecuteScriptInput, origin?: ScheduledExecutionOrigin) => Promise<ExecutionSummary>;
+  terminal: (executionId: string) => TerminalControl | null;
   cancel: (executionId: string) => ExecutionSummary;
   get: (executionId: string) => ExecutionSummary;
   list: (filters: ExecutionFilters) => { items: ExecutionSummary[]; total: number };
@@ -283,7 +287,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
     }
 
     const timeoutSec = input.timeoutSec ?? script.timeoutSec ?? config.defaultTimeoutSec;
-    const interpreter = resolveInterpreter(`.${script.format}`, script.interpreterOverride);
+    const interpreter = resolveInterpreter(`.${script.format}`, script.interpreterOverride, input.interactive ?? false);
 
     // Typed by name so this list and `RUN_ENV_NAMES` -- which is what refuses a
     // parameter colliding with one of these -- cannot drift apart: a key present
@@ -306,6 +310,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
     return {
       executionId,
+      interactive: input.interactive ?? false,
       scriptPath,
       stagingDir,
       workDir: target.work_dir,
@@ -324,6 +329,8 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
   return {
     async submit(scriptId, input, origin): Promise<ExecutionSummary> {
+      // Scheduled runs cannot depend on an operator being present to answer prompts.
+      if (origin && input.interactive) throw new ValidationError('Scheduled executions cannot be interactive');
       const scriptRow = db
         .prepare<[string], ScriptRow>('SELECT * FROM scripts WHERE id = ? AND deleted_at IS NULL')
         .get(scriptId);
@@ -349,8 +356,8 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         `INSERT INTO executions (
            id, script_id, target_id, status, command_display, target_name, script_name,
            script_rel_path, param_values_json, argv_json, work_dir, queued_at,
-           schedule_id, schedule_name, retention_days
-         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           schedule_id, schedule_name, retention_days, interactive
+         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         executionId,
         script.id,
@@ -366,6 +373,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         origin?.scheduleId ?? null,
         origin?.scheduleName ?? null,
         origin?.retentionDays ?? null,
+        plan.interactive ? 1 : 0,
       );
 
       queue.enqueue({
@@ -385,6 +393,13 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
       logger.info({ executionId, scriptId, targetId: target.id }, 'execution queued');
       return getExecution(db, executionId);
+    },
+
+    terminal(executionId): TerminalControl | null {
+      const current = getExecution(db, executionId);
+      if (!current.interactive) throw new ConflictError('not_interactive');
+      if (current.status !== 'running' && current.status !== 'queued') throw new ConflictError('not_running');
+      return runner.getTerminal(executionId);
     },
 
     cancel(executionId): ExecutionSummary {
@@ -419,7 +434,11 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
     get: (executionId) => getExecution(db, executionId),
     list: (filters) => listExecutions(db, filters),
-    logs: (executionId, afterSeq) => getExecutionLogs(db, executionId, afterSeq),
+    logs: (executionId, afterSeq) => {
+      // A prompt may be the last output: reconnect must see it before the batch timer fires.
+      runner.flushLogs(executionId);
+      return getExecutionLogs(db, executionId, afterSeq);
+    },
 
     remove(executionId): void {
       const current = getExecution(db, executionId);

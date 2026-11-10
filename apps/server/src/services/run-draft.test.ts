@@ -184,3 +184,18 @@ describe('saveRunDraft', () => {
     ).toThrow(NotFoundError);
   });
 });
+
+
+test('remembers turning interaction on and explicitly off independently of other fields', () => {
+  const db = openDatabase(':memory:');
+  try {
+    const scriptId = seed(db);
+    addRun(db, 'ex_interactive', NOW, {});
+    db.prepare('UPDATE executions SET interactive = 1').run();
+    expect(getRunPrefill(db, scriptId).draft.interactive).toBe(true);
+    const on = { params: {}, custom: [], timeoutSec: '', interactive: true };
+    expect(saveRunDraft(db, scriptId, on)).toEqual({ source: 'draft', draft: on });
+    const off = { ...on, interactive: false };
+    expect(saveRunDraft(db, scriptId, off)).toEqual({ source: 'draft', draft: off });
+  } finally { db.close(); }
+});

@@ -9,6 +9,22 @@
  */
 
 const en = {
+  'runs.interactive.label': 'Interactive terminal',
+  'runs.interactive.hint': 'Use the keyboard to answer prompts and navigate terminal menus.',
+  'runs.terminal.waiting': 'Waiting for terminal…',
+  'runs.terminal.available': 'Terminal ready — read only',
+  'runs.terminal.controlling': 'You control this terminal',
+  'runs.terminal.busy': 'Another page controls this terminal',
+  'runs.terminal.closed': 'Terminal closed',
+  'runs.terminal.offline': 'Disconnected — input disabled',
+  'runs.terminal.restoring': 'Restoring output…',
+  'runs.terminal.claim': 'Take control',
+  'runs.terminal.release': 'Release control',
+  'runs.terminal.interrupt': 'Send Ctrl+C',
+  'runs.terminal.eof': 'Send Ctrl+D',
+  'runs.terminal.inputError': 'Input could not be sent. It was not retried.',
+  'runs.terminal.label': 'Interactive script terminal',
+
   // -- execution status labels, produced by `lib/status.ts` ----------------
   'runs.status.queued': 'Queued',
   'runs.status.running': 'Running',
@@ -138,6 +154,22 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
+  'runs.interactive.label': '交互终端',
+  'runs.interactive.hint': '使用键盘回答提示、操作终端菜单。',
+  'runs.terminal.waiting': '正在等待终端…',
+  'runs.terminal.available': '终端已就绪，只读模式',
+  'runs.terminal.controlling': '你正在控制此终端',
+  'runs.terminal.busy': '其他页面正在控制此终端',
+  'runs.terminal.closed': '终端已关闭',
+  'runs.terminal.offline': '连接已断开，输入已禁用',
+  'runs.terminal.restoring': '正在恢复输出…',
+  'runs.terminal.claim': '获取控制权',
+  'runs.terminal.release': '释放控制权',
+  'runs.terminal.interrupt': '发送 Ctrl+C',
+  'runs.terminal.eof': '发送 Ctrl+D',
+  'runs.terminal.inputError': '输入未能发送，未自动重试。',
+  'runs.terminal.label': '脚本交互终端',
+
   'runs.status.queued': '排队中',
   'runs.status.running': '运行中',
   'runs.status.succeeded': '成功',

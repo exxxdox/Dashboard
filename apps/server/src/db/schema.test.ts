@@ -434,3 +434,13 @@ describe('v11 independent schedule identities', () => {
     } finally { db.close(); }
   });
 });
+
+
+test('interactive migration preserves existing executions as non-interactive', () => {
+  const db = versionOneDatabase();
+  try {
+    migrate(db);
+    expect(db.prepare('SELECT interactive FROM executions WHERE id = ?').get('run_1')).toEqual({ interactive: 0 });
+    expect(() => db.prepare('UPDATE executions SET interactive = 2').run()).toThrow();
+  } finally { db.close(); }
+});

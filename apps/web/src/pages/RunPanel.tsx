@@ -131,9 +131,11 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
   // A plan edits its own saved invocation; the manual run draft is a separate document.
   const [initial] = useState(() => initialInput ? formFromDraft({
     params: initialInput.params,
+    interactive: initialInput.interactive,
     custom: initialInput.argv.map((value) => ({ name: '', value, mode: 'argv' as const })),
     timeoutSec: initialInput.timeoutSec === undefined ? '' : String(initialInput.timeoutSec),
   }, script.params) : null);
+  const [interactive, setInteractive] = useState(initial?.interactive ?? false);
   const [targetId, setTargetId] = useState(initialInput?.targetId ?? '');
   const [values, setValues] = useState<ParamValues>(() => initial?.values ?? seedValues(script.params));
   const [timeout, setTimeoutSec] = useState(initial?.timeoutSec ?? '');
@@ -187,7 +189,7 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
   function currentInput(): ExecuteScriptInput | null {
     setShowErrors(true);
     if (hasErrors || effectiveTargetId === '') return null;
-    return toRunInput({ values, rows: customRows, timeoutSec: timeout }, effectiveTargetId);
+    return toRunInput({ values, rows: customRows, timeoutSec: timeout, interactive: mode === 'run' && interactive }, effectiveTargetId);
   }
 
   function submit(): void {
@@ -214,6 +216,7 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
     // A slow prefill must not replace edits made while the request was pending.
     if (!touched) {
       const restored = formFromDraft(prefill.data.draft, script.params);
+      setInteractive(restored.interactive ?? false);
       setValues(restored.values);
       setCustomRows(restored.rows);
       if (restored.timeoutSec !== '') setTimeoutSec(restored.timeoutSec);
@@ -226,7 +229,7 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
   // something -- opening a script must not rewrite its draft.
   const savedDraft = prefill.data?.draft;
   const save = saveDraft.mutateAsync;
-  const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout });
+  const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout, interactive });
   const lastRequested = useRef('');
   const saveQueue = useRef<Promise<unknown> | null>(null);
   const serialized = JSON.stringify(draft);
@@ -302,6 +305,14 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
             </Select>
           )}
         </RunRow>
+
+        {mode === 'run' ? (
+          <div className="grid gap-1.5">
+            <Switch label={t('runs.interactive.label')} checked={interactive}
+              onChange={(checked) => { setTouched(true); setInteractive(checked); }} />
+            <p className="text-mute text-meta">{t('runs.interactive.hint')}</p>
+          </div>
+        ) : null}
 
         {noTargets ? (
           <p className="text-mute text-meta">

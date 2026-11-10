@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 11;
+const TARGET_VERSION = 12;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -383,6 +383,10 @@ export const MIGRATIONS: Migration[] = [
         schedule_name = (SELECT name FROM script_schedules WHERE last_execution_id = executions.id)
       WHERE EXISTS (SELECT 1 FROM script_schedules WHERE last_execution_id = executions.id);
     `);
+  },
+  // v12 -- historical runs had no terminal; opt-in avoids changing unattended execution.
+  (db) => {
+    db.exec('ALTER TABLE executions ADD COLUMN interactive INTEGER NOT NULL DEFAULT 0 CHECK (interactive IN (0, 1))');
   },
 ];
 

@@ -114,3 +114,15 @@ describe('describePrefill', () => {
     expect(describePrefill(prefill)).not.toBeNull();
   });
 });
+
+it('round-trips interactive mode through the same draft used by one-click execution', () => {
+  const form = formFromDraft({ ...EMPTY, interactive: true }, []);
+  expect(form.interactive).toBe(true);
+  expect(draftFromForm(form).interactive).toBe(true);
+});
+
+it('preserves an explicit disabled terminal mode so last-run fallback cannot re-enable it', () => {
+  const form = formFromDraft({ ...EMPTY, interactive: false }, []);
+  expect(form.interactive).toBe(false);
+  expect(draftFromForm(form)).toHaveProperty('interactive', false);
+});

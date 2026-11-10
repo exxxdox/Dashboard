@@ -93,7 +93,7 @@ test('GitHub scan, preview and execution use the selected subdirectory', async (
   const queue = createQueue({ concurrency: 1, perKeyConcurrency: 1 });
   const service = createExecutionService({
     ...h, box, queue, hub: { publish() {}, subscribe: () => () => {} },
-    runner: { async run(plan) { plans.push(plan); return 'succeeded'; } },
+    runner: { getTerminal: () => null, flushLogs: () => undefined, async run(plan) { plans.push(plan); return 'succeeded'; } },
   });
   await service.submit(script.id, { targetId: target.id, params: {}, argv: [] });
   await queue.drain();

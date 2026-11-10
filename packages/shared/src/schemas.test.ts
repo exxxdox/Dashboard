@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import {
   executeScriptSchema,
+  clientMessageSchema,
+  saveScriptScheduleSchema,
   loginSchema,
   runDraftSchema,
   testNotificationSchema,
@@ -261,4 +263,25 @@ test('schedule identities and per-plan retention are explicit and bounded', asyn
   expect(saveScriptScheduleSchema.safeParse({ ...input, retentionDays: 3651 }).success).toBe(false);
   expect(saveScriptScheduleSchema.safeParse({ ...input, name: '' }).success).toBe(false);
   expect(saveScriptScheduleSchema.safeParse({ ...input, scriptId: '' }).success).toBe(false);
+});
+
+
+describe('interactive terminal contracts', () => {
+  test('preserves opt-in on execution and draft while old inputs remain non-interactive', () => {
+    expect(executeScriptSchema.parse({ targetId: 't', interactive: true }).interactive).toBe(true);
+    expect(runDraftSchema.parse({ interactive: true }).interactive).toBe(true);
+    expect(executeScriptSchema.parse({ targetId: 't' }).interactive ?? false).toBe(false);
+  });
+  test('rejects interactive unattended schedules', () => {
+    expect(saveScriptScheduleSchema.safeParse({ scriptId: 's', name: 'daily', retentionDays: 30,
+      cron: '* * * * *', timeZone: 'UTC', enabled: true,
+      input: { targetId: 't', interactive: true } }).success).toBe(false);
+  });
+  test('accepts terminal controls and rejects oversized UTF-8 or invalid dimensions', () => {
+    expect(clientMessageSchema.safeParse({ type: 'terminal_claim', executionId: 'r' }).success).toBe(true);
+    expect(clientMessageSchema.safeParse({ type: 'terminal_input', executionId: 'r', data: 'yes\r' }).success).toBe(true);
+    expect(clientMessageSchema.safeParse({ type: 'terminal_input', executionId: 'r', data: '中'.repeat(6000) }).success).toBe(false);
+    expect(clientMessageSchema.safeParse({ type: 'terminal_resize', executionId: 'r', cols: 80, rows: 24 }).success).toBe(true);
+    for (const cols of [0, 501, 2.5]) expect(clientMessageSchema.safeParse({ type: 'terminal_resize', executionId: 'r', cols, rows: 24 }).success).toBe(false);
+  });
 });

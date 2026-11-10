@@ -8,6 +8,7 @@ import type {
 export type SocketState = 'idle' | 'connecting' | 'open' | 'reconnecting';
 
 export type MessageHandlers = {
+  onTerminal?: (message: Extract<ServerMessage, { type: 'terminal_state' }>) => void;
   onLog?: (chunk: ExecutionLogChunk) => void;
   onStatus?: (execution: ExecutionSummary) => void;
   /** Fired on every (re)subscribe — the cue to backfill anything missed. */
@@ -24,6 +25,7 @@ export type MessageHandlers = {
  */
 export type SocketLike = {
   readyState: number;
+  bufferedAmount?: number;
   send(data: string): void;
   close(code?: number, reason?: string): void;
   onopen: ((event: unknown) => void) | null;
@@ -74,6 +76,11 @@ export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (!isRecord(parsed) || typeof parsed.type !== 'string') return null;
 
   switch (parsed.type) {
+    case 'terminal_state': {
+      if (typeof parsed.executionId !== 'string' || !['waiting', 'available', 'controlling', 'busy', 'closed'].includes(String(parsed.state))) return null;
+      if (parsed.error !== undefined && typeof parsed.error !== 'string') return null;
+      return parsed as unknown as Extract<ServerMessage, { type: 'terminal_state' }>;
+    }
     case 'hello':
       return typeof parsed.serverTime === 'string'
         ? { type: 'hello', serverTime: parsed.serverTime }
@@ -224,6 +231,13 @@ export class ExecutionSocket {
     for (const listener of this.stateListeners) listener(next);
   }
 
+  // Keyboard input is disposable: replay after reconnect could execute a command twice.
+  sendTerminal(message: Extract<ClientMessage, { type: `terminal_${string}` }>): boolean {
+    if (!this.subscriptions.has(message.executionId) || this.socket?.readyState !== SOCKET_OPEN
+      || (this.socket.bufferedAmount ?? 0) >= 65536) return false;
+    try { this.socket.send(JSON.stringify(message)); return true; } catch { return false; }
+  }
+
   private send(message: ClientMessage): void {
     if (this.socket?.readyState !== SOCKET_OPEN) return;
     this.socket.send(JSON.stringify(message));
@@ -233,6 +247,12 @@ export class ExecutionSocket {
     if (!message) return;
 
     switch (message.type) {
+      case 'terminal_state': {
+        for (const subscription of this.subscriptions.get(message.executionId) ?? []) {
+          subscription.handlers.onTerminal?.(message);
+        }
+        return;
+      }
       case 'log': {
         for (const subscription of this.subscriptions.get(message.chunk.executionId) ?? []) {
           subscription.handlers.onLog?.(message.chunk);

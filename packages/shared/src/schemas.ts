@@ -130,6 +130,7 @@ export const updateSourceSchema = z.object({
 export type UpdateSourceInput = z.infer<typeof updateSourceSchema>;
 
 export const executeScriptSchema = z.object({
+  interactive: z.boolean().optional(),
   targetId: z.string().min(1),
   /** Parameter values, keyed by name. The script reads these from its environment. */
   params: z.record(z.string(), z.string()).default({}),
@@ -155,7 +156,7 @@ export const saveScriptScheduleSchema = z.object({
   cron: z.string().trim().min(1).max(200),
   timeZone: z.string().trim().min(1).max(100),
   enabled: z.boolean(),
-  input: executeScriptSchema,
+  input: executeScriptSchema.refine((input) => !input.interactive, { message: 'Scheduled runs cannot use an interactive terminal' }),
 });
 export type SaveScriptScheduleInput = z.infer<typeof saveScriptScheduleSchema>;
 
@@ -211,6 +212,7 @@ export const runDraftRowSchema = z.object({
  * "the script's own limit", and a half-typed number is not a number yet.
  */
 export const runDraftSchema = z.object({
+  interactive: z.boolean().optional(),
   /**
    * Parameter values, keyed by name.
    *
@@ -411,6 +413,7 @@ export type ScriptTreeNode = {
 };
 
 export type ExecutionSummary = {
+  interactive?: boolean;
   id: string;
   scheduleId: string | null;
   scheduleName: string | null;
@@ -688,10 +691,22 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('subscribe'), executionId: z.string().min(1) }),
   z.object({ type: z.literal('unsubscribe'), executionId: z.string().min(1) }),
   z.object({ type: z.literal('ping') }),
+  z.object({ type: z.literal('terminal_claim'), executionId: z.string().min(1) }),
+  z.object({ type: z.literal('terminal_release'), executionId: z.string().min(1) }),
+  z.object({ type: z.literal('terminal_input'), executionId: z.string().min(1),
+    data: z.string().min(1).max(16384).refine((data) => [...data].reduce((bytes, char) => {
+      const point = char.codePointAt(0)!;
+      return bytes + (point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4);
+    }, 0) <= 16384) }),
+  z.object({ type: z.literal('terminal_resize'), executionId: z.string().min(1),
+    cols: z.number().int().min(2).max(500), rows: z.number().int().min(2).max(500) }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
+export type TerminalState = 'waiting' | 'available' | 'controlling' | 'busy' | 'closed';
+
 export type ServerMessage =
+  | { type: 'terminal_state'; executionId: string; state: TerminalState; error?: string }
   | { type: 'hello'; serverTime: string }
   | { type: 'subscribed'; executionId: string }
   | { type: 'log'; chunk: ExecutionLogChunk }

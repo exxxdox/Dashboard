@@ -11,6 +11,7 @@
 import type { ExecutionStatus, ExecutionStream, ExecutionSummary } from '@dashboard/shared';
 import {
   buildCommand,
+  buildInteractiveCommand,
   cleanupStagingCommand,
   type InterpreterSpec,
 } from '@dashboard/shared';
@@ -19,11 +20,12 @@ import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';
 import type { Logger } from '../lib/logger.js';
 import type { NotificationService } from '../services/notifications/service.js';
-import type { Transport } from '../transport/types.js';
+import type { TerminalControl, Transport } from '../transport/types.js';
 import type { ExecutionHub } from '../ws/hub.js';
 
 export type ExecutionPlan = {
   executionId: string;
+  interactive?: boolean;
   /**
    * Absolute path on the host the script is staged at. Transient: it exists for
    * the duration of the run and is removed afterwards.
@@ -71,6 +73,8 @@ const FLUSH_INTERVAL_MS = 80;
 const FLUSH_BYTES = 16 * 1024;
 
 export type ExecutionRunner = {
+  getTerminal: (executionId: string) => TerminalControl | null;
+  flushLogs: (executionId: string) => void;
   /**
    * Run a plan to completion. Resolves once the execution row is final; never
    * rejects for a script that exits non-zero, and never rejects on cancel.
@@ -80,6 +84,7 @@ export type ExecutionRunner = {
 
 export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
   const { db, hub, logger, maxLogBytes, loadSummary } = deps;
+  const sessions = new Map<string, { terminal: TerminalControl | null; flush: () => void }>();
 
   const insertLog = db.prepare(
     'INSERT INTO execution_logs (execution_id, seq, stream, data, ts) VALUES (?, ?, ?, ?, ?)',
@@ -94,6 +99,8 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
   );
 
   return {
+    getTerminal: (executionId) => sessions.get(executionId)?.terminal ?? null,
+    flushLogs: (executionId) => sessions.get(executionId)?.flush(),
     async run(plan, transport, signal): Promise<ExecutionStatus> {
       const { executionId } = plan;
 
@@ -171,6 +178,8 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
         }
       };
 
+      const session = { terminal: null as TerminalControl | null, flush };
+      sessions.set(executionId, session);
       const startedAt = nowIso();
       markRunning.run('running', startedAt, executionId);
       record('system', `$ ${plan.displayCommand}\n`);
@@ -182,18 +191,28 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
       let errorMessage: string | null = null;
 
       try {
-        const built = buildCommand({
+        const input = {
           interpreter: plan.interpreter,
           scriptPath: plan.scriptPath,
           stagingDir: plan.stagingDir,
           cwd: plan.workDir,
           env: plan.env,
           args: plan.argv,
-        });
+        };
+        const interactive = plan.interactive ? buildInteractiveCommand(input) : null;
+        const built = interactive ?? buildCommand(input);
 
         const outcome = await transport.exec({
           command: built.command,
           stdin: plan.scriptBytes,
+          ...(interactive ? { terminal: {
+            uploadCommand: interactive.uploadCommand,
+            onReady: (control: TerminalControl) => {
+              if (signal.aborted) return;
+              session.terminal = control;
+              hub.publish(executionId, { type: 'terminal_state', executionId, state: 'available' });
+            },
+          } } : {}),
           // Sent whatever the outcome, so a cancelled or timed-out run does not
           // leave its staging directory behind on the host.
           cleanupCommand: cleanupStagingCommand(plan.stagingDir),
@@ -221,6 +240,9 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
         record('system', `\n[transport error] ${errorMessage}\n`);
         logger.warn({ executionId, err: error }, 'execution transport failed');
       } finally {
+        // The execution owns its PTY; leaving a page only releases the input lease.
+        sessions.delete(executionId);
+        if (plan.interactive) hub.publish(executionId, { type: 'terminal_state', executionId, state: 'closed' });
         flush();
       }
 

@@ -21,7 +21,8 @@ export default defineConfig({
       '/mcp': { target: 'http://127.0.0.1:8080', changeOrigin: true },
       '/api': {
         target: 'http://127.0.0.1:8080',
-        changeOrigin: true,
+        // Keep the browser's Host so the API can verify WebSocket Origin in dev.
+        changeOrigin: false,
         ws: true,
       },
     },

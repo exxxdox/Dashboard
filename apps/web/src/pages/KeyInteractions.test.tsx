@@ -205,10 +205,10 @@ describe('one-click run', () => {
   });
   test('submits stored params and positional args to the first target and navigates after success', () => {
     hooks.targets.push({ ...target, id: 'other' });
-    hooks.prefill.data!.draft = { params: { NAME: 'saved' }, custom: [{ name: '标签', value: 'a b', mode: 'argv' }], timeoutSec: '30' };
+    hooks.prefill.data!.draft = { interactive: true, params: { NAME: 'saved' }, custom: [{ name: '标签', value: 'a b', mode: 'argv' }], timeoutSec: '30' };
     click(renderButton());
     expect(hooks.execute.mutate).toHaveBeenCalledWith({ scriptId: 'script', input: {
-      targetId: 'target', params: { NAME: 'saved' }, argv: ['a b'], timeoutSec: 30,
+      targetId: 'target', interactive: true, params: { NAME: 'saved' }, argv: ['a b'], timeoutSec: 30,
     } }, expect.any(Object));
     hooks.execute.mutate.mock.calls[0]![1].onSuccess({ executionId: 'a/b' });
     expect(hooks.navigate).toHaveBeenCalledWith('/runs/a%2Fb');

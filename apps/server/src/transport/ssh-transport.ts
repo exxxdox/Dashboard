@@ -20,6 +20,7 @@ import { PID_MARKER } from '@dashboard/shared';
 
 import type { ExecOptions, ExecOutcome, Transport, TransportCheck } from './types.js';
 import { writeStdin } from './write-stdin.js';
+import { createTerminalInput } from './terminal-input.js';
 
 const ssh2 = (ssh2Namespace as unknown as { default?: typeof ssh2Namespace }).default ?? ssh2Namespace;
 const { Client } = ssh2;
@@ -116,6 +117,7 @@ export function createSshTransport(config: SshTransportConfig): Transport {
     },
 
     async exec(options: ExecOptions): Promise<ExecOutcome> {
+      if (options.terminal) return execTerminal(config, options);
       const client = new Client();
       let remotePid: number | null = null;
 
@@ -181,6 +183,70 @@ export function createSshTransport(config: SshTransportConfig): Transport {
   };
 }
 
+/** A PTY cannot carry the upload: canonical mode would rewrite and echo its bytes. */
+async function execTerminal(config: SshTransportConfig, options: ExecOptions): Promise<ExecOutcome> {
+  const client = new Client();
+  const deadline = new AbortController();
+  const signal = AbortSignal.any([options.signal, deadline.signal]);
+  const timer = options.timeoutMs === null ? null : setTimeout(() => deadline.abort(), options.timeoutMs);
+  let remotePid: number | null = null;
+  let input: ReturnType<typeof createTerminalInput> | undefined;
+  let releaseWriter: () => void = () => undefined;
+  const commandSettled = new Promise<void>((resolve) => { releaseWriter = resolve; });
+  const interrupted = (): ExecOutcome => ({
+    exitCode: null, signal: 'TERM', canceled: options.signal.aborted,
+    timedOut: !options.signal.aborted && deadline.signal.aborted, stdinError: null,
+  });
+  let connected = false;
+  let completed = false;
+  try {
+    await connect(client, toConnectConfig(config), signal);
+    connected = true;
+    if (signal.aborted) return interrupted();
+    const terminal = options.terminal;
+    if (!terminal) throw new Error('Missing terminal options');
+    const upload = await openChannel(client, terminal.uploadCommand, signal);
+    let writing = Promise.resolve<string | null>(null);
+    const uploaded = await pump(upload, { ...options, signal, timeoutMs: null }, (pid) => {
+      remotePid = pid;
+      if (!signal.aborted) {
+        writing = writeStdin(upload, Buffer.concat([Buffer.from('\n'), options.stdin ?? Buffer.alloc(0)]), { giveUp: commandSettled });
+      }
+    });
+    releaseWriter();
+    const stdinError = remotePid === null ? 'The host did not confirm script delivery' : await writing;
+    completed = !signal.aborted && uploaded.exitCode !== null;
+    if (signal.aborted) return interrupted();
+    if (uploaded.exitCode !== 0 || stdinError !== null) return { ...uploaded, stdinError };
+    remotePid = null;
+    completed = false;
+    const channel = await openChannel(client, options.command, signal, true);
+    const outcome = await pump(channel, { ...options, signal, timeoutMs: null }, (pid) => {
+      remotePid = pid;
+      if (signal.aborted) return;
+      channel.write(Buffer.from('\n'));
+      input = createTerminalInput(channel);
+      terminal.onReady(input);
+    }, true);
+    completed = !signal.aborted && (outcome.exitCode !== null || outcome.signal !== null);
+    return signal.aborted ? interrupted() : { ...outcome, stdinError: null };
+  } catch (error) {
+    if (signal.aborted) return interrupted();
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+    input?.close();
+    releaseWriter();
+    if (connected && !completed && remotePid !== null) {
+      await killProcessGroup(client, remotePid).catch(() => undefined);
+    }
+    if (connected && options.cleanupCommand !== undefined) {
+      await runCommand(client, options.cleanupCommand, { timeoutMs: CLEANUP_TIMEOUT_MS }).catch(() => undefined);
+    }
+    client.end();
+  }
+}
+
 type PumpResult = Omit<ExecOutcome, 'stdinError'>;
 
 /**
@@ -194,6 +260,7 @@ function pump(
   channel: ClientChannel,
   options: ExecOptions,
   onPid: (pid: number) => void,
+  markerOnStdout = false,
 ): Promise<PumpResult> {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -216,7 +283,7 @@ function pump(
     };
 
     const emitStderr = (data: string): void => {
-      if (data !== '') emit({ stream: 'stderr', data });
+      if (data !== '') emit({ stream: markerOnStdout ? 'stdout' : 'stderr', data });
     };
 
     const cleanup = (): void => {
@@ -240,16 +307,7 @@ function pump(
       settle({ exitCode: null, signal: 'TERM', canceled: true, timedOut: false });
     };
 
-    channel.on('data', (buffer: Buffer) => {
-      if (settled) return;
-      const data = stdoutDecoder.write(buffer);
-      if (data !== '') emit({ stream: 'stdout', data });
-    });
-
-    channel.stderr.on('data', (buffer: Buffer) => {
-      if (settled) return;
-      const text = stderrDecoder.write(buffer);
-
+    const consumeMarker = (text: string): void => {
       if (pidResolved) {
         emitStderr(text);
         return;
@@ -271,8 +329,12 @@ function pump(
           return;
         }
 
-        const pid = Number.parseInt(stderrBuffer.slice(markerIndex + PID_MARKER.length, lineEnd), 10);
-        if (Number.isSafeInteger(pid) && pid > 0) onPid(pid);
+        const rawPid = stderrBuffer.slice(markerIndex + PID_MARKER.length, lineEnd).replace(/\r$/, '');
+        const pid = /^\d+$/.test(rawPid) ? Number(rawPid) : 0;
+        if (Number.isSafeInteger(pid) && pid > 0) {
+          try { onPid(pid); }
+          catch (error) { settled = true; cleanup(); reject(error); return; }
+        }
 
         const before = stderrBuffer.slice(0, markerIndex);
         const after = stderrBuffer.slice(lineEnd + 1);
@@ -290,6 +352,20 @@ function pump(
         emitStderr(stderrBuffer.slice(0, -tail));
         stderrBuffer = stderrBuffer.slice(-tail);
       }
+    };
+
+    channel.on('data', (buffer: Buffer) => {
+      if (settled) return;
+      const data = stdoutDecoder.write(buffer);
+      if (markerOnStdout) consumeMarker(data);
+      else if (data !== '') emit({ stream: 'stdout', data });
+    });
+    channel.stderr.on('data', (buffer: Buffer) => {
+      if (settled) return;
+      const data = stderrDecoder.write(buffer);
+      if (markerOnStdout) {
+        if (data !== '') emit({ stream: 'stdout', data });
+      } else consumeMarker(data);
     });
 
     channel.on('close', (code: number | null, signal?: string | null) => {
@@ -361,17 +437,19 @@ function connect(client: SshClient, config: ConnectConfig, signal?: AbortSignal)
   });
 }
 
-function openChannel(client: SshClient, command: string, signal: AbortSignal): Promise<ClientChannel> {
+function openChannel(client: SshClient, command: string, signal: AbortSignal, terminal = false): Promise<ClientChannel> {
   return new Promise((resolve, reject) => {
     const onAbort = (): void => reject(new Error('SSH channel canceled'));
     if (signal.aborted) { onAbort(); return; }
     signal.addEventListener('abort', onAbort, { once: true });
-    client.exec(command, (error: Error | undefined, channel: ClientChannel) => {
+    const opened = (error: Error | undefined, channel: ClientChannel): void => {
       signal.removeEventListener('abort', onAbort);
       if (error) reject(error);
-      else if (signal.aborted) onAbort();
+      else if (signal.aborted) { channel.close?.(); onAbort(); }
       else resolve(channel);
-    });
+    };
+    if (terminal) client.exec(command, { pty: { term: 'xterm-256color', cols: 80, rows: 24 } }, opened);
+    else client.exec(command, opened);
   });
 }
 

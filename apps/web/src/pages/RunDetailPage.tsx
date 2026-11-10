@@ -227,7 +227,7 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
               </div>
             }
           >
-            <RunTerminal executionId={data.id} live={isLive} onStatus={applyUpdate} />
+            <RunTerminal executionId={data.id} live={isLive} interactive={data.interactive ?? false} onStatus={applyUpdate} />
           </Suspense>
         </div>
       </PageBody>

@@ -52,7 +52,7 @@ export function emptyDraft(): RunDraft {
  * someone opened and left alone would freeze the last run's values out.
  */
 function hasContent(draft: RunDraft): boolean {
-  return Object.keys(draft.params).length > 0 || draft.custom.length > 0 || draft.timeoutSec !== '';
+  return Object.keys(draft.params).length > 0 || draft.custom.length > 0 || draft.timeoutSec !== '' || draft.interactive !== undefined;
 }
 
 type ScriptDraftRow = {
@@ -74,6 +74,7 @@ function loadScriptRow(db: Db, scriptId: string): ScriptDraftRow {
 }
 
 type LastRunRow = {
+  interactive: number;
   param_values_json: string;
   argv_json: string;
 };
@@ -90,7 +91,7 @@ type LastRunRow = {
 function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): RunDraft | null {
   const row = db
     .prepare<[string], LastRunRow>(
-      `SELECT param_values_json, argv_json FROM executions
+      `SELECT param_values_json, argv_json, interactive FROM executions
        WHERE script_id = ? ORDER BY queued_at DESC LIMIT 1`,
     )
     .get(scriptId);
@@ -109,7 +110,7 @@ function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): Ru
     custom.push({ name: '', value, mode: 'argv' });
   }
 
-  return { params, custom, timeoutSec: '' };
+  return { params, custom, timeoutSec: '', ...(row.interactive === 1 ? { interactive: true } : {}) };
 }
 
 export function getRunPrefill(db: Db, scriptId: string): ScriptRunPrefill {

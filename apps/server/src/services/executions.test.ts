@@ -51,7 +51,7 @@ function setup(retentionDays = 30) {
   const queue = createQueue({ concurrency: 1, perKeyConcurrency: 1, schedule: (fn) => scheduled.push(fn) });
   const run = vi.fn(async (_plan: ExecutionPlan, _transport: Transport, _signal: AbortSignal) => 'succeeded' as const);
   const config = { ...loadConfig({ SCRIPT_ROOT_CONTAINER: root, SERVE_WEB: 'false' }), retentionDays };
-  const service = createExecutionService({ db, queue, config, runner: { run },
+  const service = createExecutionService({ db, queue, config, runner: { run, getTerminal: () => null, flushLogs: () => undefined },
     box: createSecretBox(randomBytes(32)), hub: createExecutionHub(), logger: createLogger({ level: 'silent', pretty: false }) });
   const input = { targetId: 'tgt_1', params: { ENV: 'prod' }, argv: [] as string[] };
   const addRun = (id: string, status = 'succeeded', queuedAt = now) => db.prepare(`INSERT INTO executions
@@ -266,4 +266,33 @@ test('global forever retention does not override a finite plan policy', () => {
   h.db.prepare("UPDATE executions SET schedule_id = 'deleted', retention_days = 1 WHERE id = 'scheduled'").run();
   expect(h.service.prune()).toBe(1);
   expect(h.service.get('manual').scheduleId).toBeNull();
+});
+
+
+test('snapshots interactive mode and refuses unattended interactive execution', async () => {
+  const h = setup();
+  const interactive = { ...h.input, interactive: true };
+  const result = await h.service.submit('scr_1', interactive);
+  expect(result).toMatchObject({ interactive: true });
+  expect(h.service.get(result.id).interactive).toBe(true);
+  h.scheduled.shift()!(); await h.queue.drain();
+  expect(h.run.mock.calls[0]![0].interactive).toBe(true);
+  await expect(h.service.submit('scr_1', interactive, {
+    scheduleId: 'schedule', scheduleName: 'Daily', retentionDays: 30,
+  })).rejects.toThrow(ValidationError);
+  const ordinary = await h.service.submit('scr_1', h.input);
+  expect(ordinary.interactive).toBe(false);
+  h.scheduled.shift()!(); await h.queue.drain();
+});
+
+
+test('terminal access validates execution mode and state before exposing the runtime handle', () => {
+  const h = setup();
+  expect(() => h.service.terminal('missing')).toThrow(NotFoundError);
+  h.addRun('ordinary', 'running');
+  expect(() => h.service.terminal('ordinary')).toThrow('not_interactive');
+  h.db.prepare('UPDATE executions SET interactive = 1').run();
+  expect(h.service.terminal('ordinary')).toBeNull();
+  h.db.prepare("UPDATE executions SET status = 'succeeded'").run();
+  expect(() => h.service.terminal('ordinary')).toThrow('not_running');
 });
