@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ExecutionSummary, SaveScriptScheduleInput } from '@dashboard/shared';
 import { openDatabase } from '../db/client.js';
 import { createLogger } from '../lib/logger.js';
-import { NotFoundError, ValidationError } from '../lib/errors.js';
+import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
 import { createScriptScheduleService } from './script-schedules.js';
 
 const NOW = '2026-11-10T00:00:00.000Z';
@@ -47,6 +47,20 @@ describe('script schedules', () => {
     expect(h.service.list()).toHaveLength(2);
   });
 
+  test('rejects duplicate names on create and rename without changing saved plans', () => {
+    const h = setup();
+    const first = h.service.create(h.input);
+    for (const name of ['Daily job', ' Daily job ', 'daily JOB']) {
+      expect(() => h.service.create({ ...h.input, name })).toThrow(ConflictError);
+    }
+    const second = h.service.create({ ...h.input, name: 'Evening' });
+    expect(() => h.service.save(second.id, { ...h.input, name: ' Daily job ' })).toThrow(ConflictError);
+    expect(h.service.get(second.id).name).toBe('Evening');
+    expect(h.service.save(first.id, { ...h.input, enabled: false }).enabled).toBe(false);
+    h.service.remove(first.id);
+    expect(h.service.create(h.input).name).toBe('Daily job');
+  });
+
   test.each(['* * * * * *', '@daily', '61 * * * *', '* * 31 2 *'])('rejects unusable Cron %s before saving', (cron) => {
     const h = setup();
     expect(() => h.service.create({ ...h.input, cron })).toThrow(ValidationError);
@@ -68,7 +82,7 @@ describe('script schedules', () => {
   test('calculates Cron in the saved time zone with standard day OR semantics', () => {
     const h = setup();
     expect(h.service.create({ ...h.input, cron: '0 9 * * *', timeZone: 'Asia/Shanghai' }).nextRunAt).toBe('2026-11-10T01:00:00.000Z');
-    expect(h.service.create({ ...h.input, cron: '0 9 12 * 3' }).nextRunAt).toBe('2026-11-11T09:00:00.000Z');
+    expect(h.service.create({ ...h.input, name: 'Other rule', cron: '0 9 12 * 3' }).nextRunAt).toBe('2026-11-11T09:00:00.000Z');
   });
 
   test('keeps overlap protection per plan and submits atomic execution origin metadata', async () => {

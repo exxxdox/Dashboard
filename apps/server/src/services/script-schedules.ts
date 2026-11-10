@@ -10,7 +10,7 @@ import {
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/client.js';
 import { nowIso } from '../db/client.js';
-import { NotFoundError, ValidationError } from '../lib/errors.js';
+import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
 import type { Logger } from '../lib/logger.js';
 import { newScriptScheduleId } from '../lib/ids.js';
 import type { ExecutionService } from './executions.js';
@@ -170,6 +170,10 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
 
   function write(id: string, rawInput: SaveScriptScheduleInput): ScriptSchedule {
     const input = saveScriptScheduleSchema.parse(rawInput);
+    // All writes are synchronous on the single instance, so checking here also covers API callers.
+    if (db.prepare<[string, string], { id: string }>('SELECT id FROM script_schedules WHERE name = ? COLLATE NOCASE AND id <> ? LIMIT 1').get(input.name, id)) {
+      throw new ConflictError('A schedule with this name already exists', { key: 'error.schedule.duplicateName' });
+    }
     const metadata = toScriptSummary(script(input.scriptId));
     getTargetRow(db, input.input.targetId);
     const next = nextRun(input.cron, input.timeZone, new Date());

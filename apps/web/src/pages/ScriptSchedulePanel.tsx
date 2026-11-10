@@ -49,8 +49,8 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
       </h3>
           <p className="text-mute text-meta">{t('schedule.snapshotHint')}</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t('schedule.name')}>
-              {({ id }) => <TextInput id={id} value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />}
+            <Field label={t('schedule.name')} hint={t('schedule.nameHint')}>
+              {({ id, describedBy }) => <TextInput id={id} aria-describedby={describedBy} value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />}
             </Field>
             <Field label={t('schedule.retention')} hint={t('schedule.retentionHint')}>
               {({ id, describedBy }) => <TextInput id={id} aria-describedby={describedBy} type="number" min={0} max={3650} step={1} value={retentionDays} onChange={(event) => setRetentionDays(event.target.value)} />}
