@@ -3,6 +3,8 @@ dist/
 build/
 coverage/
 /tmp/
+# Server commands can create scratch state relative to their package directory.
+/apps/server/tmp/
 /docs/
 *.tsbuildinfo
 
