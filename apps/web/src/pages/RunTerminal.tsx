@@ -17,6 +17,7 @@ import { executionSocket } from '../api/ws';
 import { Button, IconButton } from '../components/Button';
 import { TextInput } from '../components/Form';
 import { useI18n } from '../lib/i18n';
+import { pushToast } from '../lib/toast';
 import { formatExit } from '../lib/format';
 import { executionStatusLabel } from '../lib/status';
 import {
@@ -212,6 +213,21 @@ export function RunTerminal({
     } else setInputError(false);
   }
 
+  async function clipboard(action: 'copy' | 'paste', terminal: Terminal): Promise<void> {
+    try {
+      if (action === 'copy') {
+        const selection = terminal.getSelection();
+        if (selection) await navigator.clipboard.writeText(selection);
+      } else if (canInput()) {
+        const text = await navigator.clipboard.readText();
+        // Clipboard permission may settle after control is released or this run unmounts.
+        if (terminalRef.current === terminal && canInput()) terminal.paste(text);
+      }
+    } catch {
+      pushToast(t('runs.terminal.clipboardError'), { tone: 'error' });
+    }
+  }
+
   function find(direction: 'next' | 'previous'): void {
     const addon = searchAddonRef.current;
     if (!addon || searchTerm === '') return;
@@ -323,6 +339,13 @@ export function RunTerminal({
     // The browser's own find bar cannot reach xterm's buffer; take the shortcut
     // before it becomes bytes for the script.
     terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey
+        && (event.code === 'KeyC' || event.code === 'KeyV')) {
+        // Consume browser shortcuts so one paste cannot also trigger a native paste event.
+        event.preventDefault();
+        void clipboard(event.code === 'KeyC' ? 'copy' : 'paste', terminal);
+        return false;
+      }
       if (event.type === 'keydown' && event.ctrlKey && event.shiftKey && event.code === 'KeyF') {
         setSearchOpen(true);
         return false;

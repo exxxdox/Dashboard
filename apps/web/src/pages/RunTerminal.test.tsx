@@ -3,6 +3,7 @@ import type { ExecutionLogChunk, ExecutionSummary } from '@dashboard/shared';
 import type { ExecutionStreamOptions } from '../api/useExecutionStream';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { RunTerminal } from './RunTerminal';
+import { pushToast } from '../lib/toast';
 
 // Exercise terminal effect and output callbacks without a DOM/canvas runtime.
 const harness = vi.hoisted(() => ({
@@ -15,7 +16,7 @@ const harness = vi.hoisted(() => ({
   terminal: {
     options: { disableStdin: true }, cols: 80, rows: 24, unicode: { activeVersion: '' },
     onData: vi.fn(), onResize: vi.fn(), open: vi.fn(), loadAddon: vi.fn(), write: vi.fn(),
-    dispose: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
+    dispose: vi.fn(), attachCustomKeyEventHandler: vi.fn(), getSelection: vi.fn(), paste: vi.fn(),
   },
   search: {
     findNext: vi.fn(), findPrevious: vi.fn(), clearDecorations: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('react', async (original) => ({
   useEffect: (effect: () => (() => void) | void) => { harness.effects.push(effect); },
 }));
 vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? JSON.stringify(params) : '') }) }));
+vi.mock('../lib/toast', () => ({ pushToast: vi.fn() }));
 vi.mock('../api/ws', () => ({ executionSocket: { getState: () => harness.state, onStateChange: harness.onState, sendTerminal: harness.send } }));
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: unknown) {
   harness.construct(options);
@@ -237,4 +239,66 @@ test('falls back to the theme monospace stack when no font is saved', () => {
     fontFamily: 'monospace', fontSize: 14,
   }));
   cleanup();
+});
+
+function clipboardKey(code: string): KeyboardEvent {
+  return { type: 'keydown', ctrlKey: true, shiftKey: true, code, preventDefault: vi.fn() } as unknown as KeyboardEvent;
+}
+
+test('copies the terminal selection with Ctrl+Shift+C and preserves Ctrl+C', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  harness.terminal.getSelection.mockReturnValue('selected output');
+  const cleanup = mount(false);
+  const handler = harness.terminal.attachCustomKeyEventHandler.mock.calls[0]![0] as (event: KeyboardEvent) => boolean;
+  const event = clipboardKey('KeyC');
+  expect(handler(event)).toBe(false);
+  await Promise.resolve();
+  expect(event.preventDefault).toHaveBeenCalledOnce();
+  expect(writeText).toHaveBeenCalledWith('selected output');
+  expect(handler({ ...event, shiftKey: false } as KeyboardEvent)).toBe(true);
+  cleanup();
+});
+
+test('pastes through xterm only while controlling and rechecks after clipboard read', async () => {
+  const readText = vi.fn().mockResolvedValue('hello\nworld');
+  vi.stubGlobal('navigator', { clipboard: { readText } });
+  const cleanup = mount(true, vi.fn(), true);
+  const handler = harness.terminal.attachCustomKeyEventHandler.mock.calls[0]![0] as (event: KeyboardEvent) => boolean;
+  expect(handler(clipboardKey('KeyV'))).toBe(false);
+  expect(readText).not.toHaveBeenCalled();
+  harness.stream!.onSyncChange!(false);
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'controlling' });
+  handler(clipboardKey('KeyV'));
+  await Promise.resolve();
+  expect(harness.terminal.paste).toHaveBeenCalledWith('hello\nworld');
+  harness.terminal.paste.mockClear();
+  handler(clipboardKey('KeyV'));
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'busy' });
+  await Promise.resolve();
+  expect(harness.terminal.paste).not.toHaveBeenCalled();
+  cleanup();
+});
+
+test('reports denied clipboard access without an unhandled rejection', async () => {
+  vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } });
+  harness.terminal.getSelection.mockReturnValue('output');
+  const cleanup = mount(false);
+  const handler = harness.terminal.attachCustomKeyEventHandler.mock.calls[0]![0] as (event: KeyboardEvent) => boolean;
+  handler(clipboardKey('KeyC'));
+  await Promise.resolve();
+  expect(pushToast).toHaveBeenCalledWith('runs.terminal.clipboardError', { tone: 'error' });
+  cleanup();
+});
+
+test('discards a pending paste when the terminal is unmounted', async () => {
+  vi.stubGlobal('navigator', { clipboard: { readText: vi.fn().mockResolvedValue('late paste') } });
+  const cleanup = mount(true, vi.fn(), true);
+  harness.stream!.onSyncChange!(false);
+  harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'controlling' });
+  const handler = harness.terminal.attachCustomKeyEventHandler.mock.calls[0]![0] as (event: KeyboardEvent) => boolean;
+  handler(clipboardKey('KeyV'));
+  cleanup();
+  await Promise.resolve();
+  expect(harness.terminal.paste).not.toHaveBeenCalled();
 });
