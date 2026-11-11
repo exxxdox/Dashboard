@@ -89,6 +89,7 @@ function run(status: ExecutionSummary['status']): ExecutionSummary {
   return {
     id: 'run', scheduleId: null, scheduleName: null, scriptId: 'script', targetId: 'target', status, exitCode: null, signal: null,
     commandDisplay: 'sh run.sh', targetName: 'host', scriptName: 'run', scriptRelPath: 'run.sh',
+    scriptPath: '/tmp/sd-run/run.sh',
     paramValues: {}, argv: [], queuedAt: '2026-01-01T00:00:00Z', startedAt: null, finishedAt: null,
     durationMs: null, logBytes: 0, truncated: false, errorMessage: null,
   };

@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 14;
+const TARGET_VERSION = 15;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -403,6 +403,12 @@ export const MIGRATIONS: Migration[] = [
       UPDATE scripts SET deleted_at = COALESCE(deleted_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         WHERE format = 'ps1';
     `);
+  },
+  // v15 -- history records the absolute path the host executed. Nullable because
+  // older rows never stored it and their staging directory is derived per run,
+  // so it cannot be reconstructed after the fact.
+  (db) => {
+    db.exec('ALTER TABLE executions ADD COLUMN script_path TEXT');
   },
 ];
 

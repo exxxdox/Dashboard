@@ -67,6 +67,9 @@ describe('execution submission', () => {
     h.db.prepare('UPDATE scripts SET timeout_sec = 12').run();
     const execution = await h.service.submit('scr_1', { ...h.input, argv: ['a b', '; echo unsafe'], timeoutSec: 7 });
     expect(execution).toMatchObject({ status: 'queued', paramValues: { ENV: 'prod', COUNT: '3' }, argv: ['a b', '; echo unsafe'] });
+    // The host path is history, not a derived display: the staging directory is
+    // per run and is gone by the time anyone reads the record.
+    expect(execution.scriptPath).toMatch(new RegExp(`/sd-${execution.id}/deploy\\.sh$`));
     writeFileSync(h.scriptPath, 'echo changed\n');
     h.scheduled.shift()!();
     await h.queue.drain();

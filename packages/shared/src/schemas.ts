@@ -432,6 +432,12 @@ export type ExecutionSummary = {
   targetName: string;
   scriptName: string;
   scriptRelPath: string;
+  /**
+   * Absolute path of the uploaded script on the target host. The file lives in
+   * that run's staging directory and is deleted when the run ends. Null on runs
+   * recorded before this was stored.
+   */
+  scriptPath: string | null;
   paramValues: Record<string, string>;
   /** Positional arguments, in the order the script received them. */
   argv: string[];

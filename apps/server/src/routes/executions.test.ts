@@ -20,6 +20,7 @@ async function setup() {
   const summary: ExecutionSummary = {
     id: 'run_1', scheduleId: null, scheduleName: null, scriptId: 'scr_1', targetId: 'tgt_1', status: 'queued', exitCode: null, signal: null,
     commandDisplay: 'bash deploy.sh', targetName: 'edge', scriptName: 'Deploy', scriptRelPath: 'deploy.sh',
+    scriptPath: '/tmp/sd-run_1/deploy.sh',
     paramValues: {}, argv: [], queuedAt: '2026-01-01T00:00:00.000Z', startedAt: null, finishedAt: null,
     durationMs: null, logBytes: 0, truncated: false, errorMessage: null,
   };
