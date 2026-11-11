@@ -107,11 +107,10 @@ test('GitHub content cannot be created, edited or deleted through the API', asyn
   expect(readFileSync(join(h.directory, 'test.sh'), 'utf8')).toBe('echo readonly');
 });
 
-test('creation bounds UTF-8 byte size and accepts PowerShell scripts', async () => {
+test('creation bounds UTF-8 byte size and refuses PowerShell scripts', async () => {
   const h = setup();
   const response = await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'test.ps1', content: 'Write-Output hello' } });
-  expect(response.statusCode).toBe(201);
-  expect(response.json().format).toBe('ps1');
+  expect(response.statusCode).toBe(422);
   expect((await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'large.sh', content: '界'.repeat(700_000) } })).statusCode).toBe(422);
 });
 
@@ -188,12 +187,12 @@ test('hard-linked scripts cannot be read, saved or deleted through the editor', 
 test('invalid UTF-8 scripts are refused without rewriting their bytes', async () => {
   const h = setup();
   const bytes = Buffer.from([0xff, 0xfe, 0x65, 0x00]);
-  writeFileSync(join(h.directory, 'test.ps1'), bytes);
+  writeFileSync(join(h.directory, 'test.sh'), bytes);
   await syncSource(h.db, h.config, h.source.id, h.logger);
   const script = h.db.prepare('SELECT id, content_hash FROM scripts').get() as { id: string; content_hash: string };
   expect((await h.app.inject(`/api/scripts/${script.id}/content`)).statusCode).toBe(422);
   expect((await h.app.inject({ method: 'PUT', url: `/api/scripts/${script.id}/content`, payload: { content: 'changed', expectedHash: script.content_hash } })).statusCode).toBe(422);
-  expect(readFileSync(join(h.directory, 'test.ps1'))).toEqual(bytes);
+  expect(readFileSync(join(h.directory, 'test.sh'))).toEqual(bytes);
 });
 
 test('synchronizations of the same source cannot overlap', async () => {

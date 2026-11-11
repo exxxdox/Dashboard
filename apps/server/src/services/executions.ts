@@ -336,6 +336,10 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         .get(scriptId);
       if (!scriptRow) throw new NotFoundError('Script');
 
+      // Old records may still be addressed directly before their next source scan.
+      if (scriptRow.format !== 'sh') {
+        throw new ValidationError('Only Bash scripts are supported', undefined, { key: 'error.scripts.bashOnly' });
+      }
       const script = toScriptSummary(scriptRow);
       const source = getSourceRow(db, script.sourceId);
       const target = getTargetRow(db, input.targetId);

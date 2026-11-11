@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { FilePlus, Pencil, Trash2 } from 'lucide-react';
 import type { ScriptContent, ScriptSummary } from '@dashboard/shared';
 import { Button } from '../components/Button';
-import { Field, TextArea, TextInput } from '../components/Form';
+import { Field, TextInput } from '../components/Form';
 import { ErrorBanner, LoadingBlock } from '../components/Feedback';
 import { Modal } from '../components/Modal';
+import { BashEditor } from '../components/BashEditor';
 import { useCreateScript, useDeleteScript, useSaveScriptContent, useScriptContent } from '../api/queries';
 import { errorMessage } from '../api/client';
 import { useI18n } from '../lib/i18n';
@@ -97,7 +98,7 @@ export function ScriptFileForm({ sourceId, scriptId, relPath, initial, mode, onC
         {({ id }) => <TextInput id={id} value={path} required placeholder="tools/example.sh" disabled={pending} onChange={event => setPath(event.target.value)} />}
       </Field> : null}
       <Field label={i18n.t('scripts.file.content')}>
-        {({ id }) => <TextArea id={id} value={content} className="mono min-h-[40vh] text-meta" rows={18} spellCheck={false} autoCapitalize="off" autoCorrect="off" disabled={pending} onChange={event => setContent(event.target.value)} />}
+        {({ id, describedBy }) => <BashEditor id={id} describedBy={describedBy} label={i18n.t('scripts.file.content')} value={content} readOnly={pending} onChange={setContent} />}
       </Field>
       {mutation.isError ? <ErrorBanner message={errorMessage(mutation.error, i18n)} /> : null}
       <div className="flex flex-wrap items-center gap-3">

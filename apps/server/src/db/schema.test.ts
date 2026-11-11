@@ -460,3 +460,21 @@ test('v13 feature switches preserve existing settings and default both features 
     });
   } finally { db.close(); }
 });
+
+
+test('v14 retires legacy PowerShell scripts and schedules while preserving execution history', () => {
+  const db = versionOneDatabase();
+  try {
+    for (const migration of MIGRATIONS.slice(1, 13)) migration(db);
+    db.pragma('user_version = 13');
+    db.prepare("UPDATE scripts SET format = 'ps1', rel_path = 'api.ps1', file_name = 'api.ps1' WHERE id = 'scr_1'").run();
+    db.prepare(`INSERT INTO script_schedules
+      (id,script_id,name,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at)
+      VALUES ('sch_legacy','scr_1','legacy','tgt_1','0 9 * * *','UTC',1,'{}',?,?,?)`).run(NOW, NOW, NOW);
+    const execution = db.prepare('SELECT * FROM executions').get();
+    migrate(db);
+    expect(db.prepare('SELECT deleted_at FROM scripts').get()).toEqual({ deleted_at: expect.any(String) });
+    expect(db.prepare('SELECT enabled,next_run_at FROM script_schedules').get()).toEqual({ enabled: 0, next_run_at: null });
+    expect(db.prepare('SELECT * FROM executions').get()).toEqual(execution);
+  } finally { db.close(); }
+});

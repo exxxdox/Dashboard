@@ -47,7 +47,7 @@ echo hi
     expect(meta.params.map((param) => param.name)).toEqual(['TOP']);
   });
 
-  test('reads a leading PowerShell block comment', () => {
+  test('ignores a leading PowerShell block comment', () => {
     const meta = parseScriptMeta(`<#
 .SYNOPSIS
 @name Restart Service
@@ -55,10 +55,8 @@ echo hi
 #>
 Write-Host "hello"
 `);
-    expect(meta.name).toBe('Restart Service');
-    expect(meta.params).toEqual([
-      { name: 'SERVICE', type: 'string', required: true, default: null, description: 'Which service' },
-    ]);
+    expect(meta.name).toBeNull();
+    expect(meta.params).toEqual([]);
   });
 
   test('rejects parameter names that are not environment identifiers', () => {

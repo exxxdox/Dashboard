@@ -50,7 +50,7 @@ export function envPrefix(env: Record<string, string>): string {
   return parts.length > 0 ? `${parts.join(' ')} ` : '';
 }
 
-/** A resolved interpreter invocation, e.g. ['bash'] or ['pwsh','-NoProfile']. */
+/** A resolved Bash invocation, including an optional explicit executable override. */
 export type InterpreterSpec = {
   /** argv[0] and any fixed flags. The script path is appended after these. */
   argv: string[];
@@ -58,25 +58,16 @@ export type InterpreterSpec = {
   label: string;
 };
 
-/**
- * Pick the interpreter for a script based on its extension.
- *
- * The SSH target is Linux, so PowerShell scripts need PowerShell Core (`pwsh`),
- * not Windows PowerShell. Users can override per script when their host has a
- * differently named binary.
- */
-export function resolveInterpreter(extension: string, override?: readonly string[] | null, interactive = false): InterpreterSpec {
+/** Resolve supported scripts before considering a stored executable override. */
+export function resolveInterpreter(extension: string, override?: readonly string[] | null, _interactive = false): InterpreterSpec {
+  // Legacy overrides must not make a retired script format runnable again.
+  if (extension.toLowerCase() !== '.sh') {
+    throw new Error(`Unsupported script extension: ${JSON.stringify(extension)}`);
+  }
   if (override && override.length > 0) {
     return { argv: [...override], label: override.join(' ') };
   }
-  switch (extension.toLowerCase()) {
-    case '.sh':
-      return { argv: ['bash'], label: 'bash' };
-    case '.ps1':
-      return { argv: ['pwsh', '-NoProfile', ...(interactive ? [] : ['-NonInteractive']), '-File'], label: 'pwsh' };
-    default:
-      throw new Error(`Unsupported script extension: ${JSON.stringify(extension)}`);
-  }
+  return { argv: ['bash'], label: 'bash' };
 }
 
 export type BuildCommandInput = {

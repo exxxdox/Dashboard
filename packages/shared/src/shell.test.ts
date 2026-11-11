@@ -61,13 +61,9 @@ describe('resolveInterpreter', () => {
     expect(resolveInterpreter('.sh').argv).toEqual(['bash']);
   });
 
-  test('uses PowerShell Core for ps1, since the target is Linux', () => {
-    expect(resolveInterpreter('.ps1').argv).toEqual([
-      'pwsh',
-      '-NoProfile',
-      '-NonInteractive',
-      '-File',
-    ]);
+  test('rejects PowerShell even with an interpreter override', () => {
+    expect(() => resolveInterpreter('.ps1')).toThrow(/Unsupported/);
+    expect(() => resolveInterpreter('.ps1', ['bash'])).toThrow(/Unsupported/);
   });
 
   test('honours an explicit override', () => {
@@ -213,11 +209,6 @@ describe('cleanupStagingCommand', () => {
 
 
 describe('interactive shell commands', () => {
-  test('keeps default PowerShell interactive without changing explicit overrides', () => {
-    expect(resolveInterpreter('.ps1', null, true).argv).toEqual(['pwsh', '-NoProfile', '-File']);
-    expect(resolveInterpreter('.ps1', ['pwsh', '-NonInteractive', '-File'], true).argv)
-      .toEqual(['pwsh', '-NonInteractive', '-File']);
-  });
 
   test('stages bytes separately and leaves the terminal attached to the interpreter', () => {
     const built = buildInteractiveCommand({

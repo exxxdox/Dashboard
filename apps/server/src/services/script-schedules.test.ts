@@ -173,3 +173,11 @@ describe('script schedules', () => {
     expect(h.service.get(replacement.id)).toMatchObject({ lastError: null, lastExecutionId: null }); expect(() => h.service.get(saved.id)).toThrow(NotFoundError);
   });
 });
+
+
+test('refuses new schedules for retired PowerShell scripts', () => {
+  const h = setup();
+  h.db.prepare("UPDATE scripts SET format = 'ps1', rel_path = 'job.ps1', file_name = 'job.ps1'").run();
+  expect(() => h.service.create(h.input)).toThrow(ValidationError);
+  expect(h.db.prepare('SELECT COUNT(*) AS n FROM script_schedules').get()).toEqual({ n: 0 });
+});

@@ -14,6 +14,7 @@ import {
   type ScriptParam,
 } from './script-meta.js';
 
+// Retain the retired value so stored script snapshots and history remain readable.
 export const scriptFormatSchema = z.enum(['sh', 'ps1']);
 export type ScriptFormat = z.infer<typeof scriptFormatSchema>;
 

@@ -296,3 +296,17 @@ test('terminal access validates execution mode and state before exposing the run
   h.db.prepare("UPDATE executions SET status = 'succeeded'").run();
   expect(() => h.service.terminal('ordinary')).toThrow('not_running');
 });
+
+
+test('legacy PowerShell scripts cannot be submitted manually or by a schedule, even with overrides', async () => {
+  const h = setup();
+  h.addRun('legacy');
+  writeFileSync(h.scriptPath.replace(/\.sh$/, '.ps1'), 'Write-Output hello');
+  h.db.prepare("UPDATE executions SET script_rel_path = 'deploy.ps1', command_display = 'pwsh deploy.ps1' WHERE id = 'legacy'").run();
+  h.db.prepare("UPDATE scripts SET format = 'ps1', rel_path = 'deploy.ps1', file_name = 'deploy.ps1', interpreter_override_json = ?").run(JSON.stringify(["bash"]));
+  await expect(h.service.submit('scr_1', h.input)).rejects.toBeInstanceOf(ValidationError);
+  await expect(h.service.submit('scr_1', h.input, { scheduleId: 'legacy-plan', scheduleName: 'Legacy', retentionDays: 30 })).rejects.toBeInstanceOf(ValidationError);
+  expect(h.service.get('legacy').commandDisplay).toBe('pwsh deploy.ps1');
+  expect(h.db.prepare('SELECT COUNT(*) AS n FROM executions').get()).toEqual({ n: 1 });
+  expect(h.scheduled).toHaveLength(0);
+});

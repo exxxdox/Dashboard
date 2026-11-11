@@ -18,7 +18,7 @@ import { nowIso } from '../db/client.js';
 import { newScriptId } from '../lib/ids.js';
 
 /** Extensions the dashboard knows how to run. */
-export const SUPPORTED_EXTENSIONS = new Set(['.sh', '.ps1']);
+export const SUPPORTED_EXTENSIONS = new Set(['.sh']);
 
 /**
  * Directories never worth walking. `.git` alone can contain thousands of files;
@@ -36,7 +36,7 @@ export type DiscoveredScript = {
   relPath: string;
   relDir: string;
   fileName: string;
-  format: 'sh' | 'ps1';
+  format: 'sh';
   sizeBytes: number;
   contentHash: string;
   meta: ScriptMeta;
@@ -124,7 +124,7 @@ export async function scanSourceDirectory(rootAbsolute: string): Promise<ScanOut
           relPath,
           relDir: scriptDir,
           fileName,
-          format: extension === '.ps1' ? 'ps1' : 'sh',
+          format: 'sh',
           sizeBytes: info.size,
           contentHash: createHash('sha256').update(content).digest('hex'),
           meta,

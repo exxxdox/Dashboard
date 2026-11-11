@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 13;
+const TARGET_VERSION = 14;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -393,6 +393,15 @@ export const MIGRATIONS: Migration[] = [
     db.exec(`
       ALTER TABLE app_settings ADD COLUMN dns_enabled INTEGER NOT NULL DEFAULT 1 CHECK (dns_enabled IN (0, 1));
       ALTER TABLE app_settings ADD COLUMN model_relay_enabled INTEGER NOT NULL DEFAULT 1 CHECK (model_relay_enabled IN (0, 1));
+    `);
+  },
+  // v14 -- retire PowerShell without deleting files or the records referenced by history.
+  (db) => {
+    db.exec(`
+      UPDATE script_schedules SET enabled = 0, next_run_at = NULL
+        WHERE script_id IN (SELECT id FROM scripts WHERE format = 'ps1');
+      UPDATE scripts SET deleted_at = COALESCE(deleted_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        WHERE format = 'ps1';
     `);
   },
 ];

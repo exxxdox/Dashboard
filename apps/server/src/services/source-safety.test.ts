@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import Fastify from 'fastify';
@@ -144,4 +144,14 @@ test('a script read failure keeps the previous list and reports a failed sync', 
   await expect(syncSource(h.db, h.config, source.id, h.logger)).rejects.toThrow('temporary read failure');
   expect(getSource(h.db, source.id).scriptCount).toBe(1);
   expect(getSource(h.db, source.id).syncStatus).toBe('error');
+});
+
+
+test('scanning discovers Bash scripts and leaves PowerShell files untouched', async () => {
+  const h = setup();
+  writeFileSync(join(h.root, 'test.sh'), 'echo hello');
+  writeFileSync(join(h.root, 'legacy.ps1'), 'Write-Output hello');
+  const scan = await scanSourceDirectory(h.root);
+  expect(scan.scripts.map(script => [script.relPath, script.format])).toEqual([['test.sh', 'sh']]);
+  expect(readFileSync(join(h.root, 'legacy.ps1'), 'utf8')).toBe('Write-Output hello');
 });

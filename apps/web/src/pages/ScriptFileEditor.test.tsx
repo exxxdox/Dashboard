@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { ScriptFileForm } from './ScriptFileEditor';
-import { TextArea, TextInput } from '../components/Form';
+import { TextInput } from '../components/Form';
+import { BashEditor } from '../components/BashEditor';
 
 const hooks = vi.hoisted(() => ({ slots: [] as unknown[], index: 0, create: vi.fn(), save: vi.fn(), remove: vi.fn(), pending: false, navigate: vi.fn(), guard: vi.fn(), effects: [] as (() => (() => void) | void)[] }));
 vi.mock('react', async (original) => ({
@@ -42,7 +43,8 @@ function render(mode: 'create' | 'edit' | 'delete' = 'edit', nextInitial = initi
 }
 function change(type: unknown, value: string, mode: 'create' | 'edit' = 'edit') {
   const node = elements(render(mode)).find(el => el.type === type)!;
-  (node.props.onChange as (event: unknown) => void)({ target: { value } });
+  if (type === BashEditor) (node.props.onChange as (value: string) => void)(value);
+  else (node.props.onChange as (event: unknown) => void)({ target: { value } });
 }
 function submit(mode: 'create' | 'edit' = 'edit') {
   const form = elements(render(mode)).find(el => el.type === 'form')!;
@@ -51,8 +53,8 @@ function submit(mode: 'create' | 'edit' = 'edit') {
 beforeEach(() => { hooks.slots = []; hooks.pending = false; close.mockReset(); hooks.create.mockReset(); hooks.save.mockReset(); hooks.remove.mockReset(); hooks.navigate.mockReset(); hooks.guard.mockReset(); hooks.guard.mockReturnValue(vi.fn()); vi.stubGlobal('window', { confirm: vi.fn(() => false), location: { href: 'http://localhost/#/scripts/script-id' }, history: { state: null, replaceState: vi.fn() }, addEventListener: vi.fn(), removeEventListener: vi.fn() }); });
 
 test('edits the complete file and submits the hash of the loaded snapshot', () => {
-  expect(elements(render()).find(el => el.type === TextArea)?.props.value).toBe(initial.content);
-  change(TextArea, 'echo changed');
+  expect(elements(render()).find(el => el.type === BashEditor)?.props.value).toBe(initial.content);
+  change(BashEditor, 'echo changed');
   // A later query result must not silently advance the version being edited.
   render('edit', { content: 'external edit', contentHash: 'new-hash' });
   submit();
@@ -63,10 +65,10 @@ test('edits the complete file and submits the hash of the loaded snapshot', () =
 });
 
 test('creates a script in a subdirectory and selects it only after success', () => {
-  change(TextInput, 'tools/new.ps1', 'create');
-  change(TextArea, 'Write-Output hello', 'create');
+  change(TextInput, 'tools/new.sh', 'create');
+  change(BashEditor, 'echo hello', 'create');
   submit('create');
-  expect(hooks.create.mock.calls[0]?.[0]).toEqual({ sourceId: 'local-source', input: { relPath: 'tools/new.ps1', content: 'Write-Output hello' } });
+  expect(hooks.create.mock.calls[0]?.[0]).toEqual({ sourceId: 'local-source', input: { relPath: 'tools/new.sh', content: 'echo hello' } });
   expect(hooks.navigate).not.toHaveBeenCalled();
   hooks.create.mock.calls[0]?.[1].onSuccess({ id: 'created' });
   expect(hooks.navigate).toHaveBeenCalledWith('/scripts/created');
@@ -77,11 +79,11 @@ test('creates a script in a subdirectory and selects it only after success', () 
 });
 
 test('keeps unsaved changes when closing is declined and ignores closing while saving', () => {
-  change(TextArea, 'unsaved');
+  change(BashEditor, 'unsaved');
   (render().props.onClose as () => void)();
   expect(window.confirm).toHaveBeenCalledWith('scripts.file.discard');
   expect(close).not.toHaveBeenCalled();
-  expect(elements(render()).find(el => el.type === TextArea)?.props.value).toBe('unsaved');
+  expect(elements(render()).find(el => el.type === BashEditor)?.props.value).toBe('unsaved');
   hooks.pending = true;
   (render().props.onClose as () => void)();
   expect(close).not.toHaveBeenCalled();
@@ -98,7 +100,7 @@ test('deletes with the loaded hash, then leaves the deleted script page', () => 
 
 
 test('registers a navigation guard that declines leaving with unsaved work or while saving', () => {
-  change(TextArea, 'unsaved');
+  change(BashEditor, 'unsaved');
   render();
   const cleanup = hooks.effects[0]!();
   const allowNavigation = hooks.guard.mock.calls[0]![0] as () => boolean;

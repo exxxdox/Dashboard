@@ -108,6 +108,7 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
   function script(scriptId: string): ScriptRow {
     const row = db.prepare<[string], ScriptRow>('SELECT * FROM scripts WHERE id = ? AND deleted_at IS NULL').get(scriptId);
     if (!row) throw new NotFoundError('Script');
+    if (row.format !== 'sh') throw new ValidationError('Only Bash scripts are supported', undefined, { key: 'error.scripts.bashOnly' });
     return row;
   }
 

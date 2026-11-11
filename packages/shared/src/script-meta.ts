@@ -76,8 +76,8 @@ export const EMPTY_SCRIPT_META: ScriptMeta = {
  * Extract the leading comment block.
  *
  * Only the *header* is considered: a `# @param` further down the file is far
- * more likely to be commented-out code than a declaration. Both `#` line
- * comments and a single leading PowerShell `<# ... #>` block are supported.
+ * more likely to be commented-out code than a declaration. Bash `#` line
+ * comments carry the declarations.
  */
 function readHeaderLines(content: string): string[] {
   const lines = content.split(/\r?\n/, HEADER_SCAN_LIMIT);
@@ -85,18 +85,6 @@ function readHeaderLines(content: string): string[] {
 
   let index = 0;
   if (lines[0]?.startsWith('#!')) index = 1;
-
-  // PowerShell block comment: only honoured if it is the first thing in the file.
-  const firstMeaningful = lines[index]?.trim() ?? '';
-  if (firstMeaningful.startsWith('<#')) {
-    const block: string[] = [];
-    for (; index < lines.length; index += 1) {
-      const line = lines[index]!;
-      block.push(line.replace('<#', '').replace('#>', ''));
-      if (line.includes('#>')) break;
-    }
-    return block;
-  }
 
   for (; index < lines.length; index += 1) {
     const line = lines[index]!;

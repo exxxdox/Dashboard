@@ -2,7 +2,7 @@
 
 `CLAUDE.md` = `AGENTS.md`, byte-identical. Claude Code read first, other agents second. Edit both in one commit; never pointer to other.
 
-Self-host dashboard. Run shell/PowerShell script on remote Linux host over SSH. Live + history output. Keep AAAA record pointed at host public IPv6.
+Self-host dashboard. Run Bash script on remote Linux host over SSH. Live + history output. Keep AAAA record pointed at host public IPv6.
 
 ## Commands
 
@@ -99,6 +99,8 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Local script files writable; GitHub files read-only.** `services/script-files.ts` owns complete UTF-8 reads, local-only create/save/delete, hash conflict checks and safe filesystem access. Source previews stay bounded; the editor reads `/api/scripts/:id/content` separately. File writes reconcile one script through `syncScripts` with `removeMissing: false`, retaining unseen siblings. Deletion preserves execution history and disables schedules before a path can be recreated. Source syncs are mutually exclusive per source and block source updates/deletion. The hash router owns the editor navigation guard, so React cannot read an unapproved route before discard confirmation. `docs/script-editing.md` describes the user flow and boundaries.
 
+**Bash code assistance.** `components/BashEditor.tsx` shares CodeMirror Bash highlighting, line numbers and bracket matching between preview and editing. Preview is read-only and capped at 400 lines; the editor keeps the complete file, original newline style, undo history and native Tab focus navigation.
+
 **Script ids soft-deleted.** Resync missing file set `deleted_at`, not row removal: history stays readable, returning file recognised. `syncScripts` rewrite metadata only on content-hash change, so display-name edits survive.
 
 **Failed DNS query never read as "no record".** `services/dns/service.ts` order: validate, detect, query, write, notify, record; query failure abort before any write. Cloudflare "no record" mean "create one", so misread duplicate record = worst outcome here; why query not folded into write. Second invariant: address not moved = no write request, no trace in provider audit log.
@@ -161,7 +163,7 @@ Moved here from README: user-facing defect list. README now only describe what p
 - Even with login on, traffic plain HTTP unless TLS reverse proxy front. Anyone sniffing LAN can take session cookie.
 - **SSH host key not verified.** Connection trust whatever key peer present.
 - **Public GitHub repo only.** Clone over anonymous HTTPS.
-- **Entry script only uploaded.** `source ./lib.sh`, `cd "$(dirname "$0")"`, sibling `.psm1` all broken — resolve relative to staged file in `/tmp`, not workDir.
+- **Entry script only uploaded.** `source ./lib.sh`, `cd "$(dirname "$0")"`, sibling shell files all broken — resolve relative to staged file in `/tmp`, not workDir.
 - **All runs on one target share one workDir**, two may run concurrently, so two script writing same output file overwrite each other.
 - **Restart interrupt** queued + running task (script keep running on host, marked `interrupted` after).
 - **Cancel depend on `setsid`**; host without it can only kill script process, not children.
@@ -170,7 +172,7 @@ Moved here from README: user-facing defect list. README now only describe what p
 - **DNS link depend on host own IPv6 egress** (see compose notes), container use host network.
 - **DNS credential + SSH credential share `data/secret.key`**: key lost = re-enter both.
 - DB migration forward only, no rollback — back up `data/` before upgrade.
-- `.ps1` need `pwsh` on target.
+- Only Bash (`.sh`) scripts are supported. Legacy PowerShell files and execution history remain on upgrade; their scripts are soft-deleted and schedules disabled.
 - Image not slim: ship server prod dep tree, `git` + `ca-certificates`. `WITH_GIT=false` drop git + its deps (119MB → 110MB), cost = GitHub source cannot clone, `local` unaffected.
 
 ## Gotchas

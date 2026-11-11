@@ -12,7 +12,7 @@ import { getSourceRow, sourceDirectory, toScriptSummary, type ScriptRow, type So
 const hash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
 function invalidPath(): never {
-  throw new ValidationError('Choose a relative .sh or .ps1 path without hidden or reserved directories', undefined, { key: 'scripts.error.invalidPath' });
+  throw new ValidationError('Choose a relative .sh path without hidden or reserved directories', undefined, { key: 'scripts.error.invalidPath' });
 }
 
 function safePath(relPath: string): string {
@@ -90,7 +90,7 @@ function expectHash(bytes: Buffer, expectedHash: string): void {
 function persistMetadata(db: Db, sourceId: string, relPath: string, bytes: Buffer): ScriptSummary {
   const fileName = relPath.split('/').at(-1)!;
   // Partial reconciliation shares the scanner's metadata rules without deleting unseen siblings.
-  syncScripts(db, sourceId, [{ relPath, relDir: relativeDir(relPath), fileName, format: extname(relPath).toLowerCase() === '.ps1' ? 'ps1' : 'sh', sizeBytes: bytes.length, contentHash: hash(bytes), meta: parseScriptMeta(bytes.toString('utf8')) }], { removeMissing: false });
+  syncScripts(db, sourceId, [{ relPath, relDir: relativeDir(relPath), fileName, format: 'sh', sizeBytes: bytes.length, contentHash: hash(bytes), meta: parseScriptMeta(bytes.toString('utf8')) }], { removeMissing: false });
   const row = db.prepare<[string, string], ScriptRow>('SELECT * FROM scripts WHERE source_id = ? AND rel_path = ?').get(sourceId, relPath)!;
   return toScriptSummary(row);
 }

@@ -18,6 +18,6 @@
   "devDependencies": {
     "typescript": "~5.9.3"
   },
-  "description": "Self-hosted dashboard for running shell and PowerShell scripts on remote Linux hosts over SSH, with live and historical execution output.",
+  "description": "Self-hosted dashboard for running Bash scripts on remote Linux hosts over SSH, with live and historical execution output.",
   "license": "MIT"
 }
