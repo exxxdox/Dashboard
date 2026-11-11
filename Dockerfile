@@ -32,13 +32,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
-# Share the project's registry with local installs; an explicit build arg can override it.
-COPY .npmrc ./
+# The registry is a deployment choice, so it comes only from the build arg; with
+# none set pnpm uses its default, the public npm registry.
 ARG NPM_REGISTRY
 # Cache policy metadata too: a warm package store alone still makes registry requests.
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     --mount=type=cache,id=pnpm-metadata,target=/root/.cache/pnpm \
-    if [ -n "$NPM_REGISTRY" ]; then printf '\nregistry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
+    if [ -n "$NPM_REGISTRY" ]; then printf 'registry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
  && pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -74,11 +74,10 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY scripts/prune-runtime-deps.mjs scripts/
-COPY .npmrc ./
 ARG NPM_REGISTRY
 RUN --mount=type=cache,id=pnpm-alpine,target=/pnpm/store \
     --mount=type=cache,id=pnpm-metadata-alpine,target=/root/.cache/pnpm \
-    if [ -n "$NPM_REGISTRY" ]; then printf '\nregistry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
+    if [ -n "$NPM_REGISTRY" ]; then printf 'registry=%s\n' "$NPM_REGISTRY" >> /app/.npmrc; fi \
  && pnpm install --frozen-lockfile --prod --filter @dashboard/server... \
  && node scripts/prune-runtime-deps.mjs /app
 
