@@ -110,7 +110,7 @@ const en = {
   'runs.field.parameters': 'Parameters',
   'runs.field.arguments': 'Arguments',
   'runs.field.target': 'Target',
-  'runs.field.scriptPath': 'Script path on target host',
+  'runs.field.workDir': 'Working directory on target host',
   'runs.field.emptyArg': '(empty)',
   'runs.field.timeout': 'Timeout',
 
@@ -262,7 +262,7 @@ const zh: Record<keyof typeof en, string> = {
   'runs.field.parameters': '参数',
   'runs.field.arguments': '位置参数',
   'runs.field.target': '目标主机',
-  'runs.field.scriptPath': '目标主机上的脚本路径',
+  'runs.field.workDir': '目标主机工作目录',
   'runs.field.emptyArg': '（空）',
   'runs.field.timeout': '超时时间',
 

@@ -62,7 +62,6 @@ export type ExecutionRow = {
   target_name: string;
   script_name: string;
   script_rel_path: string;
-  script_path: string | null;
   param_values_json: string;
   argv_json: string;
   work_dir: string;
@@ -90,7 +89,7 @@ export function toExecutionSummary(row: ExecutionRow): ExecutionSummary {
     targetName: row.target_name,
     scriptName: row.script_name,
     scriptRelPath: row.script_rel_path,
-    scriptPath: row.script_path,
+    workDir: row.work_dir,
     // These are the environment the script actually received, not the raw form
     // input, so a run's history is reproducible.
     paramValues: JSON.parse(row.param_values_json) as Record<string, string>,
@@ -361,9 +360,9 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       db.prepare(
         `INSERT INTO executions (
            id, script_id, target_id, status, command_display, target_name, script_name,
-           script_rel_path, script_path, param_values_json, argv_json, work_dir, queued_at,
+           script_rel_path, param_values_json, argv_json, work_dir, queued_at,
            schedule_id, schedule_name, retention_days, interactive
-         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         executionId,
         script.id,
@@ -372,7 +371,6 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         target.name,
         script.displayName,
         script.relPath,
-        plan.scriptPath,
         JSON.stringify(plan.paramValues),
         JSON.stringify(plan.argv),
         plan.workDir,

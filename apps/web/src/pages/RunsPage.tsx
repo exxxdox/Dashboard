@@ -247,12 +247,9 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
               >
                 <span className="mono text-faint text-meta">{runTag(execution.id)}</span>
                 <ExecutionStatusLabel status={execution.status} />
-                <span
-                  className="mono text-ink text-body min-w-0 truncate"
-                  title={execution.scriptPath ?? execution.scriptRelPath}
-                >
+                <span className="mono text-ink text-body min-w-0 truncate" title={execution.scriptRelPath}>
                   {execution.scriptName}
-                  <span className="text-faint ml-2">{execution.scriptPath ?? execution.scriptRelPath}</span>
+                  <span className="text-faint ml-2">{execution.scriptRelPath}</span>
                 </span>
                 <span className="text-mute text-meta hidden truncate xl:block">{execution.targetName}</span>
                 <span className="mono text-mute text-meta hidden text-right md:block">

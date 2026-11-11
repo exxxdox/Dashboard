@@ -207,14 +207,11 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
               </div>
             ) : null}
             <div className="grid gap-1.5">
-              <dt className="label">{t('runs.field.scriptPath')}</dt>
-              <dd className="grid gap-1">
-                {/* Runs from before the column was stored have no host path; the
-                    relative path is then the only handle on the script. */}
-                <MonoValue value={data.scriptPath ?? data.scriptRelPath} wrap />
-                {data.scriptPath === null ? null : (
-                  <span className="mono text-faint text-meta break-all">{data.scriptRelPath}</span>
-                )}
+              {/* The script is staged in a temporary directory; this is the
+                  directory it ran in, not where the file itself sits. */}
+              <dt className="label">{t('runs.field.workDir')}</dt>
+              <dd>
+                <MonoValue value={data.workDir} wrap />
               </dd>
             </div>
           </dl>

@@ -472,8 +472,7 @@ test('v14 retires legacy PowerShell scripts and schedules while preserving execu
       (id,script_id,name,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at)
       VALUES ('sch_legacy','scr_1','legacy','tgt_1','0 9 * * *','UTC',1,'{}',?,?,?)`).run(NOW, NOW, NOW);
     const execution = db.prepare('SELECT * FROM executions').get();
-    // Only v14: later migrations may add columns, which `SELECT *` would pick up.
-    MIGRATIONS[13]!(db);
+    migrate(db);
     expect(db.prepare('SELECT deleted_at FROM scripts').get()).toEqual({ deleted_at: expect.any(String) });
     expect(db.prepare('SELECT enabled,next_run_at FROM script_schedules').get()).toEqual({ enabled: 0, next_run_at: null });
     expect(db.prepare('SELECT * FROM executions').get()).toEqual(execution);
