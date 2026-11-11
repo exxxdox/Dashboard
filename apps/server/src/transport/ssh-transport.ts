@@ -369,6 +369,14 @@ function pump(
     });
 
     channel.on('close', (code: number | null, signal?: string | null) => {
+      if (settled) return;
+      // A lost connection must not masquerade as a script's unexplained failure.
+      if (typeof code !== 'number' && !signal && !canceled && !timedOut) {
+        settled = true;
+        cleanup();
+        reject(new Error('The SSH channel closed without reporting an exit status. The connection may have been interrupted.'));
+        return;
+      }
       settle({
         exitCode: typeof code === 'number' ? code : null,
         signal: signal ?? null,

@@ -101,6 +101,7 @@ beforeEach(() => {
   hooks.targets = [target];
   hooks.prefill = { data: { source: 'draft', draft: { params: {}, custom: [], timeoutSec: '' } }, isSuccess: true };
   vi.stubGlobal('window', new EventTarget());
+  vi.stubGlobal('HTMLElement', class {});
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -249,6 +250,27 @@ describe('run details', () => {
     hooks.remove.mutate.mock.calls[0]![1].onSuccess();
     expect(hooks.navigate).toHaveBeenCalledWith('/runs', { replace: true });
     expect(elements(tree).find((element) => element.props.executionId === 'run')?.props.live).toBe(false);
+  });
+  test('Escape inside the terminal or an editor stays on the run page', () => {
+    class InputTarget {
+      tagName = 'TEXTAREA';
+      isContentEditable = false;
+    }
+    vi.stubGlobal('HTMLElement', InputTarget);
+    detail();
+    const cleanup = hooks.effects[0]!();
+    const key = (target: EventTarget | InputTarget | null, prevented = false) => {
+      const event = new Event('keydown', { cancelable: true });
+      Object.defineProperties(event, { key: { value: 'Escape' }, target: { value: target } });
+      if (prevented) event.preventDefault();
+      window.dispatchEvent(event);
+    };
+    key(new InputTarget());
+    key(null, true);
+    expect(hooks.goBack).not.toHaveBeenCalled();
+    key(null);
+    expect(hooks.goBack).toHaveBeenCalledWith('/runs');
+    cleanup?.();
   });
   test('reports loading/errors, retries a failed fetch, and cleans up Escape navigation', () => {
     expect(elements(detail()).some((element) => element.props.label === 'runs.detail.loading')).toBe(true);

@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 import { createServer } from 'node:net';
 import { userInfo } from 'node:os';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { buildInteractiveCommand, cleanupStagingCommand, resolveInterpreter } from '@dashboard/shared';
+import { buildInteractiveCommand, cleanupStagingCommand, resolveInterpreter, quote } from '@dashboard/shared';
 import { createSshTransport } from './ssh-transport.js';
 import type { TerminalControl } from './types.js';
 import ssh2 from 'ssh2';
@@ -191,4 +191,41 @@ realTest('never invokes the interpreter if the terminal closes before startup co
     });
     expect(existsSync(invokedPath)).toBe(false);
   } finally { client.end(); }
+});
+
+
+realTest('nested bash menus retain input across multiple selections and a final line prompt', async () => {
+  // Match downloaded scripts that use process substitution and subshells to read raw menu keys.
+  const nested = `
+    test -t 0 && test -t 1 || exit 99
+    read_key() {
+      IFS= read -rsn1 key
+      if [[ $key == $'\\x1b' ]]; then IFS= read -rsn2 key; fi
+      printf '%s' "$key"
+    }
+    for menu in REGISTRY BACKUP; do
+      printf '%s_READY\\n' "$menu"
+      while :; do
+        key=$(read_key)
+        [[ -z $key ]] && break
+        printf '%s_KEY=%s\\n' "$menu" "$key"
+      done
+      printf '%s_SELECTED\\n' "$menu"
+    done
+    read -erp 'FINAL_PROMPT> ' value
+    printf 'DONE=%s ARG=%s\\n' "$value" "$1"
+  `;
+  const run = begin(`bash <(printf '%s' ${quote(nested)}) --only-registry`, 10000);
+  const terminal = await run.ready;
+  for (const [menu, arrow] of [['REGISTRY', '[B'], ['BACKUP', '[C']]) {
+    await vi.waitFor(() => expect(run.output()).toContain(`${menu}_READY`));
+    expect(terminal.write(`\x1b${arrow}`)).toBe(true);
+    await vi.waitFor(() => expect(run.output()).toContain(`${menu}_KEY=${arrow}`));
+    expect(terminal.write('\r')).toBe(true);
+    await vi.waitFor(() => expect(run.output()).toContain(`${menu}_SELECTED`));
+  }
+  await vi.waitFor(() => expect(run.output()).toContain('FINAL_PROMPT>'));
+  expect(terminal.write('still connected\r')).toBe(true);
+  expect(await run.result).toMatchObject({ exitCode: 0, timedOut: false, canceled: false });
+  expect(run.output()).toContain('DONE=still connected ARG=--only-registry');
 });

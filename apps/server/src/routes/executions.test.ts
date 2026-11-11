@@ -227,3 +227,50 @@ test('disconnecting the controller releases its lease without cancelling the run
   expect(await second.send({ type: 'terminal_claim', executionId: 'run_1' })).toMatchObject({ state: 'controlling' });
   expect(h.executions.cancel).not.toHaveBeenCalled();
 });
+
+test('reconnecting after a run finishes receives its latest status before subscription acknowledgement', async () => {
+  const h = await setup();
+  h.summary.interactive = true;
+  h.summary.status = 'running';
+  const first = await terminalPeer(h);
+  await first.send({ type: 'subscribe', executionId: 'run_1' });
+  first.serverSocket.terminate();
+  first.socket.terminate();
+  await vi.waitFor(() => expect(h.unsubscribe).toHaveBeenCalledTimes(1));
+
+  h.summary.status = 'failed';
+  h.summary.exitCode = 7;
+  h.summary.errorMessage = 'Remote process exited';
+  const second = await terminalPeer(h);
+  await second.send({ type: 'subscribe', executionId: 'run_1' });
+  expect(second.messages.slice(-2)).toEqual([
+    { type: 'status', execution: h.summary },
+    { type: 'subscribed', executionId: 'run_1' },
+  ]);
+});
+
+test('subscription status is read after the live listener is established', async () => {
+  const h = await setup();
+  const subscribe = h.subscribe.getMockImplementation()!;
+  h.subscribe.mockImplementationOnce((id, listener) => {
+    const dispose = subscribe(id, listener);
+    // The run may settle after validation but before its listener is installed.
+    h.summary.status = 'succeeded';
+    h.summary.exitCode = 0;
+    return dispose;
+  });
+  const peer = await terminalPeer(h);
+  await peer.send({ type: 'subscribe', executionId: 'run_1' });
+  expect(peer.messages).toContainEqual({ type: 'status', execution: h.summary });
+  expect(peer.messages.at(-1)).toEqual({ type: 'subscribed', executionId: 'run_1' });
+});
+
+test('resubscribing to a deleted execution reports an error and keeps the socket usable', async () => {
+  const h = await setup();
+  const peer = await terminalPeer(h);
+  await peer.send({ type: 'subscribe', executionId: 'run_1' });
+  h.executions.get.mockImplementation(() => { throw new NotFoundError('Execution'); });
+  expect(await peer.send({ type: 'subscribe', executionId: 'run_1' })).toEqual({ type: 'error', message: 'No such execution' });
+  expect(await peer.send({ type: 'ping' })).toEqual({ type: 'pong' });
+  expect(h.subscribe).toHaveBeenCalledTimes(1);
+});

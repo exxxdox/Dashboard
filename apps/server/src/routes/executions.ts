@@ -226,15 +226,15 @@ export function registerExecutionRoutes(app: FastifyInstance, ctx: AppContext): 
 
       if (message.type !== 'subscribe') return;
 
-      if (subscriptions.has(message.executionId)) {
-        send({ type: 'subscribed', executionId: message.executionId });
-        return;
-      }
-
       // Subscribing to an unknown id is a client bug. Say so, rather than
       // leaving the caller waiting for events that will never arrive.
       try {
-        ctx.executions.get(message.executionId);
+        const execution = ctx.executions.get(message.executionId);
+        if (subscriptions.has(message.executionId)) {
+          send({ type: 'status', execution });
+          send({ type: 'subscribed', executionId: message.executionId });
+          return;
+        }
       } catch (error) {
         send({
           type: 'error',
@@ -252,6 +252,8 @@ export function registerExecutionRoutes(app: FastifyInstance, ctx: AppContext): 
           } else send(event);
         }),
       );
+      // Reconnect can miss a final status, so read it after installing the listener.
+      send({ type: 'status', execution: ctx.executions.get(message.executionId) });
       send({ type: 'subscribed', executionId: message.executionId });
     });
 

@@ -21,6 +21,7 @@ import { formatBytes, formatDateTime, formatDuration, formatExit, runTag } from 
 import { useI18n } from '../lib/i18n';
 import { goBack, navigate } from '../lib/router';
 import { cn } from '../lib/cn';
+import { isTypingTarget } from '../lib/keyboard';
 
 // xterm is the largest dependency in the app and only a run page needs it.
 const RunTerminal = lazy(() =>
@@ -37,6 +38,8 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
+      // Terminal keys belong to the foreground program, including Escape in menus and editors.
+      if (event.defaultPrevented || isTypingTarget(event.target)) return;
       if (event.key === 'Escape') goBack('/runs');
     }
     window.addEventListener('keydown', onKeyDown);
@@ -227,7 +230,7 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
               </div>
             }
           >
-            <RunTerminal executionId={data.id} live={isLive} interactive={data.interactive ?? false} onStatus={applyUpdate} />
+            <RunTerminal executionId={data.id} live={isLive} interactive={data.interactive ?? false} execution={data} onStatus={applyUpdate} />
           </Suspense>
         </div>
       </PageBody>

@@ -1,4 +1,5 @@
-import type { ExecutionLogChunk } from '@dashboard/shared';
+import { renderToStaticMarkup } from 'react-dom/server';
+import type { ExecutionLogChunk, ExecutionSummary } from '@dashboard/shared';
 import type { ExecutionStreamOptions } from '../api/useExecutionStream';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { RunTerminal } from './RunTerminal';
@@ -25,7 +26,7 @@ vi.mock('react', async (original) => ({
   },
   useEffect: (effect: () => (() => void) | void) => { harness.effects.push(effect); },
 }));
-vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
+vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => key + (params ? JSON.stringify(params) : '') }) }));
 vi.mock('../api/ws', () => ({ executionSocket: { getState: () => harness.state, onStateChange: harness.onState, sendTerminal: harness.send } }));
 vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: unknown) {
   harness.construct(options);
@@ -147,4 +148,14 @@ test('a busy viewer waits for an explicit request when the controller releases',
   harness.stream!.onTerminal!({ type: 'terminal_state', executionId: 'run', state: 'available' });
   expect(harness.send).not.toHaveBeenCalledWith({ type: 'terminal_claim', executionId: 'run' });
   cleanup();
+});
+
+
+test.each(['succeeded', 'failed', 'timed_out', 'interrupted', 'canceled'] as const)('closed terminal explains %s and the exit result', (status) => {
+  const execution = { status, exitCode: status === 'succeeded' ? 0 : 7, signal: null, errorMessage: null } as ExecutionSummary;
+  const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live: false, interactive: true, execution }));
+  expect(html).toContain('runs.terminal.finished');
+  expect(html).toContain(status === 'timed_out' ? 'runs.status.timedOut' : `runs.status.${status}`);
+  expect(html).toContain(status === 'succeeded' ? '0' : '7');
+  if (status === 'interrupted') expect(html).toContain('runs.terminal.interruptedHint');
 });

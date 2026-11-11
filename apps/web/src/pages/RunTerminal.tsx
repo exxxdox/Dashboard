@@ -12,6 +12,8 @@ import { useExecutionStream } from '../api/useExecutionStream';
 import { executionSocket } from '../api/ws';
 import { Button } from '../components/Button';
 import { useI18n } from '../lib/i18n';
+import { formatExit } from '../lib/format';
+import { executionStatusLabel } from '../lib/status';
 
 /**
  * xterm's own palette.
@@ -106,11 +108,13 @@ export function RunTerminal({
   executionId,
   live,
   interactive = false,
+  execution,
   onStatus,
 }: {
   executionId: string;
   live: boolean;
   interactive?: boolean;
+  execution?: ExecutionSummary;
   onStatus?: (execution: ExecutionSummary) => void;
 }) {
   const { t } = useI18n();
@@ -251,7 +255,9 @@ export function RunTerminal({
     <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
       {interactive ? (
         <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
-          <span role="status" className="text-mute text-meta mr-auto">{t(statusKey[status])}</span>
+          <span role="status" className="text-mute text-meta mr-auto">{!live && execution
+            ? t('runs.terminal.finished', { status: executionStatusLabel(t, execution.status), exit: formatExit(execution.exitCode, execution.signal) })
+            : t(statusKey[status])}</span>
           {owner === 'controlling' ? (
             <Button size="sm" disabled={!connected || !live} onClick={() => {
               wantsControlRef.current = false;
@@ -263,6 +269,9 @@ export function RunTerminal({
           )}
           <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x03')}>{t('runs.terminal.interrupt')}</Button>
           <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x04')}>{t('runs.terminal.eof')}</Button>
+          {!live && execution?.status === 'interrupted' ? (
+            <p className="text-mute text-meta w-full">{t('runs.terminal.interruptedHint')}</p>
+          ) : null}
           {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
         </div>
       ) : null}
