@@ -9,6 +9,7 @@ import { Field, Select } from '../components/Form';
 import { PageHeader } from '../components/PageHeader';
 import { Modal } from '../components/Modal';
 import { Panel } from '../components/Panel';
+import { StatusDot } from '../components/StatusDot';
 import { formatDateTime } from '../lib/format';
 import { useI18n } from '../lib/i18n';
 import { href, navigate } from '../lib/router';
@@ -66,8 +67,12 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
                       <span className="text-mute text-meta block break-all">{scriptNames.get(schedule.scriptId) ?? schedule.scriptId}</span>
                       <span className="mono text-mute text-meta block break-all">{schedule.cron} · {schedule.timeZone} · {schedule.targetName}</span>
                     </span>
-                    <span className="text-mute text-meta self-center sm:text-right">
-                      {schedule.enabled ? t('schedule.nextAt', { when: formatDateTime(schedule.nextRunAt, locale) }) : t('schedule.paused')}
+                    <span className="text-mute text-meta inline-flex items-center gap-2 self-center sm:justify-self-end">
+                      {/* Status reads as colour at a glance; the word stays only for assistive tech. */}
+                      <StatusDot tone={schedule.enabled ? 'ok' : 'danger'} />
+                      {schedule.enabled
+                        ? <span>{t('schedule.nextAt', { when: formatDateTime(schedule.nextRunAt, locale) })}</span>
+                        : <span className="sr-only">{t('schedule.paused')}</span>}
                     </span>
                   </a>
                   <div className="flex flex-wrap items-center gap-2">

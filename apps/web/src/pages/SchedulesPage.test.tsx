@@ -43,6 +43,10 @@ test('shows inline actions and keeps the editor off the page until opened', () =
   expect(html).toContain('Evening backup');
   expect(html).toContain('#/schedules/sch_2');
   expect(html).toContain('0 8 * * *');
+  // Running and paused read as colour, not words: green dot, red dot.
+  expect(html).toContain('bg-ok');
+  expect(html).toContain('bg-danger');
+  expect(html).toContain('<span class="sr-only">schedule.paused</span>');
 });
 
 test('editing an existing plan seeds the shared run editor from its saved invocation', () => {
