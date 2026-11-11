@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileCode, FolderTree, RefreshCw } from 'lucide-react';
 import type { ScriptTreeNode, SourceSummary } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
@@ -13,6 +13,7 @@ import { useScript, useSourceTree, useSources, useSyncSource } from '../api/quer
 import { errorMessage } from '../api/client';
 import { useI18n, useT } from '../lib/i18n';
 import { navigate } from '../lib/router';
+import { readScriptSource, saveScriptSource } from '../lib/script-browser';
 import { ScriptDetail, ScriptIdentityBar } from './ScriptDetail';
 import { CreateScriptButton } from './ScriptFileEditor';
 
@@ -20,16 +21,19 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   const i18n = useI18n();
   const sources = useSources();
   const [chosenSourceId, setChosenSourceId] = useState<string>('');
+  const [rememberedSourceId] = useState(readScriptSource);
   // The same query key the detail pane asks for, so react-query answers both from
   // one request. It is read here because the script's identity has to sit in the
   // grid's *first* row, beside the source picker -- see the grid comment below.
   const script = useScript(scriptId);
 
-  // Falls back to the first source so the tree is never pointlessly empty. Read
-  // as a derived value rather than via an effect: an effect that sets state after
-  // paint renders one frame with no source selected, which flashes the "choose a
-  // source" panel on every visit.
-  const selectedSourceId = chosenSourceId || script.data?.sourceId || (sources.data?.[0]?.id ?? '');
+  // A linked script takes priority over browser memory; deleted sources fall back to an available one.
+  const selectedSourceId = [chosenSourceId, script.data?.sourceId, rememberedSourceId]
+    .find((id) => sources.data?.some((source) => source.id === id)) ?? sources.data?.[0]?.id ?? '';
+
+  useEffect(() => {
+    if (selectedSourceId) saveScriptSource(selectedSourceId);
+  }, [selectedSourceId]);
 
   const activeSource: SourceSummary | undefined = sources.data?.find(
     (source) => source.id === selectedSourceId,
@@ -198,7 +202,7 @@ function SourceTreePane({
         </div>
       ) : tree.data ? (
         <div className="max-h-[calc(100vh-320px)] overflow-auto">
-          <ScriptTree root={tree.data} selectedId={scriptId} onSelect={onSelect} />
+          <ScriptTree key={sourceId} sourceId={sourceId} root={tree.data} selectedId={scriptId} onSelect={onSelect} />
         </div>
       ) : null}
     </Panel>

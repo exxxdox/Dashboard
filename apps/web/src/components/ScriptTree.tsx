@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, FileCode, Folder, FolderOpen } from 'lucide-react';
 import type { ScriptTreeNode } from '@dashboard/shared';
 import { cn } from '../lib/cn';
 import { useT } from '../lib/i18n';
+import { readCollapsedDirectories, saveCollapsedDirectories } from '../lib/script-browser';
 
 export type FlatRow = {
   node: ScriptTreeNode;
@@ -44,16 +45,21 @@ function collectDirPaths(node: ScriptTreeNode, out: string[] = []): string[] {
 }
 
 export function ScriptTree({
+  sourceId,
   root,
   selectedId,
   onSelect,
 }: {
+  sourceId: string;
   root: ScriptTreeNode;
   selectedId: string | null;
   onSelect: (node: ScriptTreeNode) => void;
 }) {
   const t = useT();
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(() => readCollapsedDirectories(sourceId));
+
+  // The caller keys the tree by source so switching sources restores that source's own folders.
+  useEffect(() => { saveCollapsedDirectories(sourceId, collapsed); }, [sourceId, collapsed]);
 
   const rows = useMemo(() => childRows(root, collapsed), [root, collapsed]);
 
