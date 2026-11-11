@@ -142,6 +142,8 @@ export function ScriptDetail({ scriptId }: { scriptId: string }) {
   // narrowest thing on a page whose subject is the code.
   return (
     <Panel
+      className="flex h-full min-h-0 flex-col [&>header]:shrink-0"
+      bodyClassName="min-h-0 flex-1 overflow-hidden"
       title={i18n.t('scripts.panel.source')}
       aside={sourceKind === 'local' ? (
         <ScriptFileActions script={data} />

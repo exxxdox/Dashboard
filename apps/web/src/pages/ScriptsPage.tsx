@@ -40,7 +40,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
   );
 
   return (
-    <PageBody wide>
+    <PageBody wide className="flex min-h-0 flex-col xl:h-dvh xl:min-h-[640px]">
       <PageHeader
         eyebrow={i18n.t('scripts.eyebrow')}
         title={i18n.t('nav.scripts')}
@@ -80,13 +80,14 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
         // a title block is taller than a select. Below `xl` the columns stack,
         // which also hands the detail the full width its own source/run split
         // needs rather than the ~350px a second column left it at 1024px.
-        <div className="mt-5 grid items-start gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+        // The remaining viewport belongs to the panes; their content scrolls without sizing the page.
+        <div className="mt-5 grid min-h-0 flex-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
           <Select
             aria-label={i18n.t('scripts.source')}
             // While the columns are stacked this is the only thing in its row, and
             // a select stretched the full width of a laptop reads as a band rather
             // than a control. At `xl` the column is narrower than the cap anyway.
-            className="max-w-[420px] xl:max-w-none"
+            className="max-w-[420px] self-start xl:max-w-none"
             value={selectedSourceId}
             onChange={(event) => setChosenSourceId(event.target.value)}
           >
@@ -113,7 +114,7 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
             }}
           />
 
-          <div className="min-w-0">
+          <div className="h-[70dvh] min-h-80 min-w-0 xl:h-auto xl:min-h-0">
             {scriptId === null ? (
               <EmptyState
                 icon={<FileCode className="size-5" aria-hidden />}
@@ -172,7 +173,8 @@ function SourceTreePane({
       // Stacked, the tree spans the page and its rows run the full width -- names
       // at one edge, child counts at the other, with a laptop screen between them.
       // The cap keeps a row a row; at `xl` the column is narrower than it anyway.
-      className="min-w-0 max-w-[520px] xl:max-w-none"
+      className="flex h-[70dvh] min-h-80 min-w-0 max-w-[520px] flex-col xl:h-auto xl:min-h-0 xl:max-w-none [&>header]:shrink-0"
+      bodyClassName="flex min-h-0 flex-1 flex-col"
       flush
       title={source.name}
       // The sync state, and the button that changes it, belong to the source, so
@@ -189,7 +191,7 @@ function SourceTreePane({
       }
     >
       {source.kind === 'local' ? (
-        <p className="text-mute text-meta px-5 py-2">{i18n.t('sources.localScanHint')}</p>
+        <p className="text-mute text-meta shrink-0 px-5 py-2">{i18n.t('sources.localScanHint')}</p>
       ) : null}
       {tree.isPending ? (
         <LoadingBlock label={i18n.t('scripts.loadingTree')} />
@@ -201,7 +203,7 @@ function SourceTreePane({
           />
         </div>
       ) : tree.data ? (
-        <div className="max-h-[calc(100vh-320px)] overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto">
           <ScriptTree key={sourceId} sourceId={sourceId} root={tree.data} selectedId={scriptId} onSelect={onSelect} />
         </div>
       ) : null}

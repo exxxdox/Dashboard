@@ -4,6 +4,7 @@ import { Nav, ServerStamp } from './Nav';
 import { Wordmark } from './Wordmark';
 import { href, type Route } from '../lib/router';
 import { useT } from '../lib/i18n';
+import { cn } from '../lib/cn';
 
 /**
  * Fixed rail plus a scrolling work area.
@@ -56,9 +57,9 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
 }
 
 /** Standard page frame: consistent gutters and a max width that aids scanning. */
-export function PageBody({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
+export function PageBody({ children, wide = false, className }: { children: ReactNode; wide?: boolean; className?: string }) {
   return (
-    <div className={wide ? 'px-5 py-7 sm:px-8' : 'mx-auto w-full max-w-[1320px] px-5 py-7 sm:px-8'}>
+    <div className={cn(wide ? 'px-5 py-7 sm:px-8' : 'mx-auto w-full max-w-[1320px] px-5 py-7 sm:px-8', className)}>
       {children}
     </div>
   );

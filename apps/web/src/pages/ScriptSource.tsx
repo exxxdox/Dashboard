@@ -9,7 +9,8 @@ export function ScriptSource({ content, format }: { content: string; format: Scr
   const lines = content.split(/\r?\n/);
   // The preview remains bounded, while the edit dialog loads the complete file separately.
   return (
-    <div className="grid gap-2">
+    // CodeMirror's unlayered theme caps dialog editors; override it only in the full-height preview.
+    <div className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-2 [&_.cm-editor]:h-full [&_.cm-scroller]:max-h-none!">
       <BashEditor value={lines.slice(0, MAX_LINES).join('\n')} label={t('scripts.panel.source')} readOnly />
       <p className="text-faint text-micro">
         <span className="mono">{format}</span>
