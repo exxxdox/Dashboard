@@ -232,6 +232,29 @@ describe('one-click run', () => {
 
 describe('run details', () => {
   const detail = () => render(() => RunDetailPage({ executionId: 'run' }));
+  // `Stat` carries its label in a prop; plain rows carry it as a text child.
+  const labels = (tree: Element) => elements(tree)
+    .flatMap((element) => [element.props.children, element.props.label])
+    .filter((child): child is string => typeof child === 'string');
+
+  test('shows only target, parameters and exit code until more details are requested', () => {
+    hooks.execution.data = run('succeeded');
+    const collapsed = detail();
+    expect(labels(collapsed)).toEqual(expect.arrayContaining([
+      'runs.field.target', 'runs.field.parameters', 'runs.stat.exitCode',
+    ]));
+    expect(labels(collapsed)).not.toContain('runs.field.command');
+
+    const more = elements(collapsed).find(
+      (element) => element.props['aria-expanded'] === false && typeof element.props.onClick === 'function',
+    )!;
+    click(more);
+
+    const expanded = detail();
+    expect(labels(expanded)).toEqual(expect.arrayContaining([
+      'runs.field.command', 'runs.field.workDir', 'runs.stat.duration',
+    ]));
+  });
   test.each(['queued', 'running'] as const)('%s runs offer cancel, never delete', (status) => {
     hooks.execution.data = run(status);
     const tree = detail();

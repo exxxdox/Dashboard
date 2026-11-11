@@ -97,6 +97,8 @@ const en = {
   // A preposition with the host name styled separately, so the sentence is
   // assembled around a node the page owns.
   'runs.detail.onTarget': 'on',
+  'runs.detail.more': 'More details',
+  'runs.detail.less': 'Hide details',
   'runs.detail.cancel': 'Cancel run',
   'runs.detail.delete': 'Delete',
 
@@ -249,6 +251,8 @@ const zh: Record<keyof typeof en, string> = {
   'runs.detail.title': '运行 {tag}',
   'runs.detail.loading': '正在加载运行记录…',
   'runs.detail.onTarget': '在',
+  'runs.detail.more': '更多信息',
+  'runs.detail.less': '收起信息',
   'runs.detail.cancel': '取消运行',
   'runs.detail.delete': '删除',
 

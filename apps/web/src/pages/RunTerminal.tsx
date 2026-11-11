@@ -530,7 +530,7 @@ export function RunTerminal({
         {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
       </div>
       <div ref={hostRef} aria-label={interactive ? t('runs.terminal.label') : undefined}
-        className="h-[clamp(320px,58vh,780px)] w-full px-4 py-3" />
+        className="h-[clamp(420px,72vh,1024px)] w-full px-4 py-3" />
     </div>
   );
 }

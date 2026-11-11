@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { ArrowLeft, Ban, Trash } from 'lucide-react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { ArrowLeft, Ban, ChevronDown, Trash } from 'lucide-react';
 import { TERMINAL_EXECUTION_STATUSES } from '@dashboard/shared';
 import { PageBody } from '../components/AppShell';
 import { Button } from '../components/Button';
@@ -35,6 +35,9 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
   const applyUpdate = useApplyExecutionUpdate();
   const cancel = useCancelExecution();
   const remove = useDeleteExecution();
+  // The output is what the page is for; metadata starts collapsed so it does
+  // not push the terminal down on every visit.
+  const [showAllMeta, setShowAllMeta] = useState(false);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -151,33 +154,17 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
         ) : null}
 
         <Panel className="mt-4">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
-            <Stat label={t('runs.stat.exitCode')}>{formatExit(data.exitCode, data.signal)}</Stat>
-            <Stat label={t('runs.stat.duration')}>{formatDuration(data.durationMs)}</Stat>
-            <Stat label={t('runs.stat.started')}>
-              {formatDateTime(data.startedAt ?? data.queuedAt, locale)}
-            </Stat>
-            <Stat label={t('runs.stat.finished')}>{formatDateTime(data.finishedAt, locale)}</Stat>
-            <Stat label={t('runs.stat.output')}>{formatBytes(data.logBytes)}</Stat>
+          <div className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
             <Stat label={t('runs.field.target')}>
               <span className="truncate">{data.targetName}</span>
             </Stat>
-          </div>
-
-          <dl className="border-line mt-4 grid gap-3 border-t pt-4">
-            <div className="grid gap-1.5">
-              <dt className="label">{t('runs.field.command')}</dt>
-              <dd className="border-line bg-base mono text-ink overflow-x-auto rounded-lg border px-2.5 py-2 text-body whitespace-pre">
-                {data.commandDisplay}
-              </dd>
-            </div>
-            <div className="grid gap-1.5">
-              <dt className="label">{t('runs.field.parameters')}</dt>
-              <dd className="mono text-body">
+            <div className="grid min-w-0 gap-2">
+              <span className="label">{t('runs.field.parameters')}</span>
+              <span className="mono text-ink text-body min-w-0 break-words">
                 {Object.keys(data.paramValues).length === 0 ? (
                   <span className="text-faint">{t('common.none')}</span>
                 ) : (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span className="flex flex-wrap gap-x-4 gap-y-1">
                     {Object.entries(data.paramValues).map(([key, value]) => (
                       <span key={key} className="inline-flex items-baseline gap-1.5">
                         <span className="text-mute">{key}</span>
@@ -185,36 +172,72 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
                         <span className="text-ink break-all">{value}</span>
                       </span>
                     ))}
-                  </div>
+                  </span>
                 )}
-              </dd>
+              </span>
             </div>
-            {data.argv.length > 0 ? (
-              <div className="grid gap-1.5">
-                <dt className="label">{t('runs.field.arguments')}</dt>
-                <dd className="mono text-body flex flex-col gap-1">
-                  {data.argv.map((value, index) => (
-                    // Position is part of what the value meant: these are read
-                    // as `$1`, `$2` …, not by name.
-                    <span key={`${index}-${value}`} className="inline-flex items-baseline gap-1.5">
-                      <span className="text-faint w-6 shrink-0 text-right">${index + 1}</span>
-                      <span className="text-ink break-all">
-                        {value === '' ? t('runs.field.emptyArg') : value}
-                      </span>
-                    </span>
-                  ))}
-                </dd>
+            <Stat label={t('runs.stat.exitCode')}>{formatExit(data.exitCode, data.signal)}</Stat>
+          </div>
+
+          <button
+            type="button"
+            aria-expanded={showAllMeta}
+            onClick={() => setShowAllMeta((open) => !open)}
+            className="focus-ring text-mute hover:text-ink text-meta mt-4 inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 transition-colors duration-150"
+          >
+            <ChevronDown
+              className={cn('size-4 transition-transform duration-150', showAllMeta && 'rotate-180')}
+              aria-hidden
+            />
+            {showAllMeta ? t('runs.detail.less') : t('runs.detail.more')}
+          </button>
+
+          {showAllMeta ? (
+            <div className="border-line mt-4 grid gap-4 border-t pt-4">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                <Stat label={t('runs.stat.duration')}>{formatDuration(data.durationMs)}</Stat>
+                <Stat label={t('runs.stat.started')}>
+                  {formatDateTime(data.startedAt ?? data.queuedAt, locale)}
+                </Stat>
+                <Stat label={t('runs.stat.finished')}>{formatDateTime(data.finishedAt, locale)}</Stat>
+                <Stat label={t('runs.stat.output')}>{formatBytes(data.logBytes)}</Stat>
               </div>
-            ) : null}
-            <div className="grid gap-1.5">
-              {/* The script is staged in a temporary directory; this is the
-                  directory it ran in, not where the file itself sits. */}
-              <dt className="label">{t('runs.field.workDir')}</dt>
-              <dd>
-                <MonoValue value={data.workDir} wrap />
-              </dd>
+
+              <dl className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <dt className="label">{t('runs.field.command')}</dt>
+                  <dd className="border-line bg-base mono text-ink overflow-x-auto rounded-lg border px-2.5 py-2 text-body whitespace-pre">
+                    {data.commandDisplay}
+                  </dd>
+                </div>
+                {data.argv.length > 0 ? (
+                  <div className="grid gap-1.5">
+                    <dt className="label">{t('runs.field.arguments')}</dt>
+                    <dd className="mono text-body flex flex-col gap-1">
+                      {data.argv.map((value, index) => (
+                        // Position is part of what the value meant: these are read
+                        // as `$1`, `$2` …, not by name.
+                        <span key={`${index}-${value}`} className="inline-flex items-baseline gap-1.5">
+                          <span className="text-faint w-6 shrink-0 text-right">${index + 1}</span>
+                          <span className="text-ink break-all">
+                            {value === '' ? t('runs.field.emptyArg') : value}
+                          </span>
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="grid gap-1.5">
+                  {/* The script is staged in a temporary directory; this is the
+                      directory it ran in, not where the file itself sits. */}
+                  <dt className="label">{t('runs.field.workDir')}</dt>
+                  <dd>
+                    <MonoValue value={data.workDir} wrap />
+                  </dd>
+                </div>
+              </dl>
             </div>
-          </dl>
+          ) : null}
         </Panel>
 
         {data.truncated ? (
@@ -227,7 +250,7 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
         <div className="mt-5">
           <Suspense
             fallback={
-              <div className="border-line bg-base text-mute shadow-card flex h-[360px] items-center justify-center rounded-xl border text-body">
+              <div className="border-line bg-base text-mute shadow-card flex h-[clamp(420px,72vh,1024px)] items-center justify-center rounded-xl border text-body">
                 {t('runs.terminal.loading')}
               </div>
             }
