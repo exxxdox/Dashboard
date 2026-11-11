@@ -7,6 +7,7 @@ import { pushToast } from '../lib/toast';
 
 // Exercise terminal effect and output callbacks without a DOM/canvas runtime.
 const harness = vi.hoisted(() => ({
+  stateValues: [] as unknown[],
   refs: [] as { current: unknown }[],
   effects: [] as (() => (() => void) | void)[],
   stream: undefined as ExecutionStreamOptions | undefined,
@@ -30,7 +31,7 @@ const harness = vi.hoisted(() => ({
 }));
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
-  useState: (initial: unknown) => [initial, vi.fn()],
+  useState: (initial: unknown) => [harness.stateValues.length ? harness.stateValues.shift() : initial, vi.fn()],
   useRef: (initial: unknown) => {
     const ref = { current: initial };
     harness.refs.push(ref);
@@ -58,6 +59,7 @@ vi.mock('../api/useExecutionStream', () => ({ useExecutionStream: (options: Exec
 
 beforeEach(() => {
   vi.clearAllMocks();
+  harness.stateValues = [];
   harness.refs = []; harness.effects = []; harness.stream = undefined;
   harness.resize = undefined; harness.frame = undefined; harness.link = undefined;
   harness.fit.mockReset();
@@ -343,4 +345,19 @@ test('discards a pending paste when the terminal is unmounted', async () => {
   cleanup();
   await Promise.resolve();
   expect(harness.terminal.paste).not.toHaveBeenCalled();
+});
+
+
+test.each([
+  ['controlling', false, true, true, true, true],
+  ['busy', false, true, true, true, false],
+  ['controlling', true, true, true, true, false],
+  ['controlling', false, false, true, true, false],
+  ['controlling', false, true, false, true, false],
+  ['controlling', false, true, true, false, false],
+] as const)('focus feedback follows input readiness %s/%s/%s/%s/%s', (owner, syncing, connected, live, interactive, ready) => {
+  harness.stateValues = [owner, syncing, connected];
+  const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live, interactive }));
+  expect(html.includes('runs.terminal.focused')).toBe(ready);
+  expect(html.includes('has-[.xterm-helper-textarea:focus]:border-accent')).toBe(ready);
 });

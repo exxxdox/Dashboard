@@ -21,6 +21,7 @@ import { useI18n } from '../lib/i18n';
 import { pushToast } from '../lib/toast';
 import { formatExit } from '../lib/format';
 import { executionStatusLabel } from '../lib/status';
+import { cn } from '../lib/cn';
 import {
   clampFontSize,
   MAX_TERMINAL_FONT_SIZE,
@@ -444,9 +445,20 @@ export function RunTerminal({
       : searchResults.index >= 0 ? `${searchResults.index + 1}/${searchResults.count}`
         : `${searchResults.count}`;
   return (
-    <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
+    <div className={cn(
+      'scanlines border-line bg-base shadow-card group/terminal relative overflow-hidden rounded-xl border',
+      // Match only xterm's input focus so toolbar fields never suggest that keys reach the script.
+      enabled && 'has-[.xterm-helper-textarea:focus]:border-accent has-[.xterm-helper-textarea:focus]:ring-2 has-[.xterm-helper-textarea:focus]:ring-accent/30',
+    )}>
       <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
-        <span className="mr-auto" />
+        <span className="mr-auto">
+          {enabled ? (
+            <span className="text-accent text-meta hidden items-center gap-2 group-has-[.xterm-helper-textarea:focus]/terminal:inline-flex">
+              <span className="bg-accent size-2 rounded-full" aria-hidden />
+              {t('runs.terminal.focused')}
+            </span>
+          ) : null}
+        </span>
         {interactive ? (
           <>
             <span role="status" className="text-mute text-meta">{!live && execution

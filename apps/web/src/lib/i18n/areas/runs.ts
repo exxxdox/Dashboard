@@ -14,6 +14,7 @@ const en = {
   'runs.terminal.waiting': 'Waiting for terminal…',
   'runs.terminal.available': 'Terminal ready — read only',
   'runs.terminal.controlling': 'You control this terminal',
+  'runs.terminal.focused': 'Terminal focused',
   'runs.terminal.busy': 'Another page controls this terminal',
   'runs.terminal.closed': 'Terminal closed',
   'runs.terminal.finished': '{status} · Exit code / signal {exit}',
@@ -168,6 +169,7 @@ const en = {
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
+  'runs.terminal.focused': '终端已聚焦',
   'runs.interactive.label': '交互终端',
   'runs.interactive.hint': '使用键盘回答提示、操作终端菜单。',
   'runs.terminal.waiting': '正在等待终端…',
