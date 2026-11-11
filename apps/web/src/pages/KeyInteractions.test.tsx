@@ -31,6 +31,7 @@ vi.mock('react', async (original) => ({
     }];
   },
   useEffect: (effect: () => (() => void) | void) => { hooks.effects.push(effect); },
+  useRef: (initial: unknown) => ({ current: initial }),
 }));
 vi.mock('../api/queries', () => ({
   useLogin: () => hooks.login,
@@ -237,7 +238,7 @@ describe('run details', () => {
     .flatMap((element) => [element.props.children, element.props.label])
     .filter((child): child is string => typeof child === 'string');
 
-  test('shows only target, parameters and exit code until more details are requested', () => {
+  test('shows only target, parameters and exit code until details are opened in a dialog', () => {
     hooks.execution.data = run('succeeded');
     const collapsed = detail();
     expect(labels(collapsed)).toEqual(expect.arrayContaining([
@@ -246,7 +247,8 @@ describe('run details', () => {
     expect(labels(collapsed)).not.toContain('runs.field.command');
 
     const more = elements(collapsed).find(
-      (element) => element.props['aria-expanded'] === false && typeof element.props.onClick === 'function',
+      (element) => Array.isArray(element.props.children)
+        && (element.props.children as unknown[]).includes('runs.detail.more'),
     )!;
     click(more);
 
@@ -254,6 +256,14 @@ describe('run details', () => {
     expect(labels(expanded)).toEqual(expect.arrayContaining([
       'runs.field.command', 'runs.field.workDir', 'runs.stat.duration',
     ]));
+
+    // Escape closes the dialog, and must not also leave the page behind it.
+    const cleanup = hooks.effects[0]!();
+    const escape = new Event('keydown');
+    Object.defineProperty(escape, 'key', { value: 'Escape' });
+    window.dispatchEvent(escape);
+    expect(hooks.goBack).not.toHaveBeenCalled();
+    cleanup?.();
   });
   test.each(['queued', 'running'] as const)('%s runs offer cancel, never delete', (status) => {
     hooks.execution.data = run(status);
