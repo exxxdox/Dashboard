@@ -83,7 +83,17 @@ export function BashEditor({ value, onChange, readOnly = false, id, label, descr
       parent: container.current,
       state: EditorState.create({
         extensions: [
-          ...bashExtensions, theme, lineNumbers(), EditorView.lineWrapping,
+          ...bashExtensions, theme, lineNumbers({
+            domEventHandlers: {
+              mousedown: (editor, line) => {
+                if (!editor.state.readOnly) return false;
+                // Read-only previews still let the gutter choose the highlighted line.
+                editor.dispatch({ selection: { anchor: line.from } });
+                editor.focus();
+                return true;
+              },
+            },
+          }), EditorView.lineWrapping,
           EditorState.lineSeparator.of(lineSeparator.current),
           history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
@@ -107,6 +117,11 @@ export function BashEditor({ value, onChange, readOnly = false, id, label, descr
     if (describedBy) attributes['aria-describedby'] = describedBy;
     editor.dispatch({ effects: options.current.reconfigure([
       EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly),
+      // drawSelection paints its own cursor even when the content is not editable.
+      readOnly ? EditorView.theme({
+        '.cm-cursorLayer': { display: 'none' },
+        '.cm-content': { caretColor: 'transparent' },
+      }) : [],
       EditorView.contentAttributes.of(attributes),
     ]) });
   }, [readOnly, id, label, describedBy]);
