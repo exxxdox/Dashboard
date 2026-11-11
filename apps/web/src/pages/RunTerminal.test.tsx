@@ -219,6 +219,14 @@ test('offers search on a finished run that never accepted input', () => {
   expect(html).toContain('runs.terminal.font');
 });
 
+test('shows positional arguments as the command line above the output', () => {
+  const execution = { status: 'succeeded', exitCode: 0, signal: null, errorMessage: null,
+    commandDisplay: 'sh demo.sh', argv: ['first', 'two words'] } as ExecutionSummary;
+  const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live: false, execution }));
+  expect(html).toContain('sh demo.sh');
+  expect(html).toContain('two words');
+});
+
 test('applies the font family and size saved in this browser', () => {
   vi.stubGlobal('window', {
     localStorage: {
