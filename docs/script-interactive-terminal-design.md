@@ -95,6 +95,6 @@
 
 链接使用 `@xterm/addon-web-links` 识别输出中的 URL。输出由脚本控制，因此只有 `http(s)` 会被打开，并使用 `noopener,noreferrer` 打开新标签页；其他协议忽略。
 
-字符宽度使用 `@xterm/addon-unicode11`，解决中文、emoji 与 Powerline 字符的列宽错位。三项都在终端创建时加载，卸载时随 `terminal.dispose()` 一并释放。渲染器仍为 xterm 默认的 DOM 渲染器，达到性能瓶颈时再评估 WebGL，当前不预先引入。
+字符宽度使用 `@xterm/addon-unicode11`，解决中文、emoji 与 Powerline 字符的列宽错位。三项都在终端创建时加载，卸载时随 `terminal.dispose()` 一并释放。xterm 6 把 `terminal.unicode` 与搜索装饰列为 proposed API，因此终端以 `allowProposedApi: true` 创建；缺少该选项时加载 Unicode 11 插件会在挂载阶段抛错，整棵 React 树被卸载，表现为运行详情页黑屏。渲染器仍为 xterm 默认的 DOM 渲染器，达到性能瓶颈时再评估 WebGL，当前不预先引入。
 
 字体由用户手动输入本机已安装的字体名称，字号可调（8–32，默认 14）；工具栏提供字体面板和常见等宽字体的候选列表。输入会规范成 CSS 字体栈，主题等宽栈始终作为后备，因此字体未安装时仍是可读的终端。字体是查看设备的能力，偏好保存在 `localStorage`（`dashboard.terminal.fontFamily` / `dashboard.terminal.fontSize`），不进入服务端共享设置。运行时只改 `fontFamily` / `fontSize` 选项并重新 fit；持有控制权的页面随后发送新的行列数，避免远端 PTY 与画面不一致。不枚举本机字体，也不内嵌 webfont。

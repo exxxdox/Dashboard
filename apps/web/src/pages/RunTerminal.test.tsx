@@ -179,6 +179,7 @@ test.each(['succeeded', 'failed', 'timed_out', 'interrupted', 'canceled'] as con
 
 test('loads output search, link detection and Unicode 11 width handling', () => {
   const cleanup = mount();
+  expect(harness.construct).toHaveBeenCalledWith(expect.objectContaining({ allowProposedApi: true }));
   const loaded = harness.terminal.loadAddon.mock.calls.map((call) => call[0]);
   expect(loaded).toContain(harness.search);
   expect(loaded).toContain(harness.links);

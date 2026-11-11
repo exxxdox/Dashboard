@@ -290,6 +290,10 @@ export function RunTerminal({
       fontFamily: terminalFontStack(fontFamily, resolveMonoStack()), fontSize,
       lineHeight: 1.45, letterSpacing: 0,
       cursorBlink: interactive, disableStdin: true,
+      // xterm 6 exposes `terminal.unicode` and search decorations as proposed
+      // API; loading either addon without this flag throws during mount and
+      // takes the whole React root down with it.
+      allowProposedApi: true,
       // A PTY already emits CRLF; translating again changes full-screen cursor movement.
       convertEol: !interactive, scrollback: 10_000, theme: terminalTheme(),
     });
