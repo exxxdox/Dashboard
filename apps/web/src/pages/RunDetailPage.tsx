@@ -123,81 +123,77 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
               <ExecutionStatusLabel status={data.status} />
-              <span className="text-mute text-meta">
-                {t('runs.detail.onTarget')}{' '}
-                <span className="text-ink">{data.targetName}</span>
-              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <KeyHints hints={[{ keys: ['esc'], label: t('runs.hint.back') }]} />
-            {isLive ? (
-              <Button
-                variant="danger"
-                icon={<Ban className="size-4" aria-hidden />}
-                loading={cancel.isPending}
-                onClick={() => cancel.mutate(data.id)}
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex flex-wrap items-start justify-end gap-x-6 gap-y-2">
+              <div className="grid min-w-0 gap-0.5 text-right">
+                <span className="label">{t('runs.field.target')}</span>
+                <span className="mono text-ink text-meta max-w-[12rem] truncate">{data.targetName}</span>
+              </div>
+              <div className="grid min-w-0 max-w-[22rem] gap-0.5 text-right">
+                <span className="label">{t('runs.field.parameters')}</span>
+                <span className="mono text-mute text-meta min-w-0 break-words">
+                  {Object.keys(data.paramValues).length === 0 ? (
+                    <span className="text-faint">{t('common.none')}</span>
+                  ) : (
+                    <span className="flex flex-wrap justify-end gap-x-3 gap-y-0.5">
+                      {Object.entries(data.paramValues).map(([key, value]) => (
+                        <span key={key} className="inline-flex items-baseline gap-1.5">
+                          <span className="text-mute">{key}</span>
+                          <span className="text-faint">=</span>
+                          <span className="text-ink break-all">{value}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="grid gap-0.5 text-right">
+                <span className="label">{t('runs.stat.exitCode')}</span>
+                <span className="mono text-ink text-meta">{formatExit(data.exitCode, data.signal)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDetails(true)}
+                className="focus-ring text-mute hover:text-ink text-meta inline-flex items-center gap-1.5 self-center rounded-lg px-2 py-1 transition-colors duration-150"
               >
-                {t('runs.detail.cancel')}
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                icon={<Trash className="size-4" aria-hidden />}
-                loading={remove.isPending}
-                onClick={() =>
-                  remove.mutate(data.id, { onSuccess: () => navigate('/runs', { replace: true }) })
-                }
-              >
-                {t('runs.detail.delete')}
-              </Button>
-            )}
+                <Info className="size-3.5" aria-hidden />
+                {t('runs.detail.more')}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <KeyHints hints={[{ keys: ['esc'], label: t('runs.hint.back') }]} />
+              {isLive ? (
+                <Button
+                  variant="danger"
+                  icon={<Ban className="size-4" aria-hidden />}
+                  loading={cancel.isPending}
+                  onClick={() => cancel.mutate(data.id)}
+                >
+                  {t('runs.detail.cancel')}
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  icon={<Trash className="size-4" aria-hidden />}
+                  loading={remove.isPending}
+                  onClick={() =>
+                    remove.mutate(data.id, { onSuccess: () => navigate('/runs', { replace: true }) })
+                  }
+                >
+                  {t('runs.detail.delete')}
+                </Button>
+              )}
+            </div>
           </div>
         </header>
 
         {data.errorMessage ? (
           <ErrorBanner className="mt-4" message={data.errorMessage} />
         ) : null}
-
-        <Panel className="mt-3" bodyClassName="px-4 py-3">
-          <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
-            <div className="grid min-w-0 gap-0.5">
-              <span className="label">{t('runs.field.target')}</span>
-              <span className="mono text-ink text-meta truncate">{data.targetName}</span>
-            </div>
-            <div className="grid min-w-0 flex-1 gap-0.5">
-              <span className="label">{t('runs.field.parameters')}</span>
-              <span className="mono text-mute text-meta min-w-0 break-words">
-                {Object.keys(data.paramValues).length === 0 ? (
-                  <span className="text-faint">{t('common.none')}</span>
-                ) : (
-                  <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-                    {Object.entries(data.paramValues).map(([key, value]) => (
-                      <span key={key} className="inline-flex items-baseline gap-1.5">
-                        <span className="text-mute">{key}</span>
-                        <span className="text-faint">=</span>
-                        <span className="text-ink break-all">{value}</span>
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </span>
-            </div>
-            <div className="grid gap-0.5 text-right">
-              <span className="label">{t('runs.stat.exitCode')}</span>
-              <span className="mono text-ink text-meta">{formatExit(data.exitCode, data.signal)}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDetails(true)}
-              className="focus-ring text-mute hover:text-ink text-meta inline-flex items-center gap-1.5 self-center rounded-lg px-2 py-1 transition-colors duration-150"
-            >
-              <Info className="size-3.5" aria-hidden />
-              {t('runs.detail.more')}
-            </button>
-          </div>
-        </Panel>
 
         {showDetails ? (
           <Modal
