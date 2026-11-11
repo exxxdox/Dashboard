@@ -48,7 +48,8 @@ export function AppShell({ route, children }: { route: Route; children: ReactNod
           </div>
         </div>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* Stretch the route frame through unused viewport height so page status rails reach the bottom. */}
+        <main className="grid min-w-0 flex-1 grid-cols-1">{children}</main>
       </div>
     </div>
   );

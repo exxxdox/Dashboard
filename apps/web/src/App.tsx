@@ -55,7 +55,8 @@ export function App() {
               page should fade in, but a hash change *within* one page -- the
               DNS history's paging -- must not remount it, or the dialog it is
               showing would close on every page of the table. */}
-          <div key={route.name} className="animate-fade-in">
+          {/* Carry the shell's stretch through the animation frame to the page. */}
+          <div key={route.name} className="animate-fade-in grid grid-cols-1">
             <RouteView route={route} />
           </div>
         </AppShell>
