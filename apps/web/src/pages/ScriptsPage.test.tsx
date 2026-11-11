@@ -60,3 +60,7 @@ test('restores the selected source directory expansion state', () => {
   state.linkedSourceId = 'a';
   expect(render()).toContain('a-task.sh');
 });
+
+test('fills the preview pane with the no-selection prompt', () => {
+  expect(render()).toContain('h-full justify-center overflow-auto');
+});

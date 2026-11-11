@@ -57,14 +57,16 @@ export function EmptyState({
   title,
   description,
   action,
+  className,
 }: {
   icon?: ReactNode;
   title: string;
   description: string;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="border-line bg-panel-2/30 flex flex-col items-center gap-4 rounded-xl border border-dashed px-8 py-14 text-center">
+    <div className={cn('border-line bg-panel-2/30 flex flex-col items-center gap-4 rounded-xl border border-dashed px-8 py-14 text-center', className)}>
       {icon ? (
         <div className="bg-panel-3 text-mute grid size-11 place-items-center rounded-xl">{icon}</div>
       ) : null}

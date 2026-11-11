@@ -117,6 +117,8 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
           <div className="h-[70dvh] min-h-80 min-w-0 xl:h-auto xl:min-h-0">
             {scriptId === null ? (
               <EmptyState
+                // The empty preview occupies the same pane as the selected script.
+                className="h-full justify-center overflow-auto"
                 icon={<FileCode className="size-5" aria-hidden />}
                 title={i18n.t('scripts.noSelection.title')}
                 description={i18n.t('scripts.noSelection.description')}
