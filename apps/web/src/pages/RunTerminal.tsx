@@ -430,12 +430,31 @@ export function RunTerminal({
     : searchResults.count === 0 ? t('runs.terminal.searchNoResults')
       : searchResults.index >= 0 ? `${searchResults.index + 1}/${searchResults.count}`
         : `${searchResults.count}`;
+  // Quoted the way a shell shows it, so an argument containing a space does
+  // not read as two arguments.
+  const argvLine = execution?.argv?.map((value) =>
+    value === '' ? t('runs.field.emptyArg') : /\s/.test(value) ? `"${value}"` : value,
+  ).join(' ') ?? '';
   return (
     <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
       <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        {/* The command line stands in for the header line the runner used to
+            write into the output: one copy, in the toolbar, with its arguments. */}
+        {execution?.argv && execution.argv.length > 0 ? (
+          <span
+            className="mono text-meta mr-auto min-w-0 truncate"
+            title={`${execution.commandDisplay} ${argvLine}`}
+          >
+            <span className="text-faint" aria-hidden>$ </span>
+            <span className="text-mute">{execution.commandDisplay}</span>{' '}
+            <span className="text-ink">{argvLine}</span>
+          </span>
+        ) : (
+          <span className="mr-auto" />
+        )}
         {interactive ? (
           <>
-            <span role="status" className="text-mute text-meta mr-auto">{!live && execution
+            <span role="status" className="text-mute text-meta">{!live && execution
               ? t('runs.terminal.finished', { status: executionStatusLabel(t, execution.status), exit: formatExit(execution.exitCode, execution.signal) })
               : t(statusKey[status])}</span>
             {owner === 'controlling' ? (
@@ -529,21 +548,6 @@ export function RunTerminal({
         ) : null}
         {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
       </div>
-      {/* Positional arguments reach the script as `$1`, `$2`, so they are shown
-          as the run's command line rather than buried in the metadata. */}
-      {execution?.argv && execution.argv.length > 0 ? (
-        <p className="border-line mono text-meta flex flex-wrap items-baseline gap-x-2 border-b px-4 py-2">
-          <span className="text-faint" aria-hidden>$</span>
-          <span className="text-mute">{execution.commandDisplay}</span>
-          {execution.argv.map((value, index) => (
-            <span key={`${index}-${value}`} className="text-ink break-all">
-              {/* Quoted the way a shell would show it, so an argument that
-                  contains a space does not read as two arguments. */}
-              {value === '' ? t('runs.field.emptyArg') : /\s/.test(value) ? `"${value}"` : value}
-            </span>
-          ))}
-        </p>
-      ) : null}
       <div ref={hostRef} aria-label={interactive ? t('runs.terminal.label') : undefined}
         className="h-[clamp(420px,72vh,1024px)] w-full px-4 py-3" />
     </div>

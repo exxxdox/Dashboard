@@ -246,18 +246,16 @@ describe('createExecutionRunner', () => {
     expect(summary.signal).toBe('KILL');
   });
 
-  test('persists a header line and the script output in order', async () => {
+  test('persists only what the script wrote, in order', async () => {
     await h.run([{ match: SCRIPT_PATH, stdout: 'one\n', stderr: 'warn\n', exitCode: 0 }]);
 
     const logs = readLogs(h.db);
-    expect(logs[0]?.stream).toBe('system');
-    expect(logs[0]?.data).toContain('bash api.sh');
+    expect(logs.map((row) => row.seq)).toEqual([1, 2]);
+    expect(logs[0]).toMatchObject({ stream: 'stdout', data: 'one\n' });
+    expect(logs[1]).toMatchObject({ stream: 'stderr', data: 'warn\n' });
     // The staging path is different on every run, so it must never become part
     // of a history row that someone reads back later.
-    expect(logs[0]?.data).not.toContain(STAGING_DIR);
-    expect(logs.map((row) => row.seq)).toEqual([1, 2, 3]);
-    expect(logs[1]).toMatchObject({ stream: 'stdout', data: 'one\n' });
-    expect(logs[2]).toMatchObject({ stream: 'stderr', data: 'warn\n' });
+    expect(logs.some((row) => row.data.includes(STAGING_DIR))).toBe(false);
   });
 
   test('sends the script bytes and a cleanup command to the transport', async () => {
@@ -352,13 +350,13 @@ describe('createExecutionRunner', () => {
 
   test('counts UTF-8 bytes in retained output', async () => {
     await h.run([{ match: SCRIPT_PATH, stdout: '中文😀', exitCode: 0 }]);
-    // The ASCII header is 14 bytes; the output is 6 Chinese bytes plus 4 emoji bytes.
-    expect(getExecution(h.db, EXECUTION_ID).logBytes).toBe(24);
+    // 6 Chinese bytes plus 4 emoji bytes.
+    expect(getExecution(h.db, EXECUTION_ID).logBytes).toBe(10);
   });
 
   test('truncates multibyte output at the byte limit while keeping it live', async () => {
     const small = buildHarness(120);
-    const output = '中'.repeat(40);
+    const output = '中'.repeat(41);
     await small.run([{ match: SCRIPT_PATH, stdout: output, exitCode: 0 }]);
     expect(getExecution(small.db, EXECUTION_ID).truncated).toBe(true);
     expect(readLogs(small.db).some((row) => row.data === output)).toBe(false);

@@ -182,7 +182,8 @@ export function createExecutionRunner(deps: RunnerDeps): ExecutionRunner {
       sessions.set(executionId, session);
       const startedAt = nowIso();
       markRunning.run('running', startedAt, executionId);
-      record('system', `$ ${plan.displayCommand}\n`);
+      // No header line in the output: the run page already shows the command
+      // line, and a copy here would be the first thing in every log or search.
       hub.publish(executionId, { type: 'status', execution: loadSummary(executionId) });
 
       let status: ExecutionStatus = 'failed';

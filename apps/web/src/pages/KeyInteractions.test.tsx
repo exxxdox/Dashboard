@@ -242,9 +242,10 @@ describe('run details', () => {
     hooks.execution.data = run('succeeded');
     const collapsed = detail();
     expect(labels(collapsed)).toEqual(expect.arrayContaining([
-      'runs.field.target', 'runs.field.parameters', 'runs.stat.exitCode',
+      'runs.field.target', 'runs.stat.exitCode',
     ]));
     expect(labels(collapsed)).not.toContain('runs.field.command');
+    expect(labels(collapsed)).not.toContain('runs.field.parameters');
 
     const more = elements(collapsed).find(
       (element) => Array.isArray(element.props.children)

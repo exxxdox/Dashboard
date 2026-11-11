@@ -136,24 +136,6 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
                 <span className="label whitespace-nowrap">{t('runs.field.target')}</span>
                 <span className="mono text-ink text-meta max-w-[12rem] truncate">{data.targetName}</span>
               </span>
-              <span className="inline-flex min-w-0 items-baseline gap-1.5">
-                <span className="label whitespace-nowrap">{t('runs.field.parameters')}</span>
-                <span className="mono text-mute text-meta min-w-0 break-words">
-                  {Object.keys(data.paramValues).length === 0 ? (
-                    <span className="text-faint">{t('common.none')}</span>
-                  ) : (
-                    <span className="inline-flex flex-wrap gap-x-3 gap-y-0.5">
-                      {Object.entries(data.paramValues).map(([key, value]) => (
-                        <span key={key} className="inline-flex items-baseline gap-1.5">
-                          <span className="text-mute">{key}</span>
-                          <span className="text-faint">=</span>
-                          <span className="text-ink break-all">{value}</span>
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </span>
-              </span>
               <span className="inline-flex items-baseline gap-1.5">
                 <span className="label whitespace-nowrap">{t('runs.stat.exitCode')}</span>
                 <span className="mono text-ink text-meta">{formatExit(data.exitCode, data.signal)}</span>
@@ -221,6 +203,24 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
                 <dt className="label">{t('runs.field.command')}</dt>
                 <dd className="border-line bg-base mono text-ink overflow-x-auto rounded-lg border px-2.5 py-2 text-body whitespace-pre">
                   {data.commandDisplay}
+                </dd>
+              </div>
+              <div className="grid gap-1.5">
+                <dt className="label">{t('runs.field.parameters')}</dt>
+                <dd className="mono text-body">
+                  {Object.keys(data.paramValues).length === 0 ? (
+                    <span className="text-faint">{t('common.none')}</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {Object.entries(data.paramValues).map(([key, value]) => (
+                        <span key={key} className="inline-flex items-baseline gap-1.5">
+                          <span className="text-mute">{key}</span>
+                          <span className="text-faint">=</span>
+                          <span className="text-ink break-all">{value}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </dd>
               </div>
               {data.argv.length > 0 ? (
