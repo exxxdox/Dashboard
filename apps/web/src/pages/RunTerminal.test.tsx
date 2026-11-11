@@ -213,4 +213,27 @@ test('offers search on a finished run that never accepted input', () => {
   const execution = { status: 'succeeded', exitCode: 0, signal: null, errorMessage: null } as ExecutionSummary;
   const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live: false, execution }));
   expect(html).toContain('runs.terminal.search');
+  expect(html).toContain('runs.terminal.font');
+});
+
+test('applies the font family and size saved in this browser', () => {
+  vi.stubGlobal('window', {
+    localStorage: {
+      getItem: (key: string) => key === 'dashboard.terminal.fontFamily' ? 'Fira Code'
+        : key === 'dashboard.terminal.fontSize' ? '18' : null,
+    },
+  });
+  const cleanup = mount();
+  expect(harness.construct).toHaveBeenCalledWith(expect.objectContaining({
+    fontFamily: 'Fira Code, monospace', fontSize: 18,
+  }));
+  cleanup();
+});
+
+test('falls back to the theme monospace stack when no font is saved', () => {
+  const cleanup = mount();
+  expect(harness.construct).toHaveBeenCalledWith(expect.objectContaining({
+    fontFamily: 'monospace', fontSize: 14,
+  }));
+  cleanup();
 });

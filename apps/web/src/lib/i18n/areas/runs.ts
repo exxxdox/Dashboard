@@ -32,6 +32,11 @@ const en = {
   'runs.terminal.searchNext': 'Next match',
   'runs.terminal.searchClose': 'Close search',
   'runs.terminal.searchNoResults': 'No matches',
+  'runs.terminal.font': 'Terminal font',
+  'runs.terminal.fontPlaceholder': 'Font family, e.g. JetBrains Mono',
+  'runs.terminal.fontHint': 'Only fonts installed on this device are used',
+  'runs.terminal.fontSize': 'Font size',
+  'runs.terminal.fontClose': 'Close font settings',
 
   // -- execution status labels, produced by `lib/status.ts` ----------------
   'runs.status.queued': 'Queued',
@@ -185,6 +190,11 @@ const zh: Record<keyof typeof en, string> = {
   'runs.terminal.searchNext': '下一个匹配',
   'runs.terminal.searchClose': '关闭搜索',
   'runs.terminal.searchNoResults': '无匹配',
+  'runs.terminal.font': '终端字体',
+  'runs.terminal.fontPlaceholder': '字体名称，如 JetBrains Mono',
+  'runs.terminal.fontHint': '仅使用本机已安装的字体',
+  'runs.terminal.fontSize': '字号',
+  'runs.terminal.fontClose': '关闭字体设置',
 
   'runs.status.queued': '排队中',
   'runs.status.running': '运行中',

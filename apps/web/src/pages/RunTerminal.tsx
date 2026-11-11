@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, Type, X } from 'lucide-react';
 import type {
   ExecutionLogChunk,
   ExecutionStream as StreamKind,
@@ -19,6 +19,15 @@ import { TextInput } from '../components/Form';
 import { useI18n } from '../lib/i18n';
 import { formatExit } from '../lib/format';
 import { executionStatusLabel } from '../lib/status';
+import {
+  clampFontSize,
+  MAX_TERMINAL_FONT_SIZE,
+  MIN_TERMINAL_FONT_SIZE,
+  readTerminalFont,
+  saveTerminalFont,
+  TERMINAL_FONT_SUGGESTIONS,
+  terminalFontStack,
+} from '../lib/terminal-font';
 
 /**
  * xterm's own palette.
@@ -147,6 +156,7 @@ export function RunTerminal({
   const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const fitRef = useRef<FitAddon | null>(null);
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const disposedRef = useRef(false);
@@ -164,6 +174,11 @@ export function RunTerminal({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<{ index: number; count: number } | null>(null);
+  const savedFont = readTerminalFont();
+  const [fontOpen, setFontOpen] = useState(false);
+  const [fontFamily, setFontFamily] = useState(savedFont.family);
+  const [fontSize, setFontSize] = useState(savedFont.size);
+  const [fontSizeText, setFontSizeText] = useState(String(savedFont.size));
 
   function canInput(): boolean {
     return modeRef.current.interactive && modeRef.current.live && connectedRef.current
@@ -226,18 +241,61 @@ export function RunTerminal({
     terminalRef.current?.focus();
   }
 
+  /**
+   * Apply a font without tearing the terminal down: the options are writable at
+   * runtime, but xterm re-measures its cells, so the viewport must be fitted
+   * again and the new column count sent to the PTY when this page controls it.
+   */
+  function applyFont(family: string, size: number): void {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.fontFamily = terminalFontStack(family, resolveMonoStack());
+    terminal.options.fontSize = size;
+    requestAnimationFrame(() => {
+      try { fitRef.current?.fit(); } catch { /* A hidden terminal is fitted on the next resize. */ }
+      resize();
+    });
+  }
+
+  function changeFontFamily(family: string): void {
+    setFontFamily(family);
+    saveTerminalFont({ family, size: fontSize });
+    applyFont(family, fontSize);
+  }
+
+  function changeFontSize(value: string): void {
+    // Keep the typed text even when it is not a usable size yet: clamping every
+    // keystroke would turn "16" into "86" while the user is still typing.
+    setFontSizeText(value);
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed < MIN_TERMINAL_FONT_SIZE || parsed > MAX_TERMINAL_FONT_SIZE) return;
+    setFontSize(parsed);
+    saveTerminalFont({ family: fontFamily, size: parsed });
+    applyFont(fontFamily, parsed);
+  }
+
+  function commitFontSize(): void {
+    const size = clampFontSize(Number.parseInt(fontSizeText, 10));
+    setFontSizeText(String(size));
+    setFontSize(size);
+    saveTerminalFont({ family: fontFamily, size });
+    applyFont(fontFamily, size);
+  }
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     disposedRef.current = false;
     const terminal = new Terminal({
-      fontFamily: resolveMonoStack(), fontSize: 14, lineHeight: 1.45, letterSpacing: 0,
+      fontFamily: terminalFontStack(fontFamily, resolveMonoStack()), fontSize,
+      lineHeight: 1.45, letterSpacing: 0,
       cursorBlink: interactive, disableStdin: true,
       // A PTY already emits CRLF; translating again changes full-screen cursor movement.
       convertEol: !interactive, scrollback: 10_000, theme: terminalTheme(),
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
+    fitRef.current = fit;
     terminal.open(host);
     fit.fit();
     terminalRef.current = terminal;
@@ -291,6 +349,7 @@ export function RunTerminal({
       keyboard.dispose(); dimensions.dispose(); results.dispose(); unwatch();
       cancelAnimationFrame(frame); observer.disconnect(); terminal.dispose();
       terminalRef.current = null;
+      fitRef.current = null;
       searchAddonRef.current = null;
     };
   }, [executionId, interactive]);
@@ -365,6 +424,43 @@ export function RunTerminal({
             <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x04')}>{t('runs.terminal.eof')}</Button>
           </>
         ) : <span className="mr-auto" />}
+        {fontOpen ? (
+          <div className="flex items-center gap-1.5">
+            <TextInput
+              value={fontFamily}
+              list="terminal-font-families"
+              aria-label={t('runs.terminal.font')}
+              placeholder={t('runs.terminal.fontPlaceholder')}
+              title={t('runs.terminal.fontHint')}
+              onChange={(event) => changeFontFamily(event.target.value)}
+              className="h-10 w-52 py-0 text-meta"
+            />
+            <datalist id="terminal-font-families">
+              {TERMINAL_FONT_SUGGESTIONS.map((name) => <option key={name} value={name} />)}
+            </datalist>
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              min={MIN_TERMINAL_FONT_SIZE}
+              max={MAX_TERMINAL_FONT_SIZE}
+              value={fontSizeText}
+              aria-label={t('runs.terminal.fontSize')}
+              onChange={(event) => changeFontSize(event.target.value)}
+              onBlur={commitFontSize}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+              }}
+              className="h-10 w-20 py-0 text-meta"
+            />
+            <IconButton label={t('runs.terminal.fontClose')} onClick={() => setFontOpen(false)}>
+              <X className="size-4" aria-hidden />
+            </IconButton>
+          </div>
+        ) : (
+          <IconButton label={t('runs.terminal.font')} onClick={() => setFontOpen(true)}>
+            <Type className="size-4" aria-hidden />
+          </IconButton>
+        )}
         {searchOpen ? (
           <div className="flex items-center gap-1.5">
             <TextInput
