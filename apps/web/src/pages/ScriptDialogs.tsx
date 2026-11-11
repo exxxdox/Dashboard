@@ -79,7 +79,7 @@ export function ScriptDialogs({
         title={i18n.t('scripts.panel.run')}
         description={i18n.t('scripts.dialog.run.description')}
       >
-        <RunPanel key={script.id} script={script} />
+        <RunPanel key={script.id} script={script} active={open === 'run'} />
       </Modal>
     </>
   );

@@ -6,18 +6,16 @@ import {
   type ScriptSummary,
   type TargetSummary,
 } from '@dashboard/shared';
-import { ChevronRight, Play, Plus, Trash } from 'lucide-react';
+import { ChevronRight, Plus, Trash } from 'lucide-react';
 import { Button, IconButton } from '../components/Button';
 import { Select, Switch, TextInput } from '../components/Form';
 import {
-  useExecuteScript,
   useSaveScriptRunDraft,
   useScriptRunDraft,
   useTargets,
 } from '../api/queries';
 import { cn } from '../lib/cn';
 import { useI18n } from '../lib/i18n';
-import { navigate } from '../lib/router';
 import {
   describePrefill,
   draftFromForm,
@@ -49,6 +47,8 @@ type RunPanelProps = {
   script: ScriptSummary;
   mode?: 'run' | 'schedule';
   initialInput?: ExecuteScriptInput;
+  /** Whether the run dialog is showing. Dismissing it flushes the draft. */
+  active?: boolean;
   children?: (getInput: () => ExecuteScriptInput | null) => ReactNode;
 };
 
@@ -117,14 +117,82 @@ function RunRow({
 }
 
 /**
+ * One hand-added parameter. The mode is chosen first because it decides what the
+ * two fields are called: `env` needs an environment variable name, `argv` only a
+ * label for the operator. The inputs carry visible captions instead of relying on
+ * placeholders, which disappear as soon as the row has content.
+ */
+export function CustomParamEditor({
+  row,
+  index,
+  error,
+  onChange,
+  onRemove,
+}: {
+  row: CustomParamRow;
+  index: number;
+  error: string | undefined;
+  onChange: (patch: Partial<Pick<CustomParamRow, 'name' | 'value' | 'mode'>>) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useI18n();
+  // The row id is unique for the lifetime of the form; deriving the field ids
+  // from it keeps them stable without another hook.
+  const nameId = `custom-${row.id}-name`;
+  const valueId = `custom-${row.id}-value`;
+  const env = row.mode === 'env';
+
+  return (
+    <div className="border-line bg-panel-2/40 grid gap-2 rounded-lg border p-2.5">
+      <div className="flex items-center gap-2">
+        <Select
+          className="min-w-0 flex-1"
+          aria-label={t('runs.custom.modeLabel', { index: index + 1 })}
+          value={row.mode}
+          onChange={(event) => onChange({ mode: event.target.value as CustomParamMode })}
+        >
+          <option value="env">{t('runs.custom.modeEnv')}</option>
+          <option value="argv">{t('runs.custom.modeArgv')}</option>
+        </Select>
+        <IconButton label={t('runs.custom.remove', { index: index + 1 })} onClick={onRemove}>
+          <Trash className="size-4" aria-hidden />
+        </IconButton>
+      </div>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-1.5">
+        <label className="text-mute text-meta" htmlFor={nameId}>
+          {env ? t('runs.custom.name') : t('runs.custom.label')}
+        </label>
+        <TextInput
+          id={nameId}
+          className="mono min-w-0"
+          placeholder={env ? 'NAME' : t('runs.custom.labelPlaceholder')}
+          value={row.name}
+          onChange={(event) => onChange({ name: event.target.value })}
+        />
+        <label className="text-mute text-meta" htmlFor={valueId}>
+          {t('runs.custom.value')}
+        </label>
+        <TextInput
+          id={valueId}
+          className="mono min-w-0"
+          placeholder={t('runs.custom.valuePlaceholder')}
+          value={row.value}
+          onChange={(event) => onChange({ value: event.target.value })}
+        />
+      </div>
+      {error ? <p className="text-danger text-meta">{error}</p> : null}
+    </div>
+  );
+}
+
+/**
  * The run form. Mount it with `key={script.id}`: a different script means a
  * different parameter set, and remounting is clearer than re-seeding state.
  */
-export function RunPanel({ script, mode = 'run', initialInput, children }: RunPanelProps) {
+export function RunPanel({ script, mode = 'run', initialInput, active = true, children }: RunPanelProps) {
   const i18n = useI18n();
   const { t } = i18n;
   const targets = useTargets();
-  const execute = useExecuteScript();
   const prefill = useScriptRunDraft(mode === 'run' ? script.id : null);
   const saveDraft = useSaveScriptRunDraft();
 
@@ -170,6 +238,10 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
   const errors = validateValues(script.params, values, t);
   const customErrors = validateRows(customRows, script.params, t);
   const hasErrors = Object.keys(errors).length > 0 || Object.keys(customErrors).length > 0;
+  // The run dialog has no submit button, so `showErrors` alone would never flip
+  // in run mode: a touched form reveals its errors, and the schedule editor's
+  // save still turns them all on.
+  const revealErrors = showErrors || touched;
 
   const targetList = targets.data ?? [];
   // Defaulting to the first target keeps the common single-host setup to one click.
@@ -186,26 +258,12 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
     editRows(addRow);
   }
 
+  // Only the schedule editor reads the form through this. Manual runs go through
+  // the identity bar's run button, which reads the same saved draft.
   function currentInput(): ExecuteScriptInput | null {
     setShowErrors(true);
     if (hasErrors || effectiveTargetId === '') return null;
     return toRunInput({ values, rows: customRows, timeoutSec: timeout, interactive: mode === 'run' && interactive }, effectiveTargetId);
-  }
-
-  function submit(): void {
-    const input = currentInput();
-    if (!input) return;
-
-    flushDraft();
-    execute.mutate(
-      {
-        scriptId: script.id,
-        // Custom rows cannot collide with a declared name: validateRows refuses
-        // a row that repeats one.
-        input,
-      },
-      { onSuccess: (result) => navigate(`/runs/${encodeURIComponent(result.executionId)}`) },
-    );
   }
 
   // The draft arrives once per script; it seeds the form and then stops being
@@ -263,6 +321,14 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
   // Only unmount flushes immediately; ordinary edits still share the debounce.
   useEffect(() => () => flushRef.current(), []);
 
+  // The dialog stays mounted while closed, so unmount is not the only way out:
+  // dismissing it must store the last edit before the run button reads the draft.
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (wasActive.current && !active) flushRef.current();
+    wasActive.current = active;
+  }, [active]);
+
   const restoredNotice = mode === 'run' && prefill.data ? describePrefill(prefill.data) : null;
   // Counts every row that will be sent, not every row with a name: an argument
   // row usually has no label, and a badge that said 1 for three rows would be
@@ -307,11 +373,18 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
         </RunRow>
 
         {mode === 'run' ? (
-          <div className="grid gap-1.5">
-            <Switch label={t('runs.interactive.label')} checked={interactive}
-              onChange={(checked) => { setTouched(true); setInteractive(checked); }} />
-            <p className="text-mute text-meta">{t('runs.interactive.hint')}</p>
-          </div>
+          // A titled row: the switch alone read as an unlabeled control, and the
+          // hint below it explained the effect without ever naming it.
+          <RunRow label={t('runs.interactive.label')} hint={t('runs.interactive.hint')}>
+            {({ id }) => (
+              <Switch
+                id={id}
+                label={t('runs.interactive.label')}
+                checked={interactive}
+                onChange={(checked) => { setTouched(true); setInteractive(checked); }}
+              />
+            )}
+          </RunRow>
         ) : null}
 
         {noTargets ? (
@@ -337,7 +410,7 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
                     : ''
                 }`}
                 hint={param.description || undefined}
-                error={showErrors ? (errors[param.name] ?? null) : null}
+                error={revealErrors ? (errors[param.name] ?? null) : null}
               >
                 {({ id, describedBy }) =>
                   param.type === 'bool' ? (
@@ -395,70 +468,19 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
           {customOpen ? (
             <div className="grid gap-2">
               {customRows.map((row, index) => (
-                // The name shares its line with the remove button and the value
-                // takes the line below: a third column would leave the value too
-                // narrow to read at this pane's width.
-                <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5">
-                  <TextInput
-                    className="mono col-start-1 row-start-1 min-w-0"
-                    aria-label={
-                      row.mode === 'env'
-                        ? t('runs.custom.nameLabel', { index: index + 1 })
-                        : t('runs.custom.argLabel', { index: index + 1 })
-                    }
-                    placeholder={row.mode === 'env' ? 'NAME' : t('runs.custom.labelPlaceholder')}
-                    value={row.name}
-                    onChange={(event) =>
-                      editRows((current) =>
-                        updateRow(current, row.id, { name: event.target.value }),
-                      )
-                    }
-                  />
-                  {/* Which channel this value travels on. `env` needs a shell
-                      identifier as its name; `argv` is positional and its name
-                      is only a label, so the two are not interchangeable. */}
-                  <Select
-                    // Wide enough for the longest option: at 92px the browser
-                    // rendered "argv" as "arg".
-                    className="col-start-2 row-start-1 w-[104px]"
-                    aria-label={t('runs.custom.modeLabel', { index: index + 1 })}
-                    value={row.mode}
-                    onChange={(event) =>
-                      editRows((current) =>
-                        updateRow(current, row.id, {
-                          mode: event.target.value as CustomParamMode,
-                        }),
-                      )
-                    }
-                  >
-                    <option value="env">env</option>
-                    <option value="argv">argv</option>
-                  </Select>
-                  <IconButton
-                    label={t('runs.custom.remove', { index: index + 1 })}
-                    className="col-start-3 row-start-1"
-                    onClick={() => editRows((current) => removeRow(current, row.id))}
-                  >
-                    <Trash className="size-4" aria-hidden />
-                  </IconButton>
-                  <TextInput
-                    className="mono col-span-3 min-w-0"
-                    aria-label={t('runs.custom.valueLabel', { index: index + 1 })}
-                    placeholder={t('runs.custom.valuePlaceholder')}
-                    value={row.value}
-                    onChange={(event) =>
-                      editRows((current) =>
-                        updateRow(current, row.id, { value: event.target.value }),
-                      )
-                    }
-                  />
-                  {/* Shown as soon as the row is non-blank, not on submit: the
-                      mistakes here are typos the operator can see and fix, and a
-                      blank row reports nothing. */}
-                  {customErrors[row.id] ? (
-                    <p className="text-danger text-meta col-span-3">{customErrors[row.id]}</p>
-                  ) : null}
-                </div>
+                <CustomParamEditor
+                  key={row.id}
+                  row={row}
+                  index={index}
+                  // Shown as soon as the row is non-blank, not on submit: the
+                  // mistakes here are typos the operator can see and fix, and a
+                  // blank row reports nothing.
+                  error={customErrors[row.id]}
+                  onChange={(patch) =>
+                    editRows((current) => updateRow(current, row.id, patch))
+                  }
+                  onRemove={() => editRows((current) => removeRow(current, row.id))}
+                />
               ))}
 
               <div>
@@ -508,18 +530,7 @@ export function RunPanel({ script, mode = 'run', initialInput, children }: RunPa
         </RunRow>
       </div>
 
-      {mode === 'run' ? <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant="primary"
-          icon={<Play className="size-4" aria-hidden />}
-          loading={execute.isPending}
-          disabled={noTargets}
-          onClick={submit}
-        >
-          {t('runs.submit')}
-        </Button>
-        <span className="text-faint text-meta">{t('runs.submitHint')}</span>
-      </div> : children?.(currentInput)}
+      {children?.(currentInput)}
     </div>
   );
 }

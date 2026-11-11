@@ -144,10 +144,12 @@ const en = {
   'runs.timeout.hintOwn': "Seconds. Blank uses the script's own limit ({seconds}s).",
 
   'runs.custom.title': 'Custom parameters',
-  'runs.custom.nameLabel': 'Environment variable {index} name',
-  'runs.custom.argLabel': 'Custom argument {index} label',
   'runs.custom.modeLabel': 'Custom parameter {index} mode',
-  'runs.custom.valueLabel': 'Custom parameter {index} value',
+  'runs.custom.modeEnv': 'Environment variable (env)',
+  'runs.custom.modeArgv': 'Positional argument (argv)',
+  'runs.custom.name': 'Name',
+  'runs.custom.label': 'Label',
+  'runs.custom.value': 'Value',
   'runs.custom.remove': 'Remove parameter {index}',
   'runs.custom.labelPlaceholder': 'label (optional)',
   'runs.custom.valuePlaceholder': 'value',
@@ -163,9 +165,6 @@ const en = {
 
   'runs.prefill.draft': 'Restored what you last typed here.',
   'runs.prefill.lastRun': 'Filled in from the last run of this script.',
-
-  'runs.submit': 'Run script',
-  'runs.submitHint': 'Values reach the script as environment variables.',
 } as const;
 
 const zh: Record<keyof typeof en, string> = {
@@ -295,10 +294,12 @@ const zh: Record<keyof typeof en, string> = {
   'runs.timeout.hintOwn': '单位秒。留空则使用脚本自身的限制（{seconds} 秒）。',
 
   'runs.custom.title': '自定义参数',
-  'runs.custom.nameLabel': '环境变量 {index} 的名称',
-  'runs.custom.argLabel': '自定义参数 {index} 的标签',
   'runs.custom.modeLabel': '自定义参数 {index} 的类型',
-  'runs.custom.valueLabel': '自定义参数 {index} 的值',
+  'runs.custom.modeEnv': '环境变量（env）',
+  'runs.custom.modeArgv': '位置参数（argv）',
+  'runs.custom.name': '名称',
+  'runs.custom.label': '标签',
+  'runs.custom.value': '值',
   'runs.custom.remove': '删除参数 {index}',
   'runs.custom.labelPlaceholder': '标签（可选）',
   'runs.custom.valuePlaceholder': '值',
@@ -310,9 +311,6 @@ const zh: Record<keyof typeof en, string> = {
 
   'runs.prefill.draft': '已恢复你上次在这里填写的内容。',
   'runs.prefill.lastRun': '已按该脚本上次运行的内容填入。',
-
-  'runs.submit': '运行脚本',
-  'runs.submitHint': '参数以环境变量的形式传给脚本。',
 };
 
 export const runsMessages = { en, zh };

@@ -56,7 +56,7 @@ const en = {
   'scripts.dialog.metadata.description':
     'How this script is listed and run. Changes apply to the next run, not to past ones.',
   'scripts.dialog.run.description':
-    'Pick a host and fill in what the script needs, then start it. These values are remembered for the next time.',
+    'Pick a host and fill in what the script needs. Changes are saved as you type and used by the Run now button.',
   'scripts.runNow': 'Run now',
   'scripts.runNowTitle': 'Run now on {target}, with the settings saved for this script',
   'scripts.unsavedChanges': 'Unsaved changes',
@@ -138,7 +138,7 @@ const zh: Record<keyof typeof en, string> = {
     '最近记录的文件信息：大小、来源路径，以及内容哈希。',
   'scripts.dialog.metadata.description': '脚本的展示方式与运行方式。改动只影响之后的运行，不影响历史记录。',
   'scripts.dialog.run.description':
-    '选择目标主机，填写脚本需要的参数，然后启动。填过的值会为下次记住。',
+    '选择目标主机，填写脚本需要的参数。改动会边填边保存，由「立即运行」按钮使用。',
   'scripts.runNow': '立即运行',
   'scripts.runNowTitle': '使用该脚本已保存的设置，在 {target} 上立即运行',
   'scripts.unsavedChanges': '有未保存的改动',

@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
 import type { ScriptRunPrefill, ScriptSummary } from '@dashboard/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { RunPanel } from './RunPanel';
+import { CustomParamEditor, RunPanel } from './RunPanel';
+import { Select } from '../components/Form';
 
 // Run the real form handlers and effect cleanup without adding a DOM dependency.
 const hooks = vi.hoisted(() => ({
@@ -9,7 +10,7 @@ const hooks = vi.hoisted(() => ({
   effects: [] as { deps: unknown[]; cleanup?: () => void }[],
   pending: [] as (() => void)[],
   prefill: undefined as ScriptRunPrefill | undefined,
-  save: vi.fn(), execute: vi.fn(),
+  save: vi.fn(),
 }));
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
@@ -41,10 +42,8 @@ vi.mock('../api/queries', () => ({
   useTargets: () => ({ data: [{ id: 'target', name: 'host' }], isSuccess: true }),
   useScriptRunDraft: () => ({ data: hooks.prefill }),
   useSaveScriptRunDraft: () => ({ mutateAsync: hooks.save }),
-  useExecuteScript: () => ({ mutate: hooks.execute }),
 }));
 vi.mock('../lib/i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }));
-vi.mock('../lib/router', () => ({ navigate: vi.fn() }));
 
 const script = { id: 'script', params: [{ name: 'NAME', type: 'string', required: false, default: null, description: '' }], timeoutSec: null } as ScriptSummary;
 const saved = (): ScriptRunPrefill => ({ source: 'draft', draft: { params: { NAME: 'old' }, custom: [], timeoutSec: '' } });
@@ -78,7 +77,7 @@ function unmount(): void {
 beforeEach(() => {
   vi.useFakeTimers();
   hooks.slots = []; hooks.effects = []; hooks.pending = [];
-  hooks.prefill = saved(); hooks.save.mockReset().mockResolvedValue(saved()); hooks.execute.mockReset();
+  hooks.prefill = saved(); hooks.save.mockReset().mockResolvedValue(saved());
 });
 afterEach(() => { unmount(); vi.useRealTimers(); });
 
@@ -89,12 +88,10 @@ test('flushes an edited draft when leaving before the debounce fires', () => {
   expect(hooks.save).toHaveBeenCalledWith({ id: 'script', draft: expect.objectContaining({ params: { NAME: 'new' } }) });
 });
 
-test('saves current values before a quick submit can navigate away', () => {
-  render(); edit('new');
-  const button = elements(render()).find((element) => element.props.children === 'runs.submit')!;
-  button.props.onClick!();
+test('stores the draft when the settings dialog closes', () => {
+  render({ active: true }); edit('new');
+  render({ active: false });
   expect(hooks.save).toHaveBeenCalledWith({ id: 'script', draft: expect.objectContaining({ params: { NAME: 'new' } }) });
-  expect(hooks.save.mock.invocationCallOrder[0]).toBeLessThan(hooks.execute.mock.invocationCallOrder[0]!);
 });
 
 test('a delayed prefill does not overwrite input already edited', () => {
@@ -172,28 +169,52 @@ test('schedule editing restores its saved invocation without touching the manual
   await vi.advanceTimersByTimeAsync(1000);
   unmount();
   expect(hooks.save).not.toHaveBeenCalled();
-  expect(elements(render(props)).some((element) => element.props.children === 'runs.submit')).toBe(false);
 });
 
 
-test('restores interactive mode for manual execution and hides it in schedule mode', () => {
+function switchRow(tree: Element): Element {
+  // The row is a component element; its render prop is what holds the control.
+  const row = elements(tree).find((element) => element.props.label === 'runs.interactive.label')!;
+  return (row.props.children as (props: { id: string }) => Element)({ id: 'interactive' });
+}
+
+test('titles the interactive terminal switch and keeps it out of schedule mode', () => {
   hooks.prefill!.draft.interactive = true;
   render();
   const tree = render();
-  const toggle = elements(tree).find((element) => element.props.label === 'runs.interactive.label');
-  expect(toggle?.props).toMatchObject({ checked: true });
-  const submit = elements(tree).find((element) => element.props.children === 'runs.submit')!;
-  submit.props.onClick!();
-  expect(hooks.execute).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ interactive: true }) }), expect.anything());
+  expect(switchRow(tree).props).toMatchObject({ checked: true, label: 'runs.interactive.label' });
   expect(elements(render({ mode: 'schedule' })).some((element) => element.props.label === 'runs.interactive.label')).toBe(false);
 });
 
 test('autosaves explicit terminal disable even when every other field is empty', () => {
   hooks.prefill!.draft = { params: {}, custom: [], timeoutSec: '', interactive: true };
-  render();
-  const toggle = elements(render()).find((element) => element.props.label === 'runs.interactive.label')!;
+  const toggle = switchRow(render());
   (toggle.props as unknown as { onChange: (checked: boolean) => void }).onChange(false);
   render();
   unmount();
   expect(hooks.save).toHaveBeenCalledWith({ id: 'script', draft: expect.objectContaining({ interactive: false }) });
+});
+
+test('a custom row names its channel and both fields', () => {
+  const onChange = vi.fn();
+  const tree = CustomParamEditor({
+    row: { id: 'row-1', name: '', value: '', mode: 'env' }, index: 0, error: undefined,
+    onChange, onRemove: vi.fn(),
+  });
+  const labels = elements(tree).filter((element) => element.type === 'label').map((element) => element.props.children);
+  expect(labels).toEqual(['runs.custom.name', 'runs.custom.value']);
+  const options = elements(tree).filter((element) => element.type === 'option').map((element) => element.props.children);
+  expect(options).toEqual(['runs.custom.modeEnv', 'runs.custom.modeArgv']);
+  const select = elements(tree).find((element) => element.type === Select)!;
+  select.props.onChange!({ target: { value: 'argv' } });
+  expect(onChange).toHaveBeenCalledWith({ mode: 'argv' });
+});
+
+test('an argument row labels its name as a label, not a variable', () => {
+  const tree = CustomParamEditor({
+    row: { id: 'row-2', name: '', value: '', mode: 'argv' }, index: 0, error: undefined,
+    onChange: vi.fn(), onRemove: vi.fn(),
+  });
+  const labels = elements(tree).filter((element) => element.type === 'label').map((element) => element.props.children);
+  expect(labels).toEqual(['runs.custom.label', 'runs.custom.value']);
 });
