@@ -5,6 +5,7 @@ import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ChevronDown, ChevronUp, Search, Type, X } from 'lucide-react';
+import { envPrefix, quoteAll } from '@dashboard/shared';
 import type {
   ExecutionLogChunk,
   ExecutionStream as StreamKind,
@@ -319,6 +320,15 @@ export function RunTerminal({
     terminal.open(host);
     fit.fit();
     terminalRef.current = terminal;
+    if (execution) {
+      // Derive the display from the saved invocation so old runs also show every parameter.
+      const command = `${envPrefix(execution.paramValues ?? {})}${execution.commandDisplay}${execution.argv?.length ? ` ${quoteAll(execution.argv)}` : ''}`;
+      // Parameter bytes are text here, never terminal control sequences or extra output lines.
+      const display = command.replace(/[\x00-\x1f\x7f-\x9f]/g, (character) =>
+        `\\x${character.charCodeAt(0).toString(16).padStart(2, '0')}`,
+      );
+      terminal.write(`${STREAM_PREFIX.system}$ ${display}${RESET}\r\n`);
+    }
     // Search covers the local buffer (live output plus the replay window), not
     // output the server already dropped at MAX_LOG_BYTES.
     const search = new SearchAddon();
@@ -413,6 +423,9 @@ export function RunTerminal({
     },
     onChunk: (chunk) => {
       if (disposedRef.current) return;
+      // Older runners persisted a parameter-less header; replace only that exact first record.
+      if (execution && chunk.seq === 1 && chunk.stream === 'system'
+        && chunk.data === `$ ${execution.commandDisplay}\n`) return;
       // Dashboard notices must not overwrite a full-screen application's cursor state.
       if (interactive && chunk.stream === 'system') return;
       terminalRef.current?.write(paint(chunk));
@@ -430,28 +443,10 @@ export function RunTerminal({
     : searchResults.count === 0 ? t('runs.terminal.searchNoResults')
       : searchResults.index >= 0 ? `${searchResults.index + 1}/${searchResults.count}`
         : `${searchResults.count}`;
-  // Quoted the way a shell shows it, so an argument containing a space does
-  // not read as two arguments.
-  const argvLine = execution?.argv?.map((value) =>
-    value === '' ? t('runs.field.emptyArg') : /\s/.test(value) ? `"${value}"` : value,
-  ).join(' ') ?? '';
   return (
     <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
       <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
-        {/* The command line stands in for the header line the runner used to
-            write into the output: one copy, in the toolbar, with its arguments. */}
-        {execution?.argv && execution.argv.length > 0 ? (
-          <span
-            className="mono text-meta mr-auto min-w-0 truncate"
-            title={`${execution.commandDisplay} ${argvLine}`}
-          >
-            <span className="text-faint" aria-hidden>$ </span>
-            <span className="text-mute">{execution.commandDisplay}</span>{' '}
-            <span className="text-ink">{argvLine}</span>
-          </span>
-        ) : (
-          <span className="mr-auto" />
-        )}
+        <span className="mr-auto" />
         {interactive ? (
           <>
             <span role="status" className="text-mute text-meta">{!live && execution

@@ -219,12 +219,46 @@ test('offers search on a finished run that never accepted input', () => {
   expect(html).toContain('runs.terminal.font');
 });
 
-test('shows positional arguments as the command line above the output', () => {
+test.each([false, true])('writes the complete command before replay, interactive=%s', (interactive) => {
   const execution = { status: 'succeeded', exitCode: 0, signal: null, errorMessage: null,
-    commandDisplay: 'sh demo.sh', argv: ['first', 'two words'] } as ExecutionSummary;
-  const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live: false, execution }));
-  expect(html).toContain('sh demo.sh');
-  expect(html).toContain('two words');
+    commandDisplay: 'bash demo.sh', paramValues: { MODE: 'all ports' }, argv: ['50000', 'two words', '', "it's", '\x1b[2J', 'a\nb'] } as unknown as ExecutionSummary;
+  const tree = RunTerminal({ executionId: 'run', live: false, execution, interactive });
+  expect(renderToStaticMarkup(tree)).not.toContain('bash demo.sh');
+  harness.refs[0]!.current = {};
+  const cleanup = harness.effects[0]!();
+  const header = harness.terminal.write.mock.calls[0]![0] as string;
+  expect(header).toContain("MODE='all ports' bash demo.sh 50000 'two words' '' 'it");
+  expect(header).toContain('\\x1b[2J');
+  expect(header).toContain('a\\x0ab');
+  expect(header).toContain('\r\n');
+  expect(header).not.toContain('\x1b[2J');
+  harness.terminal.write.mockClear();
+  harness.stream!.onChunk!(chunk('system', '$ bash demo.sh\n'));
+  expect(harness.terminal.write).not.toHaveBeenCalled();
+  harness.stream!.onChunk!({ ...chunk('stdout', 'script output\n'), seq: 2 });
+  expect(harness.terminal.write).toHaveBeenCalledWith('script output\n');
+  cleanup?.();
+});
+
+test('keeps output and notices while showing the command once across resyncs', () => {
+  const execution = { commandDisplay: 'bash demo.sh', paramValues: {}, argv: [] } as unknown as ExecutionSummary;
+  RunTerminal({ executionId: 'run', live: false, execution });
+  harness.refs[0]!.current = {};
+  const cleanup = harness.effects[0]!();
+  expect(harness.terminal.write).toHaveBeenCalledWith('\x1b[38;5;109m$ bash demo.sh\x1b[0m\r\n');
+  harness.stream!.onSyncChange!(true);
+  harness.stream!.onSyncChange!(false);
+  harness.stream!.onSyncChange!(true);
+  harness.stream!.onSyncChange!(false);
+  expect(harness.terminal.write.mock.calls.filter(([data]) => String(data).includes('$ bash'))).toHaveLength(1);
+  harness.terminal.write.mockClear();
+  harness.stream!.onChunk!(chunk('stdout', '$ bash demo.sh\n'));
+  harness.stream!.onChunk!({ ...chunk('system', '$ bash demo.sh\n'), seq: 2 });
+  harness.stream!.onChunk!(chunk('system', 'interrupted\n'));
+  expect(harness.terminal.write.mock.calls).toEqual([
+    ['$ bash demo.sh\n'], ['\x1b[38;5;109m$ bash demo.sh\n\x1b[0m'], ['\x1b[38;5;109minterrupted\n\x1b[0m'],
+  ]);
+  cleanup?.();
 });
 
 test('applies the font family and size saved in this browser', () => {
