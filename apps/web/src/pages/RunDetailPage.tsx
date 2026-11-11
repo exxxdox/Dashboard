@@ -105,8 +105,10 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
       />
 
       <PageBody wide>
-        <header className="flex flex-wrap items-start gap-4">
-          <div className="min-w-0 flex-1">
+        {/* Two columns only when there is room for both: a wrapping flex row
+            let the summary squeeze the title until it truncated. */}
+        <header className="grid gap-x-6 gap-y-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+          <div className="min-w-0">
             <button
               type="button"
               onClick={() => goBack('/runs')}
@@ -126,19 +128,21 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-3">
-            <div className="flex flex-wrap items-start justify-end gap-x-6 gap-y-2">
-              <div className="grid min-w-0 gap-0.5 text-right">
-                <span className="label">{t('runs.field.target')}</span>
+          <div className="flex flex-col gap-3 xl:items-end">
+            {/* Label and value share one baseline: stacked pairs left each column
+                label floating over a value of a different width. */}
+            <div className="flex max-w-full flex-wrap items-center gap-x-5 gap-y-2 xl:justify-end">
+              <span className="inline-flex items-baseline gap-1.5">
+                <span className="label whitespace-nowrap">{t('runs.field.target')}</span>
                 <span className="mono text-ink text-meta max-w-[12rem] truncate">{data.targetName}</span>
-              </div>
-              <div className="grid min-w-0 max-w-[22rem] gap-0.5 text-right">
-                <span className="label">{t('runs.field.parameters')}</span>
+              </span>
+              <span className="inline-flex min-w-0 items-baseline gap-1.5">
+                <span className="label whitespace-nowrap">{t('runs.field.parameters')}</span>
                 <span className="mono text-mute text-meta min-w-0 break-words">
                   {Object.keys(data.paramValues).length === 0 ? (
                     <span className="text-faint">{t('common.none')}</span>
                   ) : (
-                    <span className="flex flex-wrap justify-end gap-x-3 gap-y-0.5">
+                    <span className="inline-flex flex-wrap gap-x-3 gap-y-0.5">
                       {Object.entries(data.paramValues).map(([key, value]) => (
                         <span key={key} className="inline-flex items-baseline gap-1.5">
                           <span className="text-mute">{key}</span>
@@ -149,22 +153,22 @@ export function RunDetailPage({ executionId }: { executionId: string }) {
                     </span>
                   )}
                 </span>
-              </div>
-              <div className="grid gap-0.5 text-right">
-                <span className="label">{t('runs.stat.exitCode')}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1.5">
+                <span className="label whitespace-nowrap">{t('runs.stat.exitCode')}</span>
                 <span className="mono text-ink text-meta">{formatExit(data.exitCode, data.signal)}</span>
-              </div>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowDetails(true)}
-                className="focus-ring text-mute hover:text-ink text-meta inline-flex items-center gap-1.5 self-center rounded-lg px-2 py-1 transition-colors duration-150"
+                className="focus-ring text-mute hover:text-ink text-meta inline-flex items-center gap-1.5 rounded-lg px-2 py-1 transition-colors duration-150"
               >
                 <Info className="size-3.5" aria-hidden />
                 {t('runs.detail.more')}
               </button>
-            </div>
-
-            <div className="flex items-center gap-2">
               <KeyHints hints={[{ keys: ['esc'], label: t('runs.hint.back') }]} />
               {isLive ? (
                 <Button
