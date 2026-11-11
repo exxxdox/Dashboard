@@ -151,15 +151,15 @@ WORKDIR /app
 # these were removed.
 #
 # The official Alpine mirror is unreachable from some networks, which hangs this
-# step until the build times out. The default keeps the official source, so the
-# image stays reproducible for everyone; pass `--build-arg
+# step until the build times out. Leave the image source untouched unless a
+# mirror is explicitly configured; pass `--build-arg
 # ALPINE_MIRROR=mirrors.example.org` when building behind a slow or blocked one.
 # Only the host is substituted, so the mirror has to carry alpine under the same
 # paths the official one does.
-ARG ALPINE_MIRROR=dl-cdn.alpinelinux.org
+ARG ALPINE_MIRROR
 ARG WITH_GIT=true
 # Keep Bash and curl available for interactive sessions and network diagnostics after rebuilds.
-RUN if [ "$ALPINE_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
+RUN if [ -n "$ALPINE_MIRROR" ]; then \
       sed -i "s|dl-cdn.alpinelinux.org|$ALPINE_MIRROR|g" /etc/apk/repositories; \
     fi \
  && apk add --no-cache nodejs ca-certificates setpriv bash curl \
