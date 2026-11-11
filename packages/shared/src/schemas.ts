@@ -326,6 +326,8 @@ export type UpdateDnsSettingsInput = z.infer<typeof updateDnsSettingsSchema>;
  * else: omitted or blank keeps the stored value, and deleting is its own flag.
  */
 export const updateAppSettingsSchema = z.object({
+  dnsEnabled: z.boolean().optional(),
+  modelRelayEnabled: z.boolean().optional(),
   gotifyAddress: z.string().max(500).optional(),
   gotifyToken: z.string().max(500).optional(),
   clearGotifyToken: z.boolean().optional(),
@@ -517,6 +519,8 @@ export type DnsSettingsView = {
  * disagree with the two fields beside it.
  */
 export type AppSettingsView = {
+  dnsEnabled: boolean;
+  modelRelayEnabled: boolean;
   gotifyAddress: string;
   hasGotifyToken: boolean;
   notificationsReady: boolean;

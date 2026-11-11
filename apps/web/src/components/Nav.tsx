@@ -2,7 +2,7 @@ import { Activity, BrainCircuit, Clock, FileCode, FolderTree, Globe, Server, Set
 
 import { cn } from '../lib/cn';
 import { href, type Route } from '../lib/router';
-import { useAuthStatus, useHealth, useLogout } from '../api/queries';
+import { useAppSettings, useAuthStatus, useHealth, useLogout } from '../api/queries';
 import { useT, type MessageKey } from '../lib/i18n';
 
 export type NavItem = {
@@ -29,9 +29,17 @@ export const NAV_ITEMS: NavItem[] = [
 export function Nav({ active }: { active: Route['name'] }) {
   const t = useT();
 
+  const settings = useAppSettings();
+  // Hide optional entries until their persisted state is known.
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.route === 'dns') return settings.data?.dnsEnabled === true;
+    if (item.route === 'modelRelay') return settings.data?.modelRelayEnabled === true;
+    return true;
+  });
+
   return (
     <nav aria-label={t('nav.main')} className="flex flex-col gap-1 px-3">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const isActive = item.route === active;
         const Icon = item.icon;
         return (

@@ -12,6 +12,12 @@ const en = {
   'settings.description':
     'Preferences that apply to the whole dashboard, on every page and for every feature.',
 
+  'settings.features.title': 'Features',
+  'settings.features.dnsHint': 'Controls DNS access and scheduled checks. Configuration and history are retained.',
+  'settings.features.modelRelayHint': 'Controls ModelExtMCP access and MCP calls. Configuration is retained.',
+  'settings.features.disabled': 'Feature disabled',
+  'settings.features.disabledHint': 'Enable this feature in Settings to continue.',
+
   'settings.language.title': 'Language',
   'settings.language.description':
     'Remembered in this browser. It changes the interface only; the log lines a server produces are not translated.',
@@ -55,6 +61,12 @@ const zh: Record<keyof typeof en, string> = {
   'settings.eyebrow': '应用',
   'settings.title': '设置',
   'settings.description': '作用于整个仪表盘的偏好设置，对所有页面和功能生效。',
+
+  'settings.features.title': '功能',
+  'settings.features.dnsHint': '控制 DNS 功能访问与定时检查，保留配置和历史记录。',
+  'settings.features.modelRelayHint': '控制 ModelExtMCP 功能访问与 MCP 调用，保留已有配置。',
+  'settings.features.disabled': '功能已关闭',
+  'settings.features.disabledHint': '请在设置中启用此功能后继续使用。',
 
   'settings.language.title': '语言',
   'settings.language.description':

@@ -398,7 +398,7 @@ describe('v10 notification preferences migration', () => {
       const before = db.prepare<[], Record<string, unknown>>('SELECT * FROM app_settings').get();
       migrate(db);
       expect(db.prepare('SELECT * FROM app_settings').get()).toEqual({
-        ...before, notify_script_results: 1, notify_dns_changes: 1,
+        ...before, notify_script_results: 1, notify_dns_changes: 1, dns_enabled: 1, model_relay_enabled: 1,
       });
       expect(() => db.prepare('UPDATE app_settings SET notify_script_results = 2').run()).toThrow(/CHECK/);
       expect(() => db.prepare('UPDATE app_settings SET notify_dns_changes = -1').run()).toThrow(/CHECK/);
@@ -442,5 +442,21 @@ test('interactive migration preserves existing executions as non-interactive', (
     migrate(db);
     expect(db.prepare('SELECT interactive FROM executions WHERE id = ?').get('run_1')).toEqual({ interactive: 0 });
     expect(() => db.prepare('UPDATE executions SET interactive = 2').run()).toThrow();
+  } finally { db.close(); }
+});
+
+test('v13 feature switches preserve existing settings and default both features on', () => {
+  const db = new Database(':memory:');
+  try {
+    for (const migration of MIGRATIONS.slice(0, 12)) migration(db);
+    db.pragma('user_version = 12');
+    db.prepare(`INSERT INTO app_settings
+      (id, gotify_address, gotify_token_encrypted, notify_script_results, notify_dns_changes, created_at, updated_at)
+      VALUES ('app', 'notify.test', 'ciphertext', 0, 1, ?, ?)`).run(NOW, NOW);
+    const before = db.prepare('SELECT * FROM app_settings').get();
+    migrate(db);
+    expect(db.prepare('SELECT * FROM app_settings').get()).toEqual({
+      ...before as Record<string, unknown>, dns_enabled: 1, model_relay_enabled: 1,
+    });
   } finally { db.close(); }
 });

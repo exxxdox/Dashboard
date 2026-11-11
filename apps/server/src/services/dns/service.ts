@@ -64,6 +64,7 @@ import {
   // bindings with one name in this file is a reading hazard.
   saveSettings as writeSettings,
 } from './settings.js';
+import { getAppSettingsView } from '../notifications/settings.js';
 import { DnsFailureError, type DnsProvider, type ResolvedDnsSettings } from './types.js';
 
 export type DnsServiceDeps = {
@@ -160,6 +161,8 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
     source: DnsCheckSource,
     signal: AbortSignal | undefined,
   ): Promise<DnsUpdateResult> {
+    // Recheck after the mutex wait, so disabling cannot release queued work into the provider.
+    requireEnabled();
     const settings = resolveSettings(db, box);
     const recordOwner = recordGeneration;
     if (!settings) return remember(source, failure('not_configured', null, ''));
@@ -206,6 +209,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
 
     let action: DnsAction;
     try {
+      requireEnabled();
       action = await provider.setIpv6(ipv6, current, signal);
     } catch (error) {
       return remember(
@@ -284,6 +288,13 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
       logger.warn({ err: errorMessage(error) }, 'the DNS check could not be recorded');
     }
     return result;
+  }
+
+  function requireEnabled(): void {
+    if (!getAppSettingsView(db).dnsEnabled) {
+      throw new AppError('This feature is disabled in settings', 503, 'feature_disabled', undefined,
+        { key: 'error.featureDisabled' });
+    }
   }
 
   function requireSettings(): ResolvedDnsSettings {
@@ -395,7 +406,7 @@ export function createDnsService(deps: DnsServiceDeps): DnsService {
         lastIpv6At = null;
       }
       deps.configureSchedule?.({
-        scheduleEnabled: view.scheduleEnabled,
+        scheduleEnabled: view.scheduleEnabled && getAppSettingsView(db).dnsEnabled,
         intervalMinutes: view.intervalMinutes,
       });
       return view;

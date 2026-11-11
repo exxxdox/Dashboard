@@ -36,6 +36,8 @@ export type AppSettingsRow = {
   gotify_token_encrypted: string | null;
   notify_script_results: number;
   notify_dns_changes: number;
+  dns_enabled: number;
+  model_relay_enabled: number;
   created_at: string;
   updated_at: string;
 };
@@ -72,7 +74,7 @@ export function readSettingsRow(db: Db): AppSettingsRow | null {
 export function getAppSettingsView(db: Db): AppSettingsView {
   const row = readSettingsRow(db);
   if (!row) {
-    return { gotifyAddress: '', hasGotifyToken: false, notificationsReady: false, notifyScriptResults: true, notifyDnsChanges: true, updatedAt: null };
+    return { dnsEnabled: true, modelRelayEnabled: true, gotifyAddress: '', hasGotifyToken: false, notificationsReady: false, notifyScriptResults: true, notifyDnsChanges: true, updatedAt: null };
   }
   return toView(row);
 }
@@ -80,6 +82,8 @@ export function getAppSettingsView(db: Db): AppSettingsView {
 function toView(row: AppSettingsRow): AppSettingsView {
   const hasGotifyToken = row.gotify_token_encrypted !== null;
   return {
+    dnsEnabled: row.dns_enabled === 1,
+    modelRelayEnabled: row.model_relay_enabled === 1,
     gotifyAddress: row.gotify_address,
     hasGotifyToken,
     notifyScriptResults: row.notify_script_results === 1,
@@ -125,19 +129,23 @@ export function saveAppSettings(
   const notifyScriptResults = input.notifyScriptResults ?? (row ? row.notify_script_results === 1 : true);
   const notifyDnsChanges = input.notifyDnsChanges ?? (row ? row.notify_dns_changes === 1 : true);
 
+  const dnsEnabled = input.dnsEnabled ?? (row ? row.dns_enabled === 1 : true);
+  const modelRelayEnabled = input.modelRelayEnabled ?? (row ? row.model_relay_enabled === 1 : true);
   const timestamp = nowIso();
   // `created_at` belongs to the insert half only: replacing the address or the
   // token does not change when the row was first written.
   db.prepare(
-    `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, notify_script_results, notify_dns_changes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO app_settings (id, gotify_address, gotify_token_encrypted, notify_script_results, notify_dns_changes, dns_enabled, model_relay_enabled, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        gotify_address = excluded.gotify_address,
        gotify_token_encrypted = excluded.gotify_token_encrypted,
        notify_script_results = excluded.notify_script_results,
        notify_dns_changes = excluded.notify_dns_changes,
+       dns_enabled = excluded.dns_enabled,
+       model_relay_enabled = excluded.model_relay_enabled,
        updated_at = excluded.updated_at`,
-  ).run(SETTINGS_ID, gotifyAddress, encryptedToken, notifyScriptResults ? 1 : 0, notifyDnsChanges ? 1 : 0, timestamp, timestamp);
+  ).run(SETTINGS_ID, gotifyAddress, encryptedToken, notifyScriptResults ? 1 : 0, notifyDnsChanges ? 1 : 0, dnsEnabled ? 1 : 0, modelRelayEnabled ? 1 : 0, timestamp, timestamp);
 
   const stored = readSettingsRow(db);
   if (!stored) throw new ConflictError('The application settings could not be stored');

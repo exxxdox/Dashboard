@@ -18,6 +18,7 @@ import { useAppSettings } from '../api/queries';
 import { cn } from '../lib/cn';
 import { useI18n, type Locale } from '../lib/i18n';
 import { NotificationSettingsForm } from './NotificationSettingsForm';
+import { FeatureSettingsForm } from './FeatureSettingsForm';
 
 export function SettingsPage() {
   const i18n = useI18n();
@@ -40,6 +41,16 @@ export function SettingsPage() {
           </div>
         </Panel>
 
+        <Panel title={t('settings.features.title')}>
+          {settings.isError ? (
+            <ErrorBanner message={errorMessage(settings.error, i18n)} onRetry={() => void settings.refetch()} />
+          ) : !settings.data ? (
+            <LoadingBlock label={t('common.loading')} />
+          ) : (
+            <FeatureSettingsForm settings={settings.data} />
+          )}
+        </Panel>
+
         <Panel
           title={t('settings.notifications.title')}
           aside={<BellRing className="text-faint size-5" aria-hidden />}
@@ -56,10 +67,10 @@ export function SettingsPage() {
             ) : settings.isPending || !settings.data ? (
               <LoadingBlock label={t('common.loading')} />
             ) : (
-              /* Remounted whenever the stored settings change, so the form's
-                 one-shot seed of its fields cannot go stale. */
+              /* Feature toggles must preserve unsaved notification edits. Only a
+                 change to the stored notification fields should reseed this form. */
               <NotificationSettingsForm
-                key={settings.data.updatedAt ?? 'new'}
+                key={JSON.stringify([settings.data.gotifyAddress, settings.data.hasGotifyToken, settings.data.notifyScriptResults, settings.data.notifyDnsChanges])}
                 settings={settings.data}
               />
             )}

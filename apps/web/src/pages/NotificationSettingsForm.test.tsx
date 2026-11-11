@@ -22,7 +22,7 @@ vi.mock('../api/queries', () => ({
 vi.mock('../lib/i18n', () => ({ useI18n: () => ({ locale: 'en', t: (key: string) => key }), useT: () => (key: string) => key }));
 
 const settings: AppSettingsView = {
-  gotifyAddress: 'notify.test', hasGotifyToken: true, notificationsReady: true,
+  dnsEnabled: true, modelRelayEnabled: true, gotifyAddress: 'notify.test', hasGotifyToken: true, notificationsReady: true,
   notifyScriptResults: true, notifyDnsChanges: false, updatedAt: '2026-11-10T00:00:00Z',
 };
 type Element = ReactElement<{ children?: unknown; label?: string; checked?: boolean; onChange?: (value: boolean) => void; onClear?: () => void; onClick?: () => void; onSubmit?: (event: FormEvent) => void }>;

@@ -9,6 +9,7 @@ import { createLogger } from '../../lib/logger.js';
 import { listChecks, summarizeChecks } from './checks.js';
 import { createDnsService, type DnsService } from './service.js';
 import { saveSettings } from './settings.js';
+import { saveAppSettings } from '../notifications/settings.js';
 import { DnsFailureError, type DnsProvider } from './types.js';
 
 const logger = createLogger({ level: 'silent', pretty: false });
@@ -550,5 +551,27 @@ test('forwards the saved interface to local detection and clears its cache when 
     expect(h.service.state().ipv6).toBeNull();
     await h.service.update('scheduled');
     expect(h.detectLocal).toHaveBeenLastCalledWith('wlp2s0', undefined);
+  } finally { h.db.close(); }
+});
+
+test('disabling DNS prevents an in-flight query from writing and queued runs from starting', async () => {
+  let release!: (value: DnsRecord) => void;
+  const queried = new Promise<DnsRecord>((resolve) => { release = resolve; });
+  const h = setup({ provider: { getRecord: () => queried } });
+  try {
+    h.save();
+    const running = h.service.update('manual');
+    await flush();
+    expect(h.provider.getRecord).toHaveBeenCalledTimes(1);
+    const queued = h.service.update('scheduled');
+    const refused = Promise.all([
+      expect(running).rejects.toMatchObject({ code: 'feature_disabled' }),
+      expect(queued).rejects.toMatchObject({ code: 'feature_disabled' }),
+    ]);
+    saveAppSettings(h.db, h.box, { dnsEnabled: false });
+    release(EXISTING);
+    await refused;
+    expect(h.provider.setIpv6).not.toHaveBeenCalled();
+    expect(h.detect).toHaveBeenCalledTimes(1);
   } finally { h.db.close(); }
 });

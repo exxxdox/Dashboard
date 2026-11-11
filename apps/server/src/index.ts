@@ -21,6 +21,7 @@ import { createDnsScheduler } from './services/dns/scheduler.js';
 import { createDnsService, type DnsService } from './services/dns/service.js';
 import { resolveSettings } from './services/dns/settings.js';
 import { createExecutionService, type ExecutionService } from './services/executions.js';
+import { getAppSettingsView } from './services/notifications/settings.js';
 import { createNotificationService } from './services/notifications/service.js';
 import { createScriptScheduleService } from './services/script-schedules.js';
 import { createExecutionHub } from './ws/hub.js';
@@ -155,7 +156,7 @@ async function main(): Promise<void> {
     const stored = resolveSettings(db, box);
     if (stored) {
       dnsScheduler.configure({
-        scheduleEnabled: stored.scheduleEnabled,
+        scheduleEnabled: stored.scheduleEnabled && getAppSettingsView(db).dnsEnabled,
         intervalMinutes: stored.intervalMinutes,
       });
     }

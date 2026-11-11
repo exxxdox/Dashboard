@@ -15,6 +15,7 @@
 import type { FastifyInstance } from 'fastify';
 import { testNotificationSchema, updateAppSettingsSchema } from '@dashboard/shared';
 
+import { getSettingsView } from '../services/dns/settings.js';
 import type { AppContext } from '../context.js';
 
 export function registerSettingsRoutes(app: FastifyInstance, ctx: AppContext): void {
@@ -22,9 +23,19 @@ export function registerSettingsRoutes(app: FastifyInstance, ctx: AppContext): v
 
   app.get('/api/settings', () => notifications.state());
 
-  app.patch('/api/settings', (request) =>
-    notifications.saveSettings(updateAppSettingsSchema.parse(request.body)),
-  );
+  app.patch('/api/settings', (request) => {
+    const input = updateAppSettingsSchema.parse(request.body);
+    const settings = notifications.saveSettings(input);
+    if (input.dnsEnabled !== undefined) {
+      // Preserve the DNS schedule preference so re-enabling restores its previous cadence.
+      const dnsSettings = getSettingsView(ctx.db);
+      ctx.dnsScheduler.configure({
+        scheduleEnabled: settings.dnsEnabled && (dnsSettings?.scheduleEnabled ?? false),
+        intervalMinutes: dnsSettings?.intervalMinutes ?? 5,
+      });
+    }
+    return settings;
+  });
 
   app.post('/api/settings/notification-test', (request) =>
     notifications.test(testNotificationSchema.parse(request.body)),

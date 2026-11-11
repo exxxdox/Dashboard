@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { AppShell, PageBody } from './components/AppShell';
 import { PageHeader } from './components/PageHeader';
-import { EmptyState } from './components/Feedback';
+import { EmptyState, ErrorBanner, LoadingBlock } from './components/Feedback';
 import { Button } from './components/Button';
 import { Toaster } from './components/Toaster';
 import { useRoute, navigate } from './lib/router';
@@ -17,9 +17,9 @@ import { DnsPage } from './pages/DnsPage';
 import { ModelRelayPage } from './model-relay/ModelRelayPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SignInPage } from './pages/SignInPage';
-import { useAuthStatus } from './api/queries';
-import { UNAUTHORIZED_EVENT } from './api/client';
-import { useT } from './lib/i18n';
+import { useAppSettings, useAuthStatus } from './api/queries';
+import { errorMessage, UNAUTHORIZED_EVENT } from './api/client';
+import { useI18n } from './lib/i18n';
 
 export function App() {
   const route = useRoute();
@@ -74,7 +74,25 @@ function PointerLight() {
 }
 
 function RouteView({ route }: { route: ReturnType<typeof useRoute> }) {
-  const t = useT();
+  const i18n = useI18n();
+  const { t } = i18n;
+  const settings = useAppSettings();
+  const featureRoute = route.name === 'dns' || route.name === 'modelRelay';
+  // Guard bookmarked routes too, before mounting a page that would issue requests.
+  if (featureRoute && !settings.data) {
+    return <PageBody>{settings.isError
+      ? <ErrorBanner message={errorMessage(settings.error, i18n)} onRetry={() => void settings.refetch()} />
+      : <LoadingBlock label={t('common.loading')} />}</PageBody>;
+  }
+  if ((route.name === 'dns' && !settings.data?.dnsEnabled) ||
+      (route.name === 'modelRelay' && !settings.data?.modelRelayEnabled)) {
+    return (
+      <PageBody>
+        <EmptyState title={t('settings.features.disabled')} description={t('settings.features.disabledHint')}
+          action={<Button onClick={() => navigate('/settings')}>{t('nav.settings')}</Button>} />
+      </PageBody>
+    );
+  }
 
   switch (route.name) {
     case 'overview':

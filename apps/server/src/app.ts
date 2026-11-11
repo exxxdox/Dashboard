@@ -13,6 +13,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyError, type FastifyInstanc
 import { ZodError } from 'zod';
 
 import type { AppContext } from './context.js';
+import { getAppSettingsView } from './services/notifications/settings.js';
 import { SCHEMA_VERSION } from './db/schema.js';
 import { AppError } from './lib/errors.js';
 import { isSecureRequest, registerAuthRoutes, setSessionCookie } from './routes/auth.js';
@@ -161,6 +162,22 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerAuthRoutes(app, ctx);
 
   if (ctx.auth.enabled) installAuthGuard(app, ctx);
+
+  // Gate before parsing bodies or opening the lazy MCP database, including existing MCP sessions.
+  app.addHook('onRequest', async (request) => {
+    const path = request.url.split('?')[0] ?? '';
+    // Fastify can match percent-encoded static paths; include its canonical route to prevent bypasses.
+    const paths = [path, request.routeOptions.url ?? ''];
+    const dnsPath = paths.some((value) => value === '/api/dns' || value.startsWith('/api/dns/'));
+    const relayPath = paths.some((value) => value === '/api/model-relay' || value.startsWith('/api/model-relay/') ||
+      value === '/mcp' || value.startsWith('/mcp/'));
+    if (!dnsPath && !relayPath) return;
+    const settings = getAppSettingsView(ctx.db);
+    if ((dnsPath && !settings.dnsEnabled) || (relayPath && !settings.modelRelayEnabled)) {
+      throw new AppError('This feature is disabled in settings', 503, 'feature_disabled', undefined,
+        { key: 'error.featureDisabled' });
+    }
+  });
 
   app.get('/api/health', () => ({
     status: 'ok' as const,

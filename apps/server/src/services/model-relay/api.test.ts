@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'vitest';
+import { openDatabase } from '../../db/client.js';
 import { buildApp } from '../../app.js';
 import { loadConfig } from '../../config.js';
 import type { AppContext } from '../../context.js';
@@ -24,7 +25,9 @@ type AdminApiHarness = {
 
 /** 用真实 HTTP 栈验证管理 API 契约：路由是否还在、返回体是否带只读定义。 */
 async function startAdminApi(directory: string): Promise<AdminApiHarness> {
+  const db = openDatabase(':memory:');
   const ctx = {
+    db,
     config: loadConfig({ DATA_DIR: directory, SERVE_WEB: 'false' }),
     logger: createLogger({ level: 'silent', pretty: false }),
     auth: createAuthenticator({}),
@@ -45,7 +48,7 @@ async function startAdminApi(directory: string): Promise<AdminApiHarness> {
         headers: { 'content-type': String(response.headers['content-type'] ?? '') },
       });
     },
-    close: () => app.close(),
+    close: async () => { await app.close(); db.close(); },
   };
 }
 

@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 12;
+const TARGET_VERSION = 13;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -387,6 +387,13 @@ export const MIGRATIONS: Migration[] = [
   // v12 -- historical runs had no terminal; opt-in avoids changing unattended execution.
   (db) => {
     db.exec('ALTER TABLE executions ADD COLUMN interactive INTEGER NOT NULL DEFAULT 0 CHECK (interactive IN (0, 1))');
+  },
+  // v13 -- keep existing installs enabled while making feature availability persistent.
+  (db) => {
+    db.exec(`
+      ALTER TABLE app_settings ADD COLUMN dns_enabled INTEGER NOT NULL DEFAULT 1 CHECK (dns_enabled IN (0, 1));
+      ALTER TABLE app_settings ADD COLUMN model_relay_enabled INTEGER NOT NULL DEFAULT 1 CHECK (model_relay_enabled IN (0, 1));
+    `);
   },
 ];
 

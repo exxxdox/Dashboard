@@ -37,6 +37,8 @@ describe('settings', () => {
       // Never null, unlike the DNS settings: the settings page always renders a
       // form, so `updatedAt` is what says nothing has been saved yet.
       expect(h.service.state()).toEqual({
+        dnsEnabled: true,
+        modelRelayEnabled: true,
         gotifyAddress: '',
         hasGotifyToken: false,
         notificationsReady: false,

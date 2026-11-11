@@ -22,6 +22,7 @@ import { createLogger } from '../lib/logger.js';
 import { createDnsScheduler } from '../services/dns/scheduler.js';
 import { createDnsService, type DnsService } from '../services/dns/service.js';
 import { readSettingsRow, saveSettings } from '../services/dns/settings.js';
+import { createNotificationService } from '../services/notifications/service.js';
 import { DnsFailureError, type DnsProvider } from '../services/dns/types.js';
 
 const logger = createLogger({ level: 'silent', pretty: false });
@@ -60,6 +61,7 @@ type Harness = {
   db: Db;
   box: SecretBox;
   app: Awaited<ReturnType<typeof buildApp>>;
+  scheduler: ReturnType<typeof createDnsScheduler>;
   cookie: () => string;
   close: () => Promise<void>;
 };
@@ -106,6 +108,7 @@ async function harness(overrides: { provider?: Partial<DnsProvider> } = {}): Pro
     loginThrottle: { isLocked: () => false, recordFailure: () => {}, reset: () => {} },
     dns,
     dnsScheduler,
+    notifications: createNotificationService({ db, box }),
     isShuttingDown: () => false,
   } as unknown as AppContext;
 
@@ -115,8 +118,10 @@ async function harness(overrides: { provider?: Partial<DnsProvider> } = {}): Pro
     db,
     box,
     app,
+    scheduler: dnsScheduler,
     cookie: () => `${SESSION_COOKIE}=${auth.issue(Date.now()).value}`,
     close: async () => {
+      dnsScheduler.stop();
       await app.close();
       db.close();
     },
@@ -291,5 +296,46 @@ test('saves the IPv6 source through HTTP and uses it for detection and updates',
       payload: { ipv6Source: 'auto' } });
     expect(invalid.statusCode).toBe(422);
     expect(readSettingsRow(h.db)?.ipv6_source).toBe('local');
+  } finally { await h.close(); }
+});
+
+test('feature switches persist and block all feature endpoints while preserving DNS settings', async () => {
+  const h = await harness();
+  try {
+    const headers = { cookie: h.cookie() };
+    const defaults = await h.app.inject({ method: 'GET', url: '/api/settings', headers });
+    expect(defaults.json()).toMatchObject({ dnsEnabled: true, modelRelayEnabled: true });
+    saveSettings(h.db, h.box, { ...CLOUDFLARE, scheduleEnabled: true });
+    const disabled = await h.app.inject({ method: 'PATCH', url: '/api/settings', headers,
+      payload: { dnsEnabled: false, modelRelayEnabled: false } });
+    expect(disabled.statusCode).toBe(200);
+    expect(h.scheduler.snapshot()).toMatchObject({ enabled: false, nextRunAt: null });
+    expect(disabled.json()).toMatchObject({ dnsEnabled: false, modelRelayEnabled: false });
+    for (const route of [...PROTECTED, { method: 'GET' as const, url: '/api/model-relay/health' },
+      { method: 'POST' as const, url: '/mcp', payload: {} },
+      { method: 'GET' as const, url: '/mcp/session' }]) {
+      const response = await h.app.inject({ ...route, headers });
+      expect(response.statusCode, route.url).toBe(503);
+      expect(response.json()).toMatchObject({ error: { code: 'feature_disabled' } });
+    }
+    for (const url of ['/api/%64ns', '/api/model-relay/%68ealth', '/%6dcp', '/api/dns/']) {
+      const response = await h.app.inject({ method: 'GET', url, headers });
+      expect([503, 404], url).toContain(response.statusCode);
+    }
+    const after = await h.app.inject({ method: 'GET', url: '/api/settings', headers });
+    const unrelatedSave = await h.app.inject({ method: 'PATCH', url: '/api/settings', headers, payload: { notifyDnsChanges: false } });
+    expect(unrelatedSave.json()).toMatchObject({ dnsEnabled: false, modelRelayEnabled: false });
+    expect(after.json()).toMatchObject({ dnsEnabled: false, modelRelayEnabled: false });
+    expect(readSettingsRow(h.db)?.schedule_enabled).toBe(1);
+    const enabled = await h.app.inject({ method: 'PATCH', url: '/api/settings', headers,
+      payload: { dnsEnabled: true } });
+    expect(enabled.statusCode).toBe(200);
+    const state = await h.app.inject({ method: 'GET', url: '/api/dns', headers });
+    expect(state.statusCode).toBe(200);
+    expect(state.json()).toMatchObject({ schedule: { enabled: true }, settings: { scheduleEnabled: true } });
+    await h.app.inject({ method: 'PATCH', url: '/api/settings', headers, payload: { dnsEnabled: false } });
+    const invalid = await h.app.inject({ method: 'PATCH', url: '/api/settings', headers,
+      payload: { dnsEnabled: 'yes' } });
+    expect(invalid.statusCode).toBe(422);
   } finally { await h.close(); }
 });

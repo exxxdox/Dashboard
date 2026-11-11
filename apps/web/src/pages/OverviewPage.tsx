@@ -15,7 +15,7 @@ import { Button } from '../components/Button';
 import { EmptyState, ErrorBanner, LoadingRows } from '../components/Feedback';
 import { ExecutionStatusLabel } from '../components/StatusDot';
 import { errorMessage } from '../api/client';
-import { useOverview } from '../api/queries';
+import { useAppSettings, useOverview } from '../api/queries';
 import { useI18n, useT } from '../lib/i18n';
 import { href, navigate } from '../lib/router';
 import { formatDuration, formatRelative, runTag } from '../lib/format';
@@ -33,6 +33,7 @@ export function OverviewPage() {
   const i18n = useI18n();
   const { t } = i18n;
   const overview = useOverview();
+  const settings = useAppSettings();
 
   if (overview.isError) {
     return (
@@ -128,7 +129,8 @@ export function OverviewPage() {
             })}
       </div>
 
-      <DnsTile dns={overview.data?.dns} pending={overview.isPending} />
+      {/* The home entry follows the same feature switch as the navigation. */}
+      {settings.data?.dnsEnabled && <DnsTile dns={overview.data?.dns} pending={overview.isPending} />}
 
       {/* Stretch cards and share their available height between recent rows to avoid bottom whitespace. */}
       <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
