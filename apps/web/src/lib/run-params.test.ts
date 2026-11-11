@@ -73,7 +73,7 @@ describe('validateRows', () => {
 
   it('refuses a name that is not a shell variable', () => {
     expect(validateRows(rows(['A; rm -rf /', 'x']), DECLARED, t)).toEqual({
-      'row-0': 'Not a valid parameter name',
+      'row-0': 'Not a valid environment variable name',
     });
   });
 
