@@ -88,3 +88,11 @@
 `docker.sh --only-registry` 在更新镜像仓库配置后会重启 Docker 服务。如果 Dashboard 容器部署在同一目标主机上，Docker 重启可能同时中断 Dashboard、SSH 连接和终端会话。浏览器重连可以恢复已保存的输出与最终状态，跨 Dashboard 重启的远程 PTY 续接仍不受支持。排查时先核对本次运行的退出码、最终状态和最后输出。
 
 本次验证覆盖真实 SSH/PTY 下嵌套 Bash 进程替换、两轮方向键菜单及后续文字输入，浏览器覆盖终端 Esc、等待输入时重连、断线期间结束、成功与失败退出码、超时，以及 Dashboard 进程重启后的中断状态。安装脚本本身的配置写入和 Docker 服务重启需在实际目标环境中核实。
+
+## 终端内查找、链接与字符宽度
+
+浏览器自带的 Ctrl+F 无法搜索 xterm 自绘的缓冲区，因此终端使用官方 `@xterm/addon-search` 提供查找：工具栏的搜索按钮或 `Ctrl+Shift+F` 打开输入框，Enter / Shift+Enter 切换下一个和上一个，Esc 仅关闭搜索并交回终端焦点；匹配高亮读取主题 token，并在输入框右侧显示当前序号和总数。搜索范围是本地缓冲区，即已回放的历史加上实时输出，不包含服务端因 `MAX_LOG_BYTES` 已丢弃的部分。
+
+链接使用 `@xterm/addon-web-links` 识别输出中的 URL。输出由脚本控制，因此只有 `http(s)` 会被打开，并使用 `noopener,noreferrer` 打开新标签页；其他协议忽略。
+
+字符宽度使用 `@xterm/addon-unicode11`，解决中文、emoji 与 Powerline 字符的列宽错位。三项都在终端创建时加载，卸载时随 `terminal.dispose()` 一并释放。渲染器仍为 xterm 默认的 DOM 渲染器，达到性能瓶颈时再评估 WebGL，当前不预先引入。

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
+import { Unicode11Addon } from '@xterm/addon-unicode11';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import type {
   ExecutionLogChunk,
   ExecutionStream as StreamKind,
@@ -10,7 +14,8 @@ import type {
 import '@xterm/xterm/css/xterm.css';
 import { useExecutionStream } from '../api/useExecutionStream';
 import { executionSocket } from '../api/ws';
-import { Button } from '../components/Button';
+import { Button, IconButton } from '../components/Button';
+import { TextInput } from '../components/Form';
 import { useI18n } from '../lib/i18n';
 import { formatExit } from '../lib/format';
 import { executionStatusLabel } from '../lib/status';
@@ -86,6 +91,28 @@ function chromeTheme() {
 }
 
 /**
+ * Match highlights are the page's, so they come from the same tokens as the
+ * chrome. The addon requires plain `#rrggbb` (it hands them to a canvas), so a
+ * token that is not one falls back rather than being passed through.
+ */
+function searchDecorations() {
+  const hex = (name: string, fallback: string): string => {
+    const value = token(name, fallback);
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+  };
+  const accent = hex('--accent', '#2ee6ff');
+  const secondary = hex('--accent-2', '#a855f7');
+  return {
+    matchBackground: hex('--surface-4', '#1f2f44'),
+    matchBorder: secondary,
+    matchOverviewRuler: secondary,
+    activeMatchBackground: accent,
+    activeMatchBorder: hex('--accent-ink', '#032027'),
+    activeMatchColorOverviewRuler: accent,
+  };
+}
+
+/**
  * Mark our own interpretation of a stream with 256-colour codes rather than the
  * basic 30–37 range, so a chunk the script coloured itself stays distinguishable
  * from a chunk we coloured.
@@ -120,6 +147,8 @@ export function RunTerminal({
   const { t } = useI18n();
   const hostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const disposedRef = useRef(false);
   const modeRef = useRef({ interactive, live });
   modeRef.current = { interactive, live };
@@ -132,6 +161,9 @@ export function RunTerminal({
   const [syncing, setSyncing] = useState(true);
   const [connected, setConnected] = useState(connectedRef.current);
   const [inputError, setInputError] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<{ index: number; count: number } | null>(null);
 
   function canInput(): boolean {
     return modeRef.current.interactive && modeRef.current.live && connectedRef.current
@@ -165,6 +197,35 @@ export function RunTerminal({
     } else setInputError(false);
   }
 
+  function find(direction: 'next' | 'previous'): void {
+    const addon = searchAddonRef.current;
+    if (!addon || searchTerm === '') return;
+    const options = { decorations: searchDecorations() };
+    if (direction === 'next') addon.findNext(searchTerm, options);
+    else addon.findPrevious(searchTerm, options);
+  }
+
+  function changeSearchTerm(value: string): void {
+    setSearchTerm(value);
+    const addon = searchAddonRef.current;
+    // Clearing the box must also clear the highlight: an empty term leaves the
+    // addon's previous decorations behind.
+    if (!addon) return;
+    if (value === '') {
+      addon.clearDecorations();
+      setSearchResults(null);
+      return;
+    }
+    addon.findNext(value, { incremental: true, decorations: searchDecorations() });
+  }
+
+  function closeSearch(): void {
+    setSearchOpen(false);
+    searchAddonRef.current?.clearDecorations();
+    setSearchResults(null);
+    terminalRef.current?.focus();
+  }
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -180,8 +241,32 @@ export function RunTerminal({
     terminal.open(host);
     fit.fit();
     terminalRef.current = terminal;
+    // Search covers the local buffer (live output plus the replay window), not
+    // output the server already dropped at MAX_LOG_BYTES.
+    const search = new SearchAddon();
+    terminal.loadAddon(search);
+    searchAddonRef.current = search;
+    const results = search.onDidChangeResults(({ resultIndex, resultCount }) => {
+      setSearchResults({ index: resultIndex, count: resultCount });
+    });
+    terminal.loadAddon(new Unicode11Addon());
+    terminal.unicode.activeVersion = '11';
+    terminal.loadAddon(new WebLinksAddon((_event, uri) => {
+      // Output is script-controlled; the browser must not navigate to anything
+      // but a normal web page, and the new tab must not keep an opener handle.
+      if (/^https?:\/\//i.test(uri)) window.open(uri, '_blank', 'noopener,noreferrer');
+    }));
     const keyboard = terminal.onData(sendInput);
     const dimensions = terminal.onResize(resize);
+    // The browser's own find bar cannot reach xterm's buffer; take the shortcut
+    // before it becomes bytes for the script.
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type === 'keydown' && event.ctrlKey && event.shiftKey && event.code === 'KeyF') {
+        setSearchOpen(true);
+        return false;
+      }
+      return true;
+    });
     const unwatch = executionSocket.onStateChange((state) => {
       connectedRef.current = state === 'open';
       setConnected(connectedRef.current);
@@ -203,13 +288,17 @@ export function RunTerminal({
     return () => {
       disposedRef.current = true;
       if (interactive) executionSocket.sendTerminal({ type: 'terminal_release', executionId });
-      keyboard.dispose(); dimensions.dispose(); unwatch();
+      keyboard.dispose(); dimensions.dispose(); results.dispose(); unwatch();
       cancelAnimationFrame(frame); observer.disconnect(); terminal.dispose();
       terminalRef.current = null;
+      searchAddonRef.current = null;
     };
   }, [executionId, interactive]);
 
   useEffect(() => { updateInput(); }, [live]);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
 
   useExecutionStream({
     executionId, live, onStatus,
@@ -251,30 +340,72 @@ export function RunTerminal({
     controlling: 'runs.terminal.controlling', busy: 'runs.terminal.busy', closed: 'runs.terminal.closed',
     offline: 'runs.terminal.offline', restoring: 'runs.terminal.restoring',
   } as const;
+  const searchLabel = !searchResults ? ''
+    : searchResults.count === 0 ? t('runs.terminal.searchNoResults')
+      : searchResults.index >= 0 ? `${searchResults.index + 1}/${searchResults.count}`
+        : `${searchResults.count}`;
   return (
     <div className="scanlines border-line bg-base shadow-card relative overflow-hidden rounded-xl border">
-      {interactive ? (
-        <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
-          <span role="status" className="text-mute text-meta mr-auto">{!live && execution
-            ? t('runs.terminal.finished', { status: executionStatusLabel(t, execution.status), exit: formatExit(execution.exitCode, execution.signal) })
-            : t(statusKey[status])}</span>
-          {owner === 'controlling' ? (
-            <Button size="sm" disabled={!connected || !live} onClick={() => {
-              wantsControlRef.current = false;
-              ownerRef.current = 'available'; setOwner('available'); updateInput();
-              executionSocket.sendTerminal({ type: 'terminal_release', executionId });
-            }}>{t('runs.terminal.release')}</Button>
-          ) : (
-            <Button size="sm" disabled={!connected || !live || syncing} onClick={claim}>{t('runs.terminal.claim')}</Button>
-          )}
-          <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x03')}>{t('runs.terminal.interrupt')}</Button>
-          <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x04')}>{t('runs.terminal.eof')}</Button>
-          {!live && execution?.status === 'interrupted' ? (
-            <p className="text-mute text-meta w-full">{t('runs.terminal.interruptedHint')}</p>
-          ) : null}
-          {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
-        </div>
-      ) : null}
+      <div className="border-line flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        {interactive ? (
+          <>
+            <span role="status" className="text-mute text-meta mr-auto">{!live && execution
+              ? t('runs.terminal.finished', { status: executionStatusLabel(t, execution.status), exit: formatExit(execution.exitCode, execution.signal) })
+              : t(statusKey[status])}</span>
+            {owner === 'controlling' ? (
+              <Button size="sm" disabled={!connected || !live} onClick={() => {
+                wantsControlRef.current = false;
+                ownerRef.current = 'available'; setOwner('available'); updateInput();
+                executionSocket.sendTerminal({ type: 'terminal_release', executionId });
+              }}>{t('runs.terminal.release')}</Button>
+            ) : (
+              <Button size="sm" disabled={!connected || !live || syncing} onClick={claim}>{t('runs.terminal.claim')}</Button>
+            )}
+            <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x03')}>{t('runs.terminal.interrupt')}</Button>
+            <Button size="sm" disabled={!enabled} onClick={() => sendInput('\x04')}>{t('runs.terminal.eof')}</Button>
+          </>
+        ) : <span className="mr-auto" />}
+        {searchOpen ? (
+          <div className="flex items-center gap-1.5">
+            <TextInput
+              ref={searchInputRef}
+              value={searchTerm}
+              aria-label={t('runs.terminal.search')}
+              placeholder={t('runs.terminal.searchPlaceholder')}
+              onChange={(event) => changeSearchTerm(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeSearch();
+                } else if (event.key === 'Enter') {
+                  event.preventDefault();
+                  find(event.shiftKey ? 'previous' : 'next');
+                }
+              }}
+              className="h-10 w-56 py-0 text-meta"
+            />
+            <span aria-live="polite" className="text-mute text-meta min-w-14 text-center tabular-nums">{searchLabel}</span>
+            <IconButton label={t('runs.terminal.searchPrevious')} onClick={() => find('previous')}>
+              <ChevronUp className="size-4" aria-hidden />
+            </IconButton>
+            <IconButton label={t('runs.terminal.searchNext')} onClick={() => find('next')}>
+              <ChevronDown className="size-4" aria-hidden />
+            </IconButton>
+            <IconButton label={t('runs.terminal.searchClose')} onClick={closeSearch}>
+              <X className="size-4" aria-hidden />
+            </IconButton>
+          </div>
+        ) : (
+          <IconButton label={t('runs.terminal.search')} onClick={() => setSearchOpen(true)}>
+            <Search className="size-4" aria-hidden />
+          </IconButton>
+        )}
+        {!live && execution?.status === 'interrupted' ? (
+          <p className="text-mute text-meta w-full">{t('runs.terminal.interruptedHint')}</p>
+        ) : null}
+        {inputError ? <p role="alert" className="text-danger text-meta w-full">{t('runs.terminal.inputError')}</p> : null}
+      </div>
       <div ref={hostRef} aria-label={interactive ? t('runs.terminal.label') : undefined}
         className="h-[clamp(320px,58vh,780px)] w-full px-4 py-3" />
     </div>

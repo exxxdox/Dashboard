@@ -12,7 +12,18 @@ const harness = vi.hoisted(() => ({
   resize: undefined as (() => void) | undefined,
   frame: undefined as (() => void) | undefined,
   data: undefined as ((data: string) => void) | undefined,
-  terminal: { options: { disableStdin: true }, cols: 80, rows: 24, onData: vi.fn(), onResize: vi.fn(), open: vi.fn(), loadAddon: vi.fn(), write: vi.fn(), dispose: vi.fn() },
+  terminal: {
+    options: { disableStdin: true }, cols: 80, rows: 24, unicode: { activeVersion: '' },
+    onData: vi.fn(), onResize: vi.fn(), open: vi.fn(), loadAddon: vi.fn(), write: vi.fn(),
+    dispose: vi.fn(), attachCustomKeyEventHandler: vi.fn(),
+  },
+  search: {
+    findNext: vi.fn(), findPrevious: vi.fn(), clearDecorations: vi.fn(),
+    onDidChangeResults: vi.fn(() => ({ dispose: vi.fn() })),
+  },
+  links: {},
+  unicode: {},
+  link: undefined as ((event: MouseEvent, uri: string) => void) | undefined,
   fit: vi.fn(), observe: vi.fn(), disconnect: vi.fn(), cancelFrame: vi.fn(),
   construct: vi.fn(), send: vi.fn(), state: 'open', onState: vi.fn(),
 }));
@@ -33,6 +44,12 @@ vi.mock('@xterm/xterm', () => ({ Terminal: vi.fn(function (options: unknown) {
   return harness.terminal;
 }) }));
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: vi.fn(function () { return { fit: harness.fit }; }) }));
+vi.mock('@xterm/addon-search', () => ({ SearchAddon: vi.fn(function () { return harness.search; }) }));
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: vi.fn(function (handler: (event: MouseEvent, uri: string) => void) {
+  harness.link = handler;
+  return harness.links;
+}) }));
+vi.mock('@xterm/addon-unicode11', () => ({ Unicode11Addon: vi.fn(function () { return harness.unicode; }) }));
 vi.mock('../api/useExecutionStream', () => ({ useExecutionStream: (options: ExecutionStreamOptions) => {
   harness.stream = options;
 } }));
@@ -40,7 +57,7 @@ vi.mock('../api/useExecutionStream', () => ({ useExecutionStream: (options: Exec
 beforeEach(() => {
   vi.clearAllMocks();
   harness.refs = []; harness.effects = []; harness.stream = undefined;
-  harness.resize = undefined; harness.frame = undefined;
+  harness.resize = undefined; harness.frame = undefined; harness.link = undefined;
   harness.fit.mockReset();
   harness.send.mockReturnValue(true);
   harness.onState.mockReturnValue(() => {});
@@ -158,4 +175,42 @@ test.each(['succeeded', 'failed', 'timed_out', 'interrupted', 'canceled'] as con
   expect(html).toContain(status === 'timed_out' ? 'runs.status.timedOut' : `runs.status.${status}`);
   expect(html).toContain(status === 'succeeded' ? '0' : '7');
   if (status === 'interrupted') expect(html).toContain('runs.terminal.interruptedHint');
+});
+
+test('loads output search, link detection and Unicode 11 width handling', () => {
+  const cleanup = mount();
+  const loaded = harness.terminal.loadAddon.mock.calls.map((call) => call[0]);
+  expect(loaded).toContain(harness.search);
+  expect(loaded).toContain(harness.links);
+  expect(loaded).toContain(harness.unicode);
+  expect(harness.terminal.unicode.activeVersion).toBe('11');
+  expect(harness.search.onDidChangeResults).toHaveBeenCalledOnce();
+  cleanup();
+});
+
+test('only opens http(s) links from terminal output', () => {
+  const open = vi.fn();
+  vi.stubGlobal('window', { open });
+  const cleanup = mount();
+  harness.link!({} as MouseEvent, 'javascript:alert(1)');
+  harness.link!({} as MouseEvent, 'file:///etc/passwd');
+  expect(open).not.toHaveBeenCalled();
+  harness.link!({} as MouseEvent, 'https://example.com/docs');
+  expect(open).toHaveBeenCalledWith('https://example.com/docs', '_blank', 'noopener,noreferrer');
+  cleanup();
+});
+
+test('Ctrl+Shift+F opens search instead of reaching the script', () => {
+  const cleanup = mount(true, vi.fn(), true);
+  const handler = harness.terminal.attachCustomKeyEventHandler.mock.calls[0]![0] as (event: KeyboardEvent) => boolean;
+  expect(handler({ type: 'keydown', ctrlKey: true, shiftKey: true, code: 'KeyF' } as KeyboardEvent)).toBe(false);
+  expect(handler({ type: 'keydown', ctrlKey: true, shiftKey: false, code: 'KeyF' } as KeyboardEvent)).toBe(true);
+  expect(handler({ type: 'keyup', ctrlKey: true, shiftKey: true, code: 'KeyF' } as KeyboardEvent)).toBe(true);
+  cleanup();
+});
+
+test('offers search on a finished run that never accepted input', () => {
+  const execution = { status: 'succeeded', exitCode: 0, signal: null, errorMessage: null } as ExecutionSummary;
+  const html = renderToStaticMarkup(RunTerminal({ executionId: 'run', live: false, execution }));
+  expect(html).toContain('runs.terminal.search');
 });

@@ -26,6 +26,12 @@ const en = {
   'runs.terminal.eof': 'Send Ctrl+D',
   'runs.terminal.inputError': 'Input could not be sent. It was not retried.',
   'runs.terminal.label': 'Interactive script terminal',
+  'runs.terminal.search': 'Search output',
+  'runs.terminal.searchPlaceholder': 'Search output…',
+  'runs.terminal.searchPrevious': 'Previous match',
+  'runs.terminal.searchNext': 'Next match',
+  'runs.terminal.searchClose': 'Close search',
+  'runs.terminal.searchNoResults': 'No matches',
 
   // -- execution status labels, produced by `lib/status.ts` ----------------
   'runs.status.queued': 'Queued',
@@ -173,6 +179,12 @@ const zh: Record<keyof typeof en, string> = {
   'runs.terminal.eof': '发送 Ctrl+D',
   'runs.terminal.inputError': '输入未能发送，未自动重试。',
   'runs.terminal.label': '脚本交互终端',
+  'runs.terminal.search': '搜索输出',
+  'runs.terminal.searchPlaceholder': '搜索输出…',
+  'runs.terminal.searchPrevious': '上一个匹配',
+  'runs.terminal.searchNext': '下一个匹配',
+  'runs.terminal.searchClose': '关闭搜索',
+  'runs.terminal.searchNoResults': '无匹配',
 
   'runs.status.queued': '排队中',
   'runs.status.running': '运行中',
