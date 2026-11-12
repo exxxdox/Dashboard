@@ -57,7 +57,7 @@ function PromptMark({ className }: { className?: string }) {
   const rimId = useId();
 
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden focusable="false">
+    <svg viewBox="0 0 40 32" className={className} aria-hidden focusable="false">
       <defs>
         <linearGradient id={rimId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="var(--accent)" />
@@ -68,7 +68,7 @@ function PromptMark({ className }: { className?: string }) {
       <rect
         x="1"
         y="1"
-        width="30"
+        width="38"
         height="30"
         rx="6.5"
         fill="var(--surface-2)"
@@ -76,7 +76,7 @@ function PromptMark({ className }: { className?: string }) {
         strokeWidth="2"
       />
       <path
-        d="M9.5 10.5 15 16 9.5 21.5"
+        d="M13.5 10.5 19 16 13.5 21.5"
         fill="none"
         stroke="var(--accent)"
         strokeWidth="3.4"
@@ -84,7 +84,7 @@ function PromptMark({ className }: { className?: string }) {
         strokeLinejoin="round"
       />
       <path
-        d="M17.5 21.5H23"
+        d="M21.5 21.5H27"
         fill="none"
         stroke="var(--accent)"
         strokeWidth="3.4"
