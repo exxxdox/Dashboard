@@ -7,9 +7,9 @@ import { cn } from '../lib/cn';
  *
  * What it replaced was two words in the mono face -- "script" greyed out beside
  * "dashboard" -- which described the software instead of naming it, and read as
- * a sentence the reader had to finish. This is one word, and a mark whose arc
- * is the shape the product is actually about: a dial with its needle resting
- * high, which is what a dashboard is for.
+ * a sentence the reader had to finish. This is one word, and a mark that is the
+ * shell prompt the product runs: the same tile and glyph as `public/favicon.svg`,
+ * so the browser tab and the rail name the product with one identity.
  *
  * The lettering is a gradient from the ink colour into the accent, so the word
  * arrives as one object rather than as two halves of a compound noun.
@@ -25,7 +25,7 @@ export function Wordmark({
 
   return (
     <span className={cn('flex items-center', hero ? 'gap-4' : 'gap-3', className)}>
-      <GaugeMark className={cn('mark-glow shrink-0', hero ? 'size-14' : 'size-9')} />
+      <PromptMark className={cn('mark-glow shrink-0', hero ? 'size-14' : 'size-9')} />
       <span
         className={cn(
           'from-ink to-accent bg-linear-to-r bg-clip-text font-semibold text-transparent',
@@ -40,49 +40,42 @@ export function Wordmark({
 }
 
 /**
- * A dial, open at the bottom, with its needle near the top.
+ * A shell prompt on the accent tile: the same geometry as `public/favicon.svg`.
  *
+ * Colours come from CSS variables rather than literals so the mark follows the
+ * theme; the favicon keeps hex copies because an icon file cannot read them.
  * The gradient id is per-instance because the mark appears more than once on a
  * page, and duplicate ids in one document are invalid however harmlessly the
  * browser resolves them.
  */
-function GaugeMark({ className }: { className?: string }) {
-  const rimId = useId();
+function PromptMark({ className }: { className?: string }) {
+  const tileId = useId();
 
   return (
-    <svg viewBox="0 0 40 40" className={className} aria-hidden focusable="false">
+    <svg viewBox="0 0 32 32" className={className} aria-hidden focusable="false">
       <defs>
-        <linearGradient id={rimId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0.85" />
+        <linearGradient id={tileId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="100%" stopColor="var(--accent-2)" />
         </linearGradient>
       </defs>
 
-      <rect
-        x="1"
-        y="1"
-        width="38"
-        height="38"
-        rx="11"
-        fill="var(--surface-2)"
-        stroke={`url(#${rimId})`}
-        strokeWidth="1.5"
+      <rect width="32" height="32" rx="7" fill={`url(#${tileId})`} />
+      <path
+        d="M9.5 10.5 15 16 9.5 21.5"
+        fill="none"
+        stroke="var(--accent-ink)"
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
       <path
-        d="M10 26a10 10 0 0 1 20 0"
+        d="M17.5 21.5H23"
         fill="none"
-        stroke="var(--accent)"
-        strokeWidth="2.5"
+        stroke="var(--accent-ink)"
+        strokeWidth="3.4"
         strokeLinecap="round"
       />
-      <path
-        d="M20 26 27 16.5"
-        fill="none"
-        stroke="var(--text)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <circle cx="20" cy="26" r="2.6" fill="var(--accent)" />
     </svg>
   );
 }
