@@ -2,9 +2,11 @@
   <!-- Solid accent tile rather than a dark glyph: tab strips and bookmark bars
        are mostly light, and a dark-on-dark mark disappears at 16px. The glyph
        is a shell prompt, which is what this app runs. Colours are the theme's
-       accent pair, copied from --accent / --accent-2 / --accent-ink in
-       index.css because an external icon cannot read CSS variables. The same
-       tile and glyph are drawn as the in-page mark in components/Wordmark.tsx. -->
+       accent pair, copied from the accent tokens in index.css because an
+       external icon cannot read CSS variables. The same tile and glyph are
+       drawn as the in-page mark in components/Wordmark.tsx. No double hyphen
+       may appear in this comment: XML forbids it, and the whole icon then
+       fails to parse and renders as nothing. -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#2ee6ff" />
