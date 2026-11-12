@@ -40,7 +40,12 @@ export function Wordmark({
 }
 
 /**
- * A shell prompt on the accent tile: the same geometry as `public/favicon.svg`.
+ * A shell prompt on a dark tile lit by the accent pair: the same geometry as
+ * `public/favicon.svg`.
+ *
+ * The tile stays a theme surface with the accent pair as its light, the way
+ * every card and panel in the app is built; painting the whole square in the
+ * accents made the mark sit on the page instead of in it.
  *
  * Colours come from CSS variables rather than literals so the mark follows the
  * theme; the favicon keeps hex copies because an icon file cannot read them.
@@ -49,22 +54,31 @@ export function Wordmark({
  * browser resolves them.
  */
 function PromptMark({ className }: { className?: string }) {
-  const tileId = useId();
+  const rimId = useId();
 
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden focusable="false">
       <defs>
-        <linearGradient id={tileId} x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={rimId} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="var(--accent)" />
           <stop offset="100%" stopColor="var(--accent-2)" />
         </linearGradient>
       </defs>
 
-      <rect width="32" height="32" rx="7" fill={`url(#${tileId})`} />
+      <rect
+        x="1"
+        y="1"
+        width="30"
+        height="30"
+        rx="6.5"
+        fill="var(--surface-2)"
+        stroke={`url(#${rimId})`}
+        strokeWidth="2"
+      />
       <path
         d="M9.5 10.5 15 16 9.5 21.5"
         fill="none"
-        stroke="var(--accent-ink)"
+        stroke="var(--accent)"
         strokeWidth="3.4"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -72,7 +86,7 @@ function PromptMark({ className }: { className?: string }) {
       <path
         d="M17.5 21.5H23"
         fill="none"
-        stroke="var(--accent-ink)"
+        stroke="var(--accent)"
         strokeWidth="3.4"
         strokeLinecap="round"
       />

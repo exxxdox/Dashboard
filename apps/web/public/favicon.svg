@@ -1,19 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Dashboard">
-  <!-- Solid accent tile rather than a dark glyph: tab strips and bookmark bars
-       are mostly light, and a dark-on-dark mark disappears at 16px. The glyph
-       is a shell prompt, which is what this app runs. Colours are the theme's
-       accent pair, copied from the accent tokens in index.css because an
-       external icon cannot read CSS variables. The same tile and glyph are
-       drawn as the in-page mark in components/Wordmark.tsx. No double hyphen
-       may appear in this comment: XML forbids it, and the whole icon then
-       fails to parse and renders as nothing. -->
+  <!-- The theme's surface with accent light, not a solid accent tile: the app
+       is dark panels lit by a cyan/violet pair, so a fully painted square read
+       as a sticker beside it. A dark tile still shows on a light tab strip
+       because the glyph and rim are the bright part. Colours are copied from
+       the accent and surface tokens in index.css because an external icon
+       cannot read CSS variables. The same tile and glyph are drawn as the
+       in-page mark in components/Wordmark.tsx. No double hyphen may appear in
+       this comment: XML forbids it, and the whole icon then fails to parse and
+       renders as nothing. -->
   <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#2ee6ff" />
       <stop offset="100%" stop-color="#a855f7" />
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="url(#tile)" />
-  <path d="M9.5 10.5 15 16 9.5 21.5" fill="none" stroke="#032027" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
-  <path d="M17.5 21.5H23" fill="none" stroke="#032027" stroke-width="3.4" stroke-linecap="round" />
+  <rect x="1" y="1" width="30" height="30" rx="6.5" fill="#101a26" stroke="url(#rim)" stroke-width="2" />
+  <path d="M9.5 10.5 15 16 9.5 21.5" fill="none" stroke="#2ee6ff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M17.5 21.5H23" fill="none" stroke="#2ee6ff" stroke-width="3.4" stroke-linecap="round" />
 </svg>

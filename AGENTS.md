@@ -125,7 +125,7 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Atmosphere = fixed layer; nothing in tree may be opaque.** `body` no background; gradients `body::before`, measurement grid `body::after`, aura fixed element in `App`. All behind content: opaque panel above hides them — why shell root has no `bg-base`, rail `bg-base/80`. Grid masked to viewport top, never under table of numbers.
 
-**Wordmark replaced software description.** Rail read "script" grey beside "dashboard": two things named at once, a sentence reader must finish. `components/Wordmark.tsx` = one word, gradient + shell-prompt tile mark, same geometry and accent pair as `public/favicon.svg`. Two sizes; endonym rule apply in spirit: drawn, not written, so nothing per-language.
+**Wordmark replaced software description.** Rail read "script" grey beside "dashboard": two things named at once, a sentence reader must finish. `components/Wordmark.tsx` = one word, gradient + shell-prompt mark on a theme surface tile lit by the accent pair, same geometry as `public/favicon.svg`. Two sizes; endonym rule apply in spirit: drawn, not written, so nothing per-language.
 
 **Scripts page = one grid, four cells; first row shared.** Source picker + script identity bar (`ScriptIdentityBar`, `pages/ScriptDetail.tsx`) siblings in grid, so tree + detail panels below start same height; alignment is grid's, not matched by hand. Detail column with own `PageHeader` put first panel ~25px lower (title block taller than select). Hence: sync status + button in tree panel header, not row above; two columns only at `xl`, below they stack (at 1024px second column left ~350px for source). Tree no root row: panel header already name source; row would repeat it + spend indent level.
 
