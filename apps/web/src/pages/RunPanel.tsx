@@ -151,7 +151,7 @@ export function CustomParamEditor({
           className="min-w-0 flex-1"
           aria-label={t('runs.custom.modeLabel', { index: index + 1 })}
           value={row.mode}
-          onChange={(event) => onChange({ mode: event.target.value as CustomParamMode })}
+          onValueChange={(next) => onChange({ mode: next as CustomParamMode })}
         >
           <option value="env">{t('runs.custom.modeEnv')}</option>
           <option value="argv">{t('runs.custom.modeArgv')}</option>
@@ -375,7 +375,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
               aria-describedby={describedBy}
               value={effectiveTargetId}
               disabled={noTargets || targets.isPending}
-              onChange={(event) => setTargetId(event.target.value)}
+              onValueChange={setTargetId}
             >
               {targets.isPending ? <option value="">{t('runs.target.loading')}</option> : null}
               {noTargets ? <option value="">{t('runs.target.none')}</option> : null}

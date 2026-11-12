@@ -29,19 +29,18 @@ const settings: DnsSettingsView = {
 };
 
 // Opening settings must preserve the source shared by manual and scheduled updates.
+// Both dropdowns render their current choice as the trigger's text.
 test('restores the saved local IPv6 source', () => {
   const html = renderToStaticMarkup(<DnsSettingsForm settings={settings} />);
-  expect(html).toContain('<option value="local" selected="">');
+  expect(html).toContain('dns.form.ipv6SourceLocal');
   expect(html).toContain('dns.form.ipv6SourceHint');
   expect(html).toContain('dns.form.localIpv6Interface');
-  expect(html).toContain('<option value="enp1s0" selected="">');
-  expect(html).toContain('<option value="eth0">eth0</option>');
-  expect(html).toContain('dns.form.localIpv6InterfaceAuto');
+  expect(html).toContain('<span class="truncate">enp1s0</span>');
 });
 
 test('defaults new DNS settings to ipify', () => {
   const html = renderToStaticMarkup(<DnsSettingsForm settings={null} />);
-  expect(html).toContain('<option value="ipify" selected="">');
+  expect(html).toContain('dns.form.ipv6SourceIpify');
   expect(html).not.toContain('dns.form.localIpv6Interface');
 });
 
@@ -56,14 +55,14 @@ test.each(['enp1s0', ''])('saves the selected interface (%s) for manual and sche
       (child: { props?: { label?: string } }) => child?.props?.label === 'dns.form.ipv6Source',
     );
     const select = sourceField.props.children({ id: 'source', describedBy: undefined });
-    select.props.onChange({ target: { value: 'local' } });
+    select.props.onValueChange('local');
     const changed = DnsSettingsForm({ settings: null });
     const interfaceField = changed.props.children.find(
       (child: { props?: { label?: string } }) => child?.props?.label === 'dns.form.localIpv6Interface',
     );
     const input = interfaceField.props.children({ id: 'interface', describedBy: undefined });
     expect(input.type).toBe(Select);
-    input.props.onChange({ target: { value: interfaceName } });
+    input.props.onValueChange(interfaceName);
     const ready = DnsSettingsForm({ settings: null });
     ready.props.onSubmit({ preventDefault: vi.fn() });
     expect(hooks.mutate).toHaveBeenCalledWith(
@@ -77,7 +76,7 @@ test.each(['enp1s0', ''])('saves the selected interface (%s) for manual and sche
 
 test('preserves a saved interface missing from the current host', () => {
   const html = renderToStaticMarkup(<DnsSettingsForm settings={{ ...settings, localIpv6Interface: 'old0' }} />);
-  expect(html).toContain('<option value="old0" selected="">old0</option>');
+  expect(html).toContain('<span class="truncate">old0</span>');
 });
 
 test('shows an interface loading error with retry', () => {

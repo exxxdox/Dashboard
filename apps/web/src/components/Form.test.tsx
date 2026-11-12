@@ -1,7 +1,6 @@
 import type { ReactElement } from 'react';
-import type { SourceSummary } from '@dashboard/shared';
 import { beforeEach, expect, test, vi } from 'vitest';
-import { SourcePicker } from './SourcePicker';
+import { Select } from './Form';
 
 // Exercise the real handlers without a browser renderer dependency, as the
 // other interaction tests here do.
@@ -23,7 +22,7 @@ vi.mock('react', async (original) => ({
   },
   useEffect: () => {},
   useRef: (initial: unknown) => ({ current: initial }),
-  useId: () => 'picker',
+  useId: () => 'select',
 }));
 
 type Element = ReactElement<Record<string, unknown>>;
@@ -34,18 +33,16 @@ function elements(node: unknown): Element[] {
   return [element, ...elements(element.props.children)];
 }
 
-function source(id: string, name: string, scriptCount: number): SourceSummary {
-  return {
-    id, name, scriptCount, kind: 'github', repoUrl: null, branch: null, subPath: null,
-    mountPath: id, syncStatus: 'never', syncError: null, lastSyncAt: null,
-    createdAt: '', updatedAt: '',
-  };
-}
-const sources = [source('a', 'Alpha', 2), source('b', 'Beta', 5)];
-
-function render(onChange: (id: string) => void): Element {
+function render(onValueChange: (value: string) => void): Element {
   hooks.index = 0;
-  return SourcePicker({ sources, value: 'b', onChange, label: 'source' });
+  return Select({
+    value: 'b',
+    onValueChange,
+    children: [
+      <option key="a" value="a">Alpha</option>,
+      <option key="b" value="b">Beta</option>,
+    ],
+  });
 }
 function trigger(tree: Element): Element {
   return elements(tree).find((element) => element.props.role === 'combobox')!;
@@ -53,34 +50,36 @@ function trigger(tree: Element): Element {
 function options(tree: Element): Element[] {
   return elements(tree).filter((element) => element.props.role === 'option');
 }
+const highlighted = (tree: Element): number =>
+  Number(String(trigger(tree).props['aria-activedescendant']).split('-').pop());
 
 beforeEach(() => {
   hooks.slots = [];
   hooks.index = 0;
 });
 
-test('hovering an option highlights it without changing the source', () => {
-  const onChange = vi.fn();
-  (trigger(render(onChange)).props.onClick as () => void)();
+test('hovering an option highlights it without changing the value', () => {
+  const onValueChange = vi.fn();
+  (trigger(render(onValueChange)).props.onClick as () => void)();
 
-  const list = options(render(onChange));
-  expect((trigger(render(onChange)).props['aria-activedescendant'] as string).endsWith('-1')).toBe(true);
+  const list = options(render(onValueChange));
+  expect(highlighted(render(onValueChange))).toBe(1);
   (list[0]!.props.onMouseEnter as () => void)();
-  expect((trigger(render(onChange)).props['aria-activedescendant'] as string).endsWith('-0')).toBe(true);
-  expect(onChange).not.toHaveBeenCalled();
+  expect(highlighted(render(onValueChange))).toBe(0);
+  expect(onValueChange).not.toHaveBeenCalled();
 });
 
-test('clicking an option is what changes the source', () => {
-  const onChange = vi.fn();
-  (trigger(render(onChange)).props.onClick as () => void)();
-  (options(render(onChange))[0]!.props.onClick as () => void)();
-  expect(onChange).toHaveBeenCalledWith('a');
+test('clicking an option is what changes the value', () => {
+  const onValueChange = vi.fn();
+  (trigger(render(onValueChange)).props.onClick as () => void)();
+  (options(render(onValueChange))[0]!.props.onClick as () => void)();
+  expect(onValueChange).toHaveBeenCalledWith('a');
 });
 
 test('keyboard picks the highlighted option', () => {
-  const onChange = vi.fn();
+  const onValueChange = vi.fn();
   const press = (key: string) =>
-    (trigger(render(onChange)).props.onKeyDown as (event: {
+    (trigger(render(onValueChange)).props.onKeyDown as (event: {
       key: string;
       preventDefault: () => void;
     }) => void)({ key, preventDefault: vi.fn() });
@@ -89,5 +88,5 @@ test('keyboard picks the highlighted option', () => {
   press('ArrowUp');
   press('ArrowUp');
   press('Enter');
-  expect(onChange).toHaveBeenCalledWith('a');
+  expect(onValueChange).toHaveBeenCalledWith('a');
 });

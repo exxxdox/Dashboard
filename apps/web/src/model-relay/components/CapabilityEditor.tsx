@@ -33,10 +33,16 @@ export function CapabilityEditor({ editor, capabilities, endpoints, deployments,
     event.preventDefault();
     const form = event.currentTarget;
     // 所有页签保持挂载以保留草稿；验证失败先切到对应页签，避免隐藏字段无法聚焦。
-    const invalid = form.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input:invalid, select:invalid, textarea:invalid");
+    const invalid = form.querySelector<HTMLInputElement | HTMLTextAreaElement>("input:invalid, textarea:invalid");
     if (invalid) {
       setTab(Number(invalid.closest<HTMLElement>("[data-tab]")?.dataset.tab ?? 0));
       requestAnimationFrame(() => invalid.reportValidity());
+      return;
+    }
+    // 自绘下拉框没有原生必填校验，空路由在这里拦下，和服务端要求一致。
+    if (routeDrafts.some((route) => !route.endpointId || !route.modelName)) {
+      setTab(2);
+      setError(relayText("请为每条路由选择 Ollama 端点和模型。"));
       return;
     }
     const data = new FormData(form);
@@ -51,8 +57,8 @@ export function CapabilityEditor({ editor, capabilities, endpoints, deployments,
           routes: routeDrafts.map((route) => {
             const prefix = `route-${route.draftKey}-`;
             return {
-              ...(route.id ? { id: route.id } : {}), endpointId: data.get(`${prefix}endpointId`),
-              modelName: data.get(`${prefix}modelName`), timeoutMs: Number(data.get(`${prefix}timeoutMs`)) * 1000,
+              ...(route.id ? { id: route.id } : {}), endpointId: route.endpointId,
+              modelName: route.modelName, timeoutMs: Number(data.get(`${prefix}timeoutMs`)) * 1000,
               priority: Number(data.get(`${prefix}priority`)),
               enabled: data.get(`${prefix}enabled`) === "on", supportsVision: data.get(`${prefix}supportsVision`) === "on"
             };
@@ -112,8 +118,8 @@ export function CapabilityEditor({ editor, capabilities, endpoints, deployments,
                 const modelNames = [...new Set([...(discoveredModels ?? []).filter((model) => model.endpointId === route.endpointId).map((model) => model.modelName), ...(route.modelName ? [route.modelName] : [])])];
                 return <section className="route-draft" key={route.draftKey}>
                   <div className="route-toolbar"><h3>{relayText("Ollama 路由")}{index + 1}</h3><button type="button" className="danger" onClick={() => { setRouteDrafts((items) => items.filter((item) => item.draftKey !== route.draftKey)); notify(relayText("路由已移除，保存配置后生效"), "info"); }}>{relayText("移除路由")}</button></div>
-                  <SelectField name={`${prefix}endpointId`} label={relayText("Ollama 端点")} value={route.endpointId} onChange={(event) => { const endpointId = event.target.value; setRouteDrafts((items) => items.map((item) => item.draftKey === route.draftKey ? { ...item, endpointId, modelName: "" } : item)); }} options={availableEndpoints.map((item) => ({ value: item.id, label: relayText("{0}{1}", [item.name, item.enabled ? "" : relayText("（停用）")]) }))} />
-                  <SelectField name={`${prefix}modelName`} label={relayText("模型")} value={route.modelName} onChange={(event) => { const modelName = event.target.value; setRouteDrafts((items) => items.map((item) => item.draftKey === route.draftKey ? { ...item, modelName } : item)); }} options={modelNames.map((name) => ({ value: name, label: name }))} />
+                  <SelectField label={relayText("Ollama 端点")} value={route.endpointId} onValueChange={(endpointId) => { setRouteDrafts((items) => items.map((item) => item.draftKey === route.draftKey ? { ...item, endpointId, modelName: "" } : item)); }} options={availableEndpoints.map((item) => ({ value: item.id, label: relayText("{0}{1}", [item.name, item.enabled ? "" : relayText("（停用）")]) }))} />
+                  <SelectField label={relayText("模型")} value={route.modelName} onValueChange={(modelName) => { setRouteDrafts((items) => items.map((item) => item.draftKey === route.draftKey ? { ...item, modelName } : item)); }} options={modelNames.map((name) => ({ value: name, label: name }))} />
                   {route.endpointId && modelNames.length === 0 && <p className="field-hint">{relayText("该端点暂无可选模型，请刷新模型列表。")}</p>}
                   <div className="route-numbers"><Field name={`${prefix}timeoutMs`} label={relayText("超时（秒）")} type="number" min="1" max="300" step="1" defaultValue={route.timeoutMs / 1000} required />
                   <Field name={`${prefix}priority`} label={relayText("优先级")} type="number" min="0" max="10000" step="1" defaultValue={route.priority} required /></div>

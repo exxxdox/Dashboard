@@ -140,7 +140,7 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
         <Select
           aria-label={t('runs.filter.status')}
           value={filters.status}
-          onChange={(event) => applyFilters({ status: event.target.value })}
+          onValueChange={(next) => applyFilters({ status: next })}
           className="w-[184px] shrink-0"
         >
           <option value="">{t('runs.filter.allStatuses')}</option>
@@ -160,7 +160,7 @@ export function RunsPage({ route }: { route: Extract<Route, { name: 'runs' }> })
         <Select
           aria-label={t('runs.filter.target')}
           value={filters.targetId}
-          onChange={(event) => applyFilters({ targetId: event.target.value })}
+          onValueChange={(next) => applyFilters({ targetId: next })}
           className="w-[208px] shrink-0"
         >
           <option value="">{t('runs.filter.allTargets')}</option>

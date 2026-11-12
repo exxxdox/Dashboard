@@ -99,7 +99,7 @@ export function SchedulesPage({ scheduleId }: { scheduleId: string | null }) {
             ) : scripts.isPending ? <LoadingBlock /> : (
               <>
                 <Field label={t('schedule.script')} hint={t('schedule.scriptHint')}>
-                  {({ id, describedBy }) => <Select id={id} aria-describedby={describedBy} value={scriptId} disabled={Boolean(saved)} onChange={(event) => setChosenScriptId(event.target.value)}>
+                  {({ id, describedBy }) => <Select id={id} aria-describedby={describedBy} value={scriptId} disabled={Boolean(saved)} onValueChange={setChosenScriptId}>
                     <option value="">{t('schedule.chooseScript')}</option>
                     {scripts.data?.map((script) => <option key={script.id} value={script.id}>{scriptNames.get(script.id)}</option>)}
                   </Select>}

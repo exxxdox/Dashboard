@@ -1,5 +1,5 @@
 import { useRelayT } from "../i18n";
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
 /** 各页面共用的展示组件：页面头、区块头、状态与表单控件。 */
 
@@ -69,15 +69,132 @@ export function Field({ label, multiline, ...props }: { label: string; multiline
   );
 }
 
-export function SelectField({ label, options, ...props }: { label: string; options: Array<{ value: string; label: string }> } & SelectHTMLAttributes<HTMLSelectElement>) {
+/**
+ * 自绘下拉框，不用原生 <select>。
+ *
+ * 原生弹层由浏览器绘制，打开时把已选项放在指针下：鼠标移入列表先命中的
+ * 仍是当前项，悬停也像在预选。这里列表在页面里，悬停只移动高亮，点击才选中。
+ */
+export function SelectField({ label, options, value, onValueChange, disabled }: {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onValueChange: (value: string) => void;
+  disabled?: boolean;
+}) {
   const relayText = useRelayT();
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const items = [{ value: "", label: relayText("请选择") }, ...options];
+  const selectedIndex = items.findIndex((item) => item.value === value);
+  const selected = items[selectedIndex];
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: MouseEvent): void {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  function openList(): void {
+    setHighlight(Math.max(0, selectedIndex));
+    setOpen(true);
+  }
+
+  function choose(index: number): void {
+    const item = items[index];
+    if (item) onValueChange(item.value);
+    setOpen(false);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    const last = items.length - 1;
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        if (open) setHighlight((current) => Math.min(current + 1, last));
+        else openList();
+        return;
+      case "ArrowUp":
+        event.preventDefault();
+        if (open) setHighlight((current) => Math.max(current - 1, 0));
+        else openList();
+        return;
+      case "Home":
+        if (!open) return;
+        event.preventDefault();
+        setHighlight(0);
+        return;
+      case "End":
+        if (!open) return;
+        event.preventDefault();
+        setHighlight(last);
+        return;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        if (open) choose(highlight);
+        else openList();
+        return;
+      case "Escape":
+        if (!open) return;
+        event.preventDefault();
+        setOpen(false);
+        return;
+      case "Tab":
+        setOpen(false);
+        return;
+      default:
+        return;
+    }
+  }
+
   return (
     <label className="field">
       <span>{label}</span>
-      <select {...props} required>
-        <option value="">{relayText("请选择")}</option>
-        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+      <div ref={containerRef} className="select-field">
+        <div
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-haspopup="listbox"
+          aria-label={label}
+          aria-activedescendant={open ? `${listId}-${highlight}` : undefined}
+          aria-disabled={disabled || undefined}
+          tabIndex={disabled ? -1 : 0}
+          className="select-trigger"
+          onClick={() => { if (!disabled) (open ? setOpen(false) : openList()); }}
+          onKeyDown={(event) => { if (!disabled) onKeyDown(event); }}
+          onBlur={() => setOpen(false)}
+        >
+          <span className="select-value">{selected?.label}</span>
+          <svg viewBox="0 0 24 24" aria-hidden className="select-chevron"><path d="m6 9 6 6 6-6" /></svg>
+        </div>
+        {open ? (
+          <ul id={listId} role="listbox" aria-label={label} className="select-list">
+            {items.map((item, index) => (
+              <li
+                key={`${item.value}-${index}`}
+                id={`${listId}-${index}`}
+                role="option"
+                aria-selected={item.value === value}
+                data-highlight={index === highlight || undefined}
+                // 焦点留在触发器上，点击才能在 onBlur 关闭列表前生效。
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setHighlight(index)}
+                onClick={() => choose(index)}
+                className="select-option"
+              >
+                {item.label}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </label>
   );
 }

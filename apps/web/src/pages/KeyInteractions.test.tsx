@@ -67,6 +67,10 @@ function field(tree: Element, label: string): Element {
 function edit(tree: Element, label: string, value: string): void {
   (field(tree, label).props.onChange as (event: { target: { value: string } }) => void)({ target: { value } });
 }
+// The shared Select reports a value, not a DOM event.
+function choose(tree: Element, label: string, value: string): void {
+  (field(tree, label).props.onValueChange as (next: string) => void)(value);
+}
 function submit(tree: Element): void {
   const form = elements(tree).find((element) => element.type === 'form')!;
   (form.props.onSubmit as (event: { preventDefault: () => void }) => void)({ preventDefault: vi.fn() });
@@ -158,7 +162,7 @@ describe('target form', () => {
   });
   test('creates password authentication and allows cancel without a request', () => {
     const done = vi.fn();
-    fill(); edit(form(), 'targets.form.auth', 'password');
+    fill(); choose(form(), 'targets.form.auth', 'password');
     edit(form(), 'targets.form.password', ' password ');
     submit(form(null, done));
     expect(hooks.create.mutate.mock.calls[0]?.[0].auth).toEqual({ method: 'password', password: ' password ' });
@@ -184,7 +188,7 @@ describe('target form', () => {
     expect(hooks.update.mutate.mock.calls[0]?.[0].input.auth).not.toHaveProperty('passphrase');
   });
   test('an edit can replace the auth method and credential', () => {
-    edit(form(target), 'targets.form.auth', 'password');
+    choose(form(target), 'targets.form.auth', 'password');
     edit(form(target), 'targets.form.password', 'replacement');
     submit(form(target));
     expect(hooks.update.mutate.mock.calls[0]?.[0].input.auth).toEqual({ method: 'password', password: 'replacement' });

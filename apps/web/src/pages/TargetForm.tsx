@@ -183,7 +183,7 @@ export function TargetForm({
           <Select
             id={id}
             value={state.authMethod}
-            onChange={(event) => patch({ authMethod: event.target.value as AuthMethod })}
+            onValueChange={(next) => patch({ authMethod: next as AuthMethod })}
           >
             <option value="key">{i18n.t('targets.form.privateKey')}</option>
             <option value="password">{i18n.t('targets.form.password')}</option>

@@ -28,6 +28,18 @@ button.secondary, .text-button, .row-actions button { color: var(--ink); backgro
 button.secondary:hover:not(:disabled), .text-button:hover:not(:disabled), .row-actions button:hover:not(:disabled) { color: var(--ink); border-color: var(--border-strong); background: var(--accent-soft); }
 
 .text-button { border: 0; padding-inline: 8px; white-space: nowrap; }
+
+/* 自绘下拉框：外观与输入框一致，弹层在页面内定位，不用浏览器自带的 select 弹层。 */
+.select-field { position: relative; }
+.select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid var(--line); background: var(--inset); padding: 11px 14px; border-radius: 9px; color: var(--ink); cursor: pointer; transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.select-trigger:hover { border-color: var(--line); }
+.select-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.select-trigger[aria-disabled="true"] { opacity: .55; cursor: wait; }
+.select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-chevron { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .65; }
+.select-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: 0 12px 30px rgba(0, 0, 0, .18); }
+.select-option { padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+.select-option[data-highlight] { background: var(--accent-soft); }
 .health { color: var(--warning); background: var(--inset); padding: 6px 10px; border-radius: 20px; font-size: 17px; font-weight: 650; white-space: nowrap; }
 .health.ready { color: var(--success); background: color-mix(in srgb, var(--ok) 12%, transparent); }
 

@@ -144,7 +144,7 @@ export function SourceForm({
               <Select
                 id={id}
                 value={state.kind}
-                onChange={(event) => patch({ kind: event.target.value as SourceKind })}
+                onValueChange={(next) => patch({ kind: next as SourceKind })}
               >
                 <option value="local">{i18n.t('sources.form.localDirectory')}</option>
                 <option value="github">{i18n.t('sources.form.githubRepository')}</option>

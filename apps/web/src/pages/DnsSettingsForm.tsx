@@ -115,7 +115,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
             id={id}
             aria-describedby={describedBy}
             value={state.ipv6Source}
-            onChange={(event) => patch({ ipv6Source: event.target.value as FormState['ipv6Source'] })}
+            onValueChange={(next) => patch({ ipv6Source: next as FormState['ipv6Source'] })}
           >
             <option value="ipify">{t('dns.form.ipv6SourceIpify')}</option>
             <option value="local">{t('dns.form.ipv6SourceLocal')}</option>
@@ -133,7 +133,7 @@ export function DnsSettingsForm({ settings }: { settings: DnsSettingsView | null
               className="mono"
               value={state.localIpv6Interface}
               disabled={interfaces.isPending}
-              onChange={(event) => patch({ localIpv6Interface: event.target.value })}
+              onValueChange={(next) => patch({ localIpv6Interface: next })}
             >
               <option value="">{interfaces.isPending ? t('common.loading') : t('dns.form.localIpv6InterfaceAuto')}</option>
               {interfaceNames.map((name) => <option key={name} value={name}>{name}</option>)}

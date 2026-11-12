@@ -206,7 +206,7 @@ test('a custom row names its channel and both fields', () => {
   const options = elements(tree).filter((element) => element.type === 'option').map((element) => element.props.children);
   expect(options).toEqual(['runs.custom.modeEnv', 'runs.custom.modeArgv']);
   const select = elements(tree).find((element) => element.type === Select)!;
-  select.props.onChange!({ target: { value: 'argv' } });
+  (select.props as { onValueChange: (value: string) => void }).onValueChange('argv');
   expect(onChange).toHaveBeenCalledWith({ mode: 'argv' });
 });
 
