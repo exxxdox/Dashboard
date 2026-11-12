@@ -69,13 +69,13 @@ export const targetAuthSchema = z.discriminatedUnion('method', [
 export type TargetAuth = z.infer<typeof targetAuthSchema>;
 
 /**
- * Where a run executes on its target when the caller names no directory.
+ * Conventional temporary directory on a target host.
  *
- * A working directory belongs to one run, not to the host: two scripts may need
- * different directories, and the host's temporary directory is a usable default
- * that needs no configuration at all.
+ * A run with no chosen directory executes in its own staging directory beneath
+ * this root; the directory picker also starts here. The root itself is not a
+ * default working directory, because one run's files must not land in another's.
  */
-export const DEFAULT_WORK_DIR = '/tmp';
+export const TARGET_TEMP_DIR = '/tmp';
 
 /** An absolute POSIX directory a run may use as its working directory. */
 export const workDirSchema = z

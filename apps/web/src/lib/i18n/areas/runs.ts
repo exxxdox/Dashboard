@@ -144,7 +144,8 @@ const en = {
   'runs.timeout.hint': "Seconds. Blank uses the script's own limit.",
   'runs.timeout.hintOwn': "Seconds. Blank uses the script's own limit ({seconds}s).",
 
-  'runs.workDir.hint': 'Absolute directory on the target host. Blank uses {default}.',
+  'runs.workDir.hint':
+    "Absolute directory on the target host. Blank uses this run's temporary directory, removed when it ends.",
   'runs.workDir.targetFirst': 'Select a target first.',
   'runs.workDir.browse': 'Browse…',
   'runs.workDir.browseTitle': 'Choose a working directory',
@@ -306,7 +307,7 @@ const zh: Record<keyof typeof en, string> = {
   'runs.timeout.hint': '单位秒。留空则使用脚本自身的限制。',
   'runs.timeout.hintOwn': '单位秒。留空则使用脚本自身的限制（{seconds} 秒）。',
 
-  'runs.workDir.hint': '目标主机上的绝对路径，留空则使用 {default}。',
+  'runs.workDir.hint': '目标主机上的绝对路径。留空则使用本次运行的临时目录，运行结束后删除。',
   'runs.workDir.targetFirst': '请先选择目标主机。',
   'runs.workDir.browse': '浏览…',
   'runs.workDir.browseTitle': '选择工作目录',

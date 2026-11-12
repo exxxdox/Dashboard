@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 15;
+const TARGET_VERSION = 16;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -409,6 +409,15 @@ export const MIGRATIONS: Migration[] = [
   // dropping the target column loses no recorded run.
   (db) => {
     db.exec('ALTER TABLE targets DROP COLUMN work_dir');
+  },
+  // v16 -- the default working directory is the per-run staging directory,
+  // which is deleted when the run ends. Record whether the directory was
+  // chosen explicitly, so restoring a last run does not point the next form at
+  // a path that no longer exists. Historical rows used a configured target
+  // directory, so they count as explicit.
+  (db) => {
+    db.exec(`ALTER TABLE executions ADD COLUMN work_dir_explicit INTEGER NOT NULL DEFAULT 1
+      CHECK (work_dir_explicit IN (0, 1))`);
   },
 ];
 

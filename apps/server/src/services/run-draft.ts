@@ -79,6 +79,7 @@ type LastRunRow = {
   param_values_json: string;
   argv_json: string;
   work_dir: string;
+  work_dir_explicit: number;
 };
 
 /**
@@ -93,8 +94,8 @@ type LastRunRow = {
 function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): RunDraft | null {
   const row = db
     .prepare<[string], LastRunRow>(
-      `SELECT param_values_json, argv_json, interactive, work_dir FROM executions
-       WHERE script_id = ? ORDER BY queued_at DESC LIMIT 1`,
+      `SELECT param_values_json, argv_json, interactive, work_dir, work_dir_explicit
+       FROM executions WHERE script_id = ? ORDER BY queued_at DESC LIMIT 1`,
     )
     .get(scriptId);
   if (!row) return null;
@@ -112,13 +113,13 @@ function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): Ru
     custom.push({ name: '', value, mode: 'argv' });
   }
 
-  // The execution stores the resolved directory, so restoring it is exact even
-  // when the last run used the host's temporary directory by default.
   return {
     params,
     custom,
     timeoutSec: '',
-    workDir: row.work_dir,
+    // A default directory is the run's own staging directory, already deleted;
+    // restoring it would point the next run at a path that cannot exist.
+    ...(row.work_dir_explicit === 1 ? { workDir: row.work_dir } : {}),
     ...(row.interactive === 1 ? { interactive: true } : {}),
   };
 }

@@ -76,6 +76,15 @@ describe('getRunPrefill', () => {
     expect(prefill.draft.workDir).toBe('/srv');
   });
 
+  test('does not restore a default run directory, which is deleted with the run', () => {
+    const db = openDatabase(':memory:');
+    const scriptId = seed(db);
+    addRun(db, 'ex_1', NOW, { ENV: 'prod' });
+    db.prepare("UPDATE executions SET work_dir = '/tmp/sd-ex_1', work_dir_explicit = 0 WHERE id = 'ex_1'").run();
+
+    expect(getRunPrefill(db, scriptId).draft).not.toHaveProperty('workDir');
+  });
+
   test('returns the newest run, not the first one recorded', () => {
     const db = openDatabase(':memory:');
     const scriptId = seed(db);

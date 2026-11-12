@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
-  DEFAULT_WORK_DIR,
+  TARGET_TEMP_DIR,
   MAX_PARAM_COUNT,
   type ExecuteScriptInput,
   type ScriptParam,
@@ -392,7 +392,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
           label={t('runs.field.workDir')}
           hint={
             selectedTarget
-              ? t('runs.workDir.hint', { default: DEFAULT_WORK_DIR })
+              ? t('runs.workDir.hint')
               : t('runs.workDir.targetFirst')
           }
           error={revealErrors ? workDirError : null}
@@ -404,7 +404,6 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
                 aria-describedby={describedBy}
                 className="mono min-w-0 flex-1"
                 value={workDir}
-                placeholder={DEFAULT_WORK_DIR}
                 spellCheck={false}
                 autoComplete="off"
                 disabled={!selectedTarget}
@@ -590,7 +589,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
         targetName={selectedTarget?.name ?? ''}
         value={workDir}
         open={pickerOpen && selectedTarget !== undefined}
-        defaultPath={DEFAULT_WORK_DIR}
+        defaultPath={TARGET_TEMP_DIR}
         onClose={() => setPickerOpen(false)}
         onSelect={(path) => {
           setTouched(true);

@@ -42,9 +42,17 @@ describe('script schedules', () => {
     h.input.input.argv.push('changed');
     h.db.prepare(`UPDATE scripts SET run_draft_json = '{"params":{"COUNT":"99"}}'`).run();
     expect(h.service.get(first.id)).toMatchObject({ scriptId: 'scr_1', name: 'Daily job', retentionDays: 30,
-      input: { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12, workDir: '/tmp' }, nextRunAt: '2026-11-10T00:01:00.000Z' });
+      input: { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12 }, nextRunAt: '2026-11-10T00:01:00.000Z' });
     expect(h.service.get(second.id)).toMatchObject({ name: 'Evening job', retentionDays: 0 });
     expect(h.service.list()).toHaveLength(2);
+  });
+
+  test('snapshots an explicitly chosen working directory and leaves a default one to each run', () => {
+    const h = setup();
+    const chosen = h.service.create({ ...h.input, name: 'Chosen', input: { ...h.input.input, workDir: '/srv/app' } });
+    expect(chosen.input.workDir).toBe('/srv/app');
+    expect(h.service.get(chosen.id).input.workDir).toBe('/srv/app');
+    expect(h.service.create({ ...h.input, name: 'Defaulted' }).input).not.toHaveProperty('workDir');
   });
 
   test('rejects duplicate names on create and rename without changing saved plans', () => {
@@ -92,7 +100,7 @@ describe('script schedules', () => {
     h.service.start();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(h.submit).toHaveBeenCalledTimes(2);
-    expect(h.submit).toHaveBeenCalledWith('scr_1', { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12, workDir: '/tmp' },
+    expect(h.submit).toHaveBeenCalledWith('scr_1', { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12 },
       { scheduleId: first.id, scheduleName: 'Daily job', retentionDays: 30 });
     expect(h.submit).toHaveBeenCalledWith('scr_1', expect.anything(), { scheduleId: second.id, scheduleName: 'Second', retentionDays: 7 });
     await vi.advanceTimersByTimeAsync(60_000);

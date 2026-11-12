@@ -1,6 +1,5 @@
 import { Cron } from 'croner';
 import {
-  DEFAULT_WORK_DIR,
   executeScriptSchema,
   saveScriptScheduleSchema,
   validateParams,
@@ -185,9 +184,9 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
       params: validation.env,
       argv: input.input.argv,
       timeoutSec: input.input.timeoutSec ?? metadata.timeoutSec ?? config.defaultTimeoutSec,
-      // Resolved now so the saved plan shows where it runs, not a blank that
-      // depends on a later default changing.
-      workDir: input.input.workDir ?? DEFAULT_WORK_DIR,
+      // Only an explicit choice is snapshotted. An omitted directory means a
+      // fresh per-run staging directory, which cannot be resolved at save time.
+      ...(input.input.workDir === undefined ? {} : { workDir: input.input.workDir }),
     };
     const timestamp = nowIso();
     db.prepare(`INSERT INTO script_schedules

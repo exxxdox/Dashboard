@@ -66,19 +66,21 @@ describe('execution submission', () => {
     const h = setup();
     h.db.prepare('UPDATE scripts SET timeout_sec = 12').run();
     const execution = await h.service.submit('scr_1', { ...h.input, argv: ['a b', '; echo unsafe'], timeoutSec: 7 });
-    expect(execution).toMatchObject({ status: 'queued', workDir: '/tmp', paramValues: { ENV: 'prod', COUNT: '3' }, argv: ['a b', '; echo unsafe'] });
+    expect(execution).toMatchObject({ status: 'queued', paramValues: { ENV: 'prod', COUNT: '3' }, argv: ['a b', '; echo unsafe'] });
+    // The default is a concrete per-run directory, not the shared temp root.
+    expect(execution.workDir).toBe(`/tmp/sd-${execution.id}`);
     writeFileSync(h.scriptPath, 'echo changed\n');
     h.scheduled.shift()!();
     await h.queue.drain();
     const plan = h.run.mock.calls[0]![0];
     expect(plan.scriptBytes.toString()).toBe('echo original\n');
-    expect(plan).toMatchObject({ workDir: '/tmp', timeoutMs: 7000, argv: execution.argv,
-      env: { ENV: 'prod', COUNT: '3', SD_EXECUTION_ID: execution.id, SD_WORK_DIR: '/tmp', SD_SOURCE_NAME: 'ops' } });
+    expect(plan).toMatchObject({ workDir: plan.stagingDir, timeoutMs: 7000, argv: execution.argv,
+      env: { ENV: 'prod', COUNT: '3', SD_EXECUTION_ID: execution.id, SD_WORK_DIR: plan.stagingDir, SD_SOURCE_NAME: 'ops' } });
     expect(plan.scriptPath).toBe(`${plan.stagingDir}/deploy.sh`);
     expect(vi.mocked(createTransportForTarget).mock.results.at(-1)?.value.disposeCount).toBe(1);
   });
 
-  test('runs in the directory the request names, falling back to the host temporary directory', async () => {
+  test('runs in the requested directory, or in its own staging directory by default', async () => {
     const h = setup();
     const chosen = await h.service.submit('scr_1', { ...h.input, workDir: '/srv/app' });
     expect(chosen.workDir).toBe('/srv/app');
@@ -89,7 +91,14 @@ describe('execution submission', () => {
     });
 
     const defaulted = await h.service.submit('scr_1', h.input);
-    expect(defaulted.workDir).toBe('/tmp');
+    expect(defaulted.workDir).toBe(`/tmp/sd-${defaulted.id}`);
+    expect(defaulted.workDir).not.toBe('/tmp');
+
+    // Only the chosen directory survives as a form value; the default is deleted with its run.
+    expect(h.db.prepare('SELECT work_dir_explicit FROM executions WHERE id = ?')
+      .get(chosen.id)).toEqual({ work_dir_explicit: 1 });
+    expect(h.db.prepare('SELECT work_dir_explicit FROM executions WHERE id = ?')
+      .get(defaulted.id)).toEqual({ work_dir_explicit: 0 });
   });
 
   test('uses script timeout and then the configured default when no override is supplied', async () => {

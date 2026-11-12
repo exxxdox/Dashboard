@@ -479,6 +479,8 @@ test('v14 retires legacy PowerShell scripts and schedules while preserving execu
     migrate(db);
     expect(db.prepare('SELECT deleted_at FROM scripts').get()).toEqual({ deleted_at: expect.any(String) });
     expect(db.prepare('SELECT enabled,next_run_at FROM script_schedules').get()).toEqual({ enabled: 0, next_run_at: null });
-    expect(db.prepare('SELECT * FROM executions').get()).toEqual(execution);
+    // v14 itself preserves the row; the later explicit-work-dir migration only
+    // adds a column whose default marks historical rows as chosen.
+    expect(db.prepare('SELECT * FROM executions').get()).toEqual({ ...execution as object, work_dir_explicit: 1 });
   } finally { db.close(); }
 });

@@ -16,7 +16,7 @@ import type {
   ExecutionStream,
   ScriptSummary,
 } from '@dashboard/shared';
-import { DEFAULT_WORK_DIR, resolveInterpreter, validateParams, type RunEnvName } from '@dashboard/shared';
+import { resolveInterpreter, validateParams, type RunEnvName } from '@dashboard/shared';
 
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/client.js';
@@ -65,6 +65,7 @@ export type ExecutionRow = {
   param_values_json: string;
   argv_json: string;
   work_dir: string;
+  work_dir_explicit: number;
   queued_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -289,8 +290,10 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
     const timeoutSec = input.timeoutSec ?? script.timeoutSec ?? config.defaultTimeoutSec;
     const interpreter = resolveInterpreter(`.${script.format}`, script.interpreterOverride, input.interactive ?? false);
-    // The run owns its working directory; the target only owns the host it is on.
-    const workDir = input.workDir ?? DEFAULT_WORK_DIR;
+    // The run owns its working directory; the target only owns the host it is
+    // on. The default is the per-run staging directory, so a blank form gets a
+    // concrete, isolated directory that is deleted with the run.
+    const workDir = input.workDir ?? stagingDir;
 
     // Typed by name so this list and `RUN_ENV_NAMES` -- which is what refuses a
     // parameter colliding with one of these -- cannot drift apart: a key present
@@ -362,9 +365,9 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       db.prepare(
         `INSERT INTO executions (
            id, script_id, target_id, status, command_display, target_name, script_name,
-           script_rel_path, param_values_json, argv_json, work_dir, queued_at,
+           script_rel_path, param_values_json, argv_json, work_dir, work_dir_explicit, queued_at,
            schedule_id, schedule_name, retention_days, interactive
-         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         executionId,
         script.id,
@@ -376,6 +379,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
         JSON.stringify(plan.paramValues),
         JSON.stringify(plan.argv),
         plan.workDir,
+        input.workDir === undefined ? 0 : 1,
         nowIso(),
         origin?.scheduleId ?? null,
         origin?.scheduleName ?? null,
