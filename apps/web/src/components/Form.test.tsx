@@ -50,8 +50,8 @@ function trigger(tree: Element): Element {
 function options(tree: Element): Element[] {
   return elements(tree).filter((element) => element.props.role === 'option');
 }
-const highlighted = (tree: Element): number =>
-  Number(String(trigger(tree).props['aria-activedescendant']).split('-').pop());
+const highlighted = (tree: Element): string | undefined =>
+  trigger(tree).props['aria-activedescendant'] as string | undefined;
 
 beforeEach(() => {
   hooks.slots = [];
@@ -63,9 +63,10 @@ test('hovering an option highlights it without changing the value', () => {
   (trigger(render(onValueChange)).props.onClick as () => void)();
 
   const list = options(render(onValueChange));
-  expect(highlighted(render(onValueChange))).toBe(1);
-  (list[0]!.props.onMouseEnter as () => void)();
-  expect(highlighted(render(onValueChange))).toBe(0);
+  // Opening must not pre-light the current value: it reads as the list jumping.
+  expect(highlighted(render(onValueChange))).toBeUndefined();
+  (list[0]!.props.onMouseMove as () => void)();
+  expect(highlighted(render(onValueChange))).toBe('select-0');
   expect(onValueChange).not.toHaveBeenCalled();
 });
 

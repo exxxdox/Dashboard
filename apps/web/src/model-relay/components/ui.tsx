@@ -84,7 +84,8 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
 }) {
   const relayText = useRelayT();
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  // -1 表示指针和键盘都还没指定行；打开时高亮当前项会被看成列表先跳了一下。
+  const [highlight, setHighlight] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const items = [{ value: "", label: relayText("请选择") }, ...options];
@@ -101,13 +102,14 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
   }, [open]);
 
   function openList(): void {
-    setHighlight(Math.max(0, selectedIndex));
+    setHighlight(-1);
     setOpen(true);
   }
 
   function choose(index: number): void {
     const item = items[index];
-    if (item) onValueChange(item.value);
+    if (!item) return;
+    onValueChange(item.value);
     setOpen(false);
   }
 
@@ -117,12 +119,19 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
       case "ArrowDown":
         event.preventDefault();
         if (open) setHighlight((current) => Math.min(current + 1, last));
-        else openList();
+        else {
+          // 键盘打开时立刻指定一行；指针打开时没有。
+          setHighlight(0);
+          setOpen(true);
+        }
         return;
       case "ArrowUp":
         event.preventDefault();
         if (open) setHighlight((current) => Math.max(current - 1, 0));
-        else openList();
+        else {
+          setHighlight(last);
+          setOpen(true);
+        }
         return;
       case "Home":
         if (!open) return;
@@ -163,7 +172,7 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
           aria-controls={listId}
           aria-haspopup="listbox"
           aria-label={label}
-          aria-activedescendant={open ? `${listId}-${highlight}` : undefined}
+          aria-activedescendant={open && highlight >= 0 ? `${listId}-${highlight}` : undefined}
           aria-disabled={disabled || undefined}
           tabIndex={disabled ? -1 : 0}
           className="select-trigger"
@@ -185,7 +194,8 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
                 data-highlight={index === highlight || undefined}
                 // 焦点留在触发器上，点击才能在 onBlur 关闭列表前生效。
                 onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setHighlight(index)}
+                // 行可能是指针不动时挂载的，因此用 mouseMove 而不是 mouseEnter。
+                onMouseMove={() => setHighlight(index)}
                 onClick={() => choose(index)}
                 className="select-option"
               >

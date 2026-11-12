@@ -103,7 +103,9 @@ export function Select({
   'aria-describedby': ariaDescribedBy,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  // -1 until the pointer or a key names a row. Highlighting the selected option
+  // at open put it under the cursor for a frame, which read as the list jumping.
+  const [highlight, setHighlight] = useState(-1);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -122,13 +124,14 @@ export function Select({
   }, [open]);
 
   function openList(): void {
-    setHighlight(Math.max(0, selectedIndex));
+    setHighlight(-1);
     setOpen(true);
   }
 
   function choose(index: number): void {
     const option = options[index];
-    if (option) onValueChange(option.value);
+    if (!option) return;
+    onValueChange(option.value);
     setOpen(false);
     triggerRef.current?.focus();
   }
@@ -139,12 +142,19 @@ export function Select({
       case 'ArrowDown':
         event.preventDefault();
         if (open) setHighlight((current) => Math.min(current + 1, last));
-        else openList();
+        else {
+          // Opening from the keyboard names a row at once; the pointer has not.
+          setHighlight(0);
+          setOpen(true);
+        }
         return;
       case 'ArrowUp':
         event.preventDefault();
         if (open) setHighlight((current) => Math.max(current - 1, 0));
-        else openList();
+        else {
+          setHighlight(last);
+          setOpen(true);
+        }
         return;
       case 'Home':
         if (!open) return;
@@ -188,7 +198,7 @@ export function Select({
         aria-haspopup="listbox"
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
-        aria-activedescendant={open ? `${listId}-${highlight}` : undefined}
+        aria-activedescendant={open && highlight >= 0 ? `${listId}-${highlight}` : undefined}
         disabled={disabled}
         className={cn(CONTROL_CLASS, 'flex cursor-pointer items-center justify-between gap-2 text-left')}
         onClick={() => (open ? setOpen(false) : openList())}
@@ -217,7 +227,9 @@ export function Select({
               aria-selected={option.value === value}
               // Keep focus on the trigger so the click lands before `onBlur` closes the list.
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setHighlight(index)}
+              // `mouseMove`, not `mouseEnter`: a row can mount under a still pointer,
+              // and pointer movement inside it would otherwise leave the highlight behind.
+              onMouseMove={() => setHighlight(index)}
               onClick={() => choose(index)}
               className={cn(
                 'text-body flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2',
