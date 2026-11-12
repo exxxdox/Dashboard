@@ -4,7 +4,7 @@ import type {
   Ref,
   TextareaHTMLAttributes,
 } from 'react';
-import { Children, isValidElement, useEffect, useId, useRef, useState } from 'react';
+import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../lib/cn';
 
@@ -76,6 +76,32 @@ export type SelectProps = {
 
 type SelectOption = { value: string; label: ReactNode };
 
+/** Viewport placement of the open list, in `position: fixed` coordinates. */
+type ListPlacement = { left: number; width: number; top?: number; bottom?: number };
+
+// Measuring needs the DOM; on the server this is a no-op render pass.
+const useMeasureEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+const LIST_MAX_HEIGHT = 288; // matches max-h-72
+const LIST_ROW_HEIGHT = 40; // only used to decide which side has room
+
+/**
+ * The list is fixed to the viewport rather than absolute inside the field: a
+ * dialog scrolls its body, and an absolutely positioned list is clipped there
+ * to one visible row. A fixed one still escapes that clip.
+ */
+function measureList(trigger: HTMLButtonElement, rows: number): ListPlacement {
+  const rect = trigger.getBoundingClientRect();
+  const height = Math.min(LIST_MAX_HEIGHT, rows * LIST_ROW_HEIGHT + 12);
+  const below = window.innerHeight - rect.bottom;
+  const flip = below < height && rect.top > below;
+  return {
+    left: rect.left,
+    width: rect.width,
+    ...(flip ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+  };
+}
+
 function readOptions(children: ReactNode): SelectOption[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<{ value?: string; children?: ReactNode }>(child)) return [];
@@ -106,6 +132,7 @@ export function Select({
   // -1 until the pointer or a key names a row. Highlighting the selected option
   // at open put it under the cursor for a frame, which read as the list jumping.
   const [highlight, setHighlight] = useState(-1);
+  const [placement, setPlacement] = useState<ListPlacement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -113,6 +140,20 @@ export function Select({
   const options = readOptions(children);
   const selectedIndex = options.findIndex((option) => option.value === value);
   const selected = options[selectedIndex];
+
+  useMeasureEffect(() => {
+    const trigger = triggerRef.current;
+    if (!open || !trigger) return;
+    const update = () => setPlacement(measureList(trigger, options.length));
+    update();
+    // Capture phase: the scrolling box may be a dialog body, not the window.
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open, options.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,7 +258,8 @@ export function Select({
           id={listId}
           role="listbox"
           aria-label={ariaLabel}
-          className="border-line bg-panel-2 shadow-float absolute top-11 left-0 z-30 max-h-72 w-full overflow-auto rounded-xl border py-1.5"
+          style={placement ?? undefined}
+          className="border-line bg-panel-2 shadow-float fixed z-50 max-h-72 overflow-auto rounded-xl border py-1.5"
         >
           {options.map((option, index) => (
             <li

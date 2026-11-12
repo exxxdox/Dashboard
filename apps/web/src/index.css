@@ -740,7 +740,10 @@
 }
 
 .animate-fade-in {
-  animation: fade-in 200ms var(--ease) both;
+  /* `backwards`, not `both`: a retained final keyframe leaves an identity
+     transform on the route wrapper, which makes every `position: fixed`
+     descendant resolve against it -- the dropdown lists landed off-screen. */
+  animation: fade-in 200ms var(--ease) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

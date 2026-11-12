@@ -21,6 +21,7 @@ vi.mock('react', async (original) => ({
     ];
   },
   useEffect: () => {},
+  useLayoutEffect: () => {},
   useRef: (initial: unknown) => ({ current: initial }),
   useId: () => 'select',
 }));

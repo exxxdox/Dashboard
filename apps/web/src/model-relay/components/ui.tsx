@@ -1,5 +1,5 @@
 import { useRelayT } from "../i18n";
-import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
 
 /** 各页面共用的展示组件：页面头、区块头、状态与表单控件。 */
 
@@ -69,6 +69,27 @@ export function Field({ label, multiline, ...props }: { label: string; multiline
   );
 }
 
+type ListPlacement = { left: number; width: number; top?: number; bottom?: number };
+
+// 测量需要 DOM；服务端渲染时退化成空操作。
+const useMeasureEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+const LIST_MAX_HEIGHT = 280; // 与 .select-list 的 max-height 一致
+const LIST_ROW_HEIGHT = 37; // 只用来判断上方还是下方有位置
+
+/** 列表用 fixed 坐标摆在触发器旁：放不下就向上翻。 */
+function measureList(trigger: HTMLElement, rows: number): ListPlacement {
+  const rect = trigger.getBoundingClientRect();
+  const height = Math.min(LIST_MAX_HEIGHT, rows * LIST_ROW_HEIGHT + 12);
+  const below = window.innerHeight - rect.bottom;
+  const flip = below < height && rect.top > below;
+  return {
+    left: rect.left,
+    width: rect.width,
+    ...(flip ? { bottom: window.innerHeight - rect.top + 4 } : { top: rect.bottom + 4 }),
+  };
+}
+
 /**
  * 自绘下拉框，不用原生 <select>。
  *
@@ -86,11 +107,27 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
   const [open, setOpen] = useState(false);
   // -1 表示指针和键盘都还没指定行；打开时高亮当前项会被看成列表先跳了一下。
   const [highlight, setHighlight] = useState(-1);
+  const [placement, setPlacement] = useState<ListPlacement | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const items = [{ value: "", label: relayText("请选择") }, ...options];
   const selectedIndex = items.findIndex((item) => item.value === value);
   const selected = items[selectedIndex];
+
+  // 弹窗会滚动内部内容，绝对定位的列表会被裁掉；fixed 定位才能越出滚动容器。
+  useMeasureEffect(() => {
+    const trigger = triggerRef.current;
+    if (!open || !trigger) return;
+    const update = () => setPlacement(measureList(trigger, items.length));
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [open, items.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -167,6 +204,7 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
       <span>{label}</span>
       <div ref={containerRef} className="select-field">
         <div
+          ref={triggerRef}
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
@@ -184,7 +222,7 @@ export function SelectField({ label, options, value, onValueChange, disabled }: 
           <svg viewBox="0 0 24 24" aria-hidden className="select-chevron"><path d="m6 9 6 6 6-6" /></svg>
         </div>
         {open ? (
-          <ul id={listId} role="listbox" aria-label={label} className="select-list">
+          <ul id={listId} role="listbox" aria-label={label} style={placement ?? undefined} className="select-list">
             {items.map((item, index) => (
               <li
                 key={`${item.value}-${index}`}

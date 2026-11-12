@@ -37,7 +37,7 @@ button.secondary:hover:not(:disabled), .text-button:hover:not(:disabled), .row-a
 .select-trigger[aria-disabled="true"] { opacity: .55; cursor: wait; }
 .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-chevron { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .65; }
-.select-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: 0 12px 30px rgba(0, 0, 0, .18); }
+.select-list { position: fixed; z-index: 40; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); box-shadow: 0 12px 30px rgba(0, 0, 0, .18); }
 .select-option { padding: 8px 10px; border-radius: 7px; cursor: pointer; }
 .select-option[data-highlight] { background: var(--accent-soft); }
 .health { color: var(--warning); background: var(--inset); padding: 6px 10px; border-radius: 20px; font-size: 17px; font-weight: 650; white-space: nowrap; }
