@@ -55,6 +55,11 @@ describe('formFromDraft', () => {
     expect(state.rows.map((row) => row.value)).toEqual(['https://example.test', '100', '200']);
     expect(new Set(state.rows.map((row) => row.id)).size).toBe(3);
     expect(state.timeoutSec).toBe('600');
+    expect(state.workDir).toBe('');
+  });
+
+  it('restores the working directory the draft recorded', () => {
+    expect(formFromDraft({ ...EMPTY, workDir: '/srv/app' }, DECLARED).workDir).toBe('/srv/app');
   });
 });
 
@@ -67,6 +72,7 @@ describe('round trip', () => {
         { id: 'row-2', name: '起始端口', value: '100', mode: 'argv' },
       ],
       timeoutSec: '30',
+      workDir: '/srv/app',
     };
 
     const restored = formFromDraft(draftFromForm(state), DECLARED);
@@ -79,6 +85,7 @@ describe('round trip', () => {
       state.rows.map(({ name, value, mode }) => ({ name, value, mode })),
     );
     expect(restored.timeoutSec).toBe('30');
+    expect(restored.workDir).toBe('/srv/app');
   });
 
   it("drops the ids, which are the form's own", () => {
@@ -88,6 +95,11 @@ describe('round trip', () => {
       timeoutSec: '',
     });
     expect(draft.custom).toEqual([{ name: 'A', value: '1', mode: 'env' }]);
+  });
+
+  it('leaves a blank working directory out of the saved draft', () => {
+    expect(draftFromForm({ values: {}, rows: [], timeoutSec: '', workDir: '  ' }))
+      .not.toHaveProperty('workDir');
   });
 });
 

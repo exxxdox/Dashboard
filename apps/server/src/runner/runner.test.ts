@@ -31,8 +31,8 @@ function seed(db: Db): void {
 
   db.prepare(
     `INSERT INTO targets (id, name, host, port, username, auth_method, secret_encrypted,
-       work_dir, connect_timeout_sec, created_at, updated_at)
-     VALUES ('tgt_1','edge','edge.test',22,'deploy','key','x','/srv/scripts',15,?,?)`,
+       connect_timeout_sec, created_at, updated_at)
+     VALUES ('tgt_1','edge','edge.test',22,'deploy','key','x',15,?,?)`,
   ).run(now, now);
 
   db.prepare(

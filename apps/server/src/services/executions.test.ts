@@ -35,8 +35,8 @@ function setup(retentionDays = 30) {
   const db = openDatabase(':memory:');
   cleanups.push(() => db.close());
   const now = '2026-01-01T00:00:00.000Z';
-  db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,work_dir,created_at,updated_at)
-    VALUES ('tgt_1','edge','edge.test','ops','password','unused','/srv',?,?)`).run(now, now);
+  db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,created_at,updated_at)
+    VALUES ('tgt_1','edge','edge.test','ops','password','unused',?,?)`).run(now, now);
   db.prepare(`INSERT INTO sources (id,name,kind,mount_path,created_at,updated_at)
     VALUES ('src_1','ops','local','local',?,?)`).run(now, now);
   db.prepare(`INSERT INTO scripts (id,source_id,rel_path,rel_dir,file_name,format,size_bytes,content_hash,display_name,params_json,discovered_at,updated_at)
@@ -66,16 +66,30 @@ describe('execution submission', () => {
     const h = setup();
     h.db.prepare('UPDATE scripts SET timeout_sec = 12').run();
     const execution = await h.service.submit('scr_1', { ...h.input, argv: ['a b', '; echo unsafe'], timeoutSec: 7 });
-    expect(execution).toMatchObject({ status: 'queued', workDir: '/srv', paramValues: { ENV: 'prod', COUNT: '3' }, argv: ['a b', '; echo unsafe'] });
+    expect(execution).toMatchObject({ status: 'queued', workDir: '/tmp', paramValues: { ENV: 'prod', COUNT: '3' }, argv: ['a b', '; echo unsafe'] });
     writeFileSync(h.scriptPath, 'echo changed\n');
     h.scheduled.shift()!();
     await h.queue.drain();
     const plan = h.run.mock.calls[0]![0];
     expect(plan.scriptBytes.toString()).toBe('echo original\n');
-    expect(plan).toMatchObject({ workDir: '/srv', timeoutMs: 7000, argv: execution.argv,
-      env: { ENV: 'prod', COUNT: '3', SD_EXECUTION_ID: execution.id, SD_WORK_DIR: '/srv', SD_SOURCE_NAME: 'ops' } });
+    expect(plan).toMatchObject({ workDir: '/tmp', timeoutMs: 7000, argv: execution.argv,
+      env: { ENV: 'prod', COUNT: '3', SD_EXECUTION_ID: execution.id, SD_WORK_DIR: '/tmp', SD_SOURCE_NAME: 'ops' } });
     expect(plan.scriptPath).toBe(`${plan.stagingDir}/deploy.sh`);
     expect(vi.mocked(createTransportForTarget).mock.results.at(-1)?.value.disposeCount).toBe(1);
+  });
+
+  test('runs in the directory the request names, falling back to the host temporary directory', async () => {
+    const h = setup();
+    const chosen = await h.service.submit('scr_1', { ...h.input, workDir: '/srv/app' });
+    expect(chosen.workDir).toBe('/srv/app');
+    h.scheduled.shift()!(); await h.queue.drain();
+    expect(h.run.mock.calls[0]![0]).toMatchObject({
+      workDir: '/srv/app',
+      env: { SD_WORK_DIR: '/srv/app', SD_SCRIPT_DIR: '/srv/app' },
+    });
+
+    const defaulted = await h.service.submit('scr_1', h.input);
+    expect(defaulted.workDir).toBe('/tmp');
   });
 
   test('uses script timeout and then the configured default when no override is supplied', async () => {

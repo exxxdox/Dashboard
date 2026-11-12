@@ -38,16 +38,14 @@ function lines(parts: Array<string | null>): string | undefined {
 /* ----------------------------------------------------------------- targets */
 
 export function targetCheckOutcome(t: Translate, result: TargetCheckResult): Outcome {
-  // A host that answers SSH but cannot enter its working directory looks
-  // perfectly healthy until the first run, so readiness is all three facts and
-  // not just reachability.
-  const ready = result.reachable && result.workDirOk && result.stagingOk;
+  // A host that answers SSH but cannot stage a script looks perfectly healthy
+  // until the first run, so readiness is both facts and not just reachability.
+  const ready = result.reachable && result.stagingOk;
   const fact = (label: string, ok: boolean): string =>
     `${label} ${ok ? t('targets.fact.ok') : t('targets.fact.failed')}`;
 
   const facts = [
     fact(t('targets.fact.reachable'), result.reachable),
-    fact(t('targets.fact.workDir'), result.workDirOk),
     fact(t('targets.fact.staging'), result.stagingOk),
   ].join(PART);
 
@@ -59,18 +57,13 @@ export function targetCheckOutcome(t: Translate, result: TargetCheckResult): Out
     .filter((part): part is string => part !== null && part !== '')
     .join(PART);
 
-  // The two notes are advice rather than findings, and they are what makes the
-  // message actionable: one names the config field to look at, the other says
-  // runs still work and only cancellation is less thorough.
-  const workDirNote = ready
-    ? null
-    : `${t('targets.workDirNote.before')} workDir${t('targets.workDirNote.after')}`;
+  // Advice rather than a finding: runs still work, only cancellation is less thorough.
   const setsidNote = result.hasSetsid ? null : `setsid ${t('targets.setsidNote')}`;
 
   return {
     message: ready ? t('targets.ready') : t('targets.cannotRun'),
     tone: ready ? 'success' : 'error',
-    detail: lines([facts, meta === '' ? null : meta, result.detail, workDirNote, setsidNote]),
+    detail: lines([facts, meta === '' ? null : meta, result.detail, setsidNote]),
   };
 }
 

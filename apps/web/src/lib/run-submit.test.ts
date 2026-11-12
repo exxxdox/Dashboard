@@ -59,6 +59,15 @@ describe('toRunInput', () => {
     expect(toRunInput(state({ timeoutSec: ' 90 ' }), 'target-1').timeoutSec).toBe(90);
   });
 
+  test('omits a blank working directory so the server default applies', () => {
+    expect(toRunInput(state(), 'target-1')).not.toHaveProperty('workDir');
+    expect(toRunInput(state({ workDir: '  ' }), 'target-1')).not.toHaveProperty('workDir');
+  });
+
+  test('sends a chosen working directory without surrounding whitespace', () => {
+    expect(toRunInput(state({ workDir: ' /srv/app ' }), 'target-1').workDir).toBe('/srv/app');
+  });
+
   test('sends a blank row as nothing at all', () => {
     const input = toRunInput(
       state({ rows: [{ id: 'row-1', name: '  ', value: '  ', mode: 'env' }] }),

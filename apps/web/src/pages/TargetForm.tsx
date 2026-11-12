@@ -17,7 +17,6 @@ type FormState = {
   privateKey: string;
   passphrase: string;
   password: string;
-  workDir: string;
   connectTimeoutSec: string;
 };
 
@@ -30,7 +29,6 @@ const EMPTY: FormState = {
   privateKey: '',
   passphrase: '',
   password: '',
-  workDir: '',
   connectTimeoutSec: '15',
 };
 
@@ -44,7 +42,6 @@ function toFormState(target: TargetSummary | null): FormState {
     port: String(target.port),
     username: target.username,
     authMethod: target.authMethod,
-    workDir: target.workDir,
     connectTimeoutSec: String(target.connectTimeoutSec),
   };
 }
@@ -74,7 +71,6 @@ export function TargetForm({
     name: state.name.trim() === '',
     host: state.host.trim() === '',
     username: state.username.trim() === '',
-    workDir: state.workDir.trim() === '',
     // On an edit, an empty secret means "keep the stored one".
     secret: !isEdit && (state.authMethod === 'key' ? state.privateKey.trim() === '' : state.password === ''),
   };
@@ -102,7 +98,6 @@ export function TargetForm({
       host: state.host.trim(),
       port: Number(state.port) || 22,
       username: state.username.trim(),
-      workDir: state.workDir.trim(),
       connectTimeoutSec: Number(state.connectTimeoutSec) || 15,
     };
 
@@ -182,22 +177,6 @@ export function TargetForm({
           )}
         </Field>
       </div>
-
-      <Field
-        label={i18n.t('targets.form.workDir')}
-        hint={i18n.t('targets.form.workDirHint')}
-        error={showErrors && missing.workDir ? i18n.t('targets.form.required') : null}
-      >
-        {({ id }) => (
-          <TextInput
-            id={id}
-            className="mono"
-            value={state.workDir}
-            placeholder={i18n.t('targets.form.workDirPlaceholder')}
-            onChange={(event) => patch({ workDir: event.target.value })}
-          />
-        )}
-      </Field>
 
       <Field label={i18n.t('targets.form.auth')}>
         {({ id }) => (

@@ -87,7 +87,7 @@ test('GitHub scan, preview and execution use the selected subdirectory', async (
   const box = createSecretBox(randomBytes(32));
   const target = createTarget(h.db, box, {
     name: 'target', host: 'localhost', port: 22, username: 'ops',
-    auth: { method: 'password', password: 'unused' }, workDir: '/tmp', connectTimeoutSec: 5,
+    auth: { method: 'password', password: 'unused' }, connectTimeoutSec: 5,
   });
   const plans: ExecutionPlan[] = [];
   const queue = createQueue({ concurrency: 1, perKeyConcurrency: 1 });

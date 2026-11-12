@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import type {
   CreateTargetInput,
   TargetCheckResult,
+  TargetDirectoryListing,
   TargetSummary,
   UpdateTargetInput,
 } from '@dashboard/shared';
@@ -20,7 +21,7 @@ import { nowIso } from '../db/client.js';
 import type { SecretBox } from '../lib/crypto.js';
 import { ConflictError, NotFoundError, ValidationError } from '../lib/errors.js';
 import { newTargetId } from '../lib/ids.js';
-import { joinRoot } from '../lib/paths.js';
+import { joinRoot, normalizePosix } from '../lib/paths.js';
 import { createSshTransport } from '../transport/ssh-transport.js';
 import type { Transport } from '../transport/types.js';
 
@@ -32,7 +33,6 @@ export type TargetRow = {
   username: string;
   auth_method: 'key' | 'password';
   secret_encrypted: string;
-  work_dir: string;
   connect_timeout_sec: number;
   last_check_at: string | null;
   last_check_ok: number | null;
@@ -54,7 +54,6 @@ function toSummary(row: TargetRow): TargetSummary {
     port: row.port,
     username: row.username,
     authMethod: row.auth_method,
-    workDir: row.work_dir,
     connectTimeoutSec: row.connect_timeout_sec,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -93,8 +92,8 @@ export function createTarget(db: Db, box: SecretBox, input: CreateTargetInput): 
   db.prepare(
     `INSERT INTO targets (
        id, name, host, port, username, auth_method, secret_encrypted,
-       work_dir, connect_timeout_sec, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       connect_timeout_sec, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.name,
@@ -103,7 +102,6 @@ export function createTarget(db: Db, box: SecretBox, input: CreateTargetInput): 
     input.username,
     input.auth.method,
     secret,
-    input.workDir,
     input.connectTimeoutSec,
     timestamp,
     timestamp,
@@ -136,7 +134,7 @@ export function updateTarget(
   db.prepare(
     `UPDATE targets SET
        name = ?, host = ?, port = ?, username = ?, auth_method = ?,
-       secret_encrypted = ?, work_dir = ?, connect_timeout_sec = ?, updated_at = ?
+       secret_encrypted = ?, connect_timeout_sec = ?, updated_at = ?
      WHERE id = ?`,
   ).run(
     input.name ?? current.name,
@@ -145,7 +143,6 @@ export function updateTarget(
     input.username ?? current.username,
     input.auth?.method ?? current.auth_method,
     secret,
-    input.workDir ?? current.work_dir,
     input.connectTimeoutSec ?? current.connect_timeout_sec,
     nowIso(),
     id,
@@ -192,24 +189,19 @@ export function createTransportForTarget(row: TargetRow, box: SecretBox): Transp
 }
 
 export type CheckTargetOptions = {
-  /**
-   * Root the run creates its per-execution staging directory under. Unlike the
-   * old shared-directory probe, this is a path the dashboard owns, so the check
-   * never writes inside the user's own working directory.
-   */
+  /** Root the run creates its per-execution staging directory under. */
   stagingRoot: string;
 };
 
 /**
  * Verify a target is ready to run something.
  *
- * Reachability alone is not enough: a run has to be able to `cd` into its
- * working directory, and it has to be able to create, write and remove a
- * staging directory on the host. Both are probed here, in one round trip, so a
- * broken target is diagnosed before the first run rather than by it.
+ * Reachability alone is not enough: a run has to be able to create, write and
+ * remove a staging directory on the host. That is the whole remote surface a
+ * run adds, so it is probed here, before the first run rather than by it.
  *
- * The staging probe writes under the staging root and never under `workDir`:
- * checking readiness must not litter the directory a user keeps their data in.
+ * The working directory is deliberately not checked any more: it belongs to a
+ * run and is chosen per script, so a target-wide fact cannot describe it.
  */
 export async function checkTarget(
   db: Db,
@@ -225,7 +217,7 @@ export async function checkTarget(
       'UPDATE targets SET last_check_at = ?, last_check_ok = ?, last_check_detail = ? WHERE id = ?',
     ).run(
       nowIso(),
-      result.reachable && result.workDirOk && result.stagingOk ? 1 : 0,
+      result.reachable && result.stagingOk ? 1 : 0,
       result.detail,
       id,
     );
@@ -240,7 +232,6 @@ export async function checkTarget(
       hostShell: null,
       hostUser: null,
       hasSetsid: false,
-      workDirOk: false,
       stagingOk: false,
     });
 
@@ -267,12 +258,9 @@ export async function checkTarget(
   const stagingProbe = joinRoot(options.stagingRoot, `probe-${token}`);
   const stagingFile = joinRoot(stagingProbe, 'probe');
 
-  // One round trip, two facts. The marker lines are what the service reads back;
-  // the exit status is deliberately not used, because the second half should
-  // still run and report when the first half fails.
+  // The marker line is what the service reads back; the exit status is
+  // deliberately not used, because cleanup should still run when the probe fails.
   const probe =
-    `if [ -d ${quote(row.work_dir)} ] && [ -x ${quote(row.work_dir)} ] ; ` +
-    `then echo WORK_OK ; else echo WORK_FAIL ; fi ; ` +
     `if (umask 077 && mkdir -p ${quote(stagingProbe)}) && ` +
     `printf %s ${quote(token)} > ${quote(stagingFile)} && ` +
     `[ "$(cat ${quote(stagingFile)})" = ${quote(token)} ] ; ` +
@@ -293,19 +281,16 @@ export async function checkTarget(
     const reason = error instanceof Error ? error.message : String(error);
     return record({
       ...shared,
-      workDirOk: false,
       stagingOk: false,
       detail: `Connected, but the readiness probe could not run: ${reason}`,
     });
   }
 
-  const workDirOk = stdout.includes('WORK_OK');
   const stagingOk = stdout.includes('STAGE_OK');
 
-  if (workDirOk && stagingOk) {
+  if (stagingOk) {
     return record({
       ...shared,
-      workDirOk: true,
       stagingOk: true,
       detail:
         `Connected as ${connectivity.user ?? row.username}; ready to run.` +
@@ -315,26 +300,82 @@ export async function checkTarget(
     });
   }
 
-  const problems: string[] = [];
-  if (!workDirOk) {
-    problems.push(
-      stdout.includes('WORK_FAIL')
-        ? `the working directory "${row.work_dir}" does not exist or cannot be entered`
-        : `the working directory "${row.work_dir}" could not be checked`,
-    );
-  }
-  if (!stagingOk) {
-    problems.push(
-      stdout.includes('STAGE_FAIL')
-        ? `a staging directory could not be created and written under "${options.stagingRoot}"`
-        : `the staging area under "${options.stagingRoot}" could not be checked`,
-    );
-  }
-
   return record({
     ...shared,
-    workDirOk,
-    stagingOk,
-    detail: `Connected, but nothing can run yet: ${problems.join('; ')}.`,
+    stagingOk: false,
+    detail:
+      `Connected, but nothing can run yet: ` +
+      (stdout.includes('STAGE_FAIL')
+        ? `a staging directory could not be created and written under "${options.stagingRoot}"`
+        : `the staging area under "${options.stagingRoot}" could not be checked`) +
+      '.',
   });
+}
+
+/** How many child directories one listing returns. */
+const MAX_DIRECTORY_ENTRIES = 500;
+
+/**
+ * List the child directories of one directory on the target.
+ *
+ * The picker needs to know what exists before a run is submitted, and only the
+ * target itself can answer that. `-print0` keeps a directory name containing a
+ * newline as one entry; the marker line separates "readable, here is the list"
+ * from "this path is not a usable directory", which is a real answer the caller
+ * must not mistake for an empty directory.
+ */
+export async function listTargetDirectories(
+  db: Db,
+  box: SecretBox,
+  id: string,
+  requested: string,
+): Promise<TargetDirectoryListing> {
+  const row = getTargetRow(db, id);
+  if (requested.includes('\0')) throw new ValidationError('The directory path is not usable');
+  const path = normalizePosix(requested);
+  if (!path.startsWith('/')) throw new ValidationError('Enter an absolute directory path');
+
+  const transport = createTransportForTarget(row, box);
+  let stdout = '';
+  try {
+    await transport.exec({
+      command:
+        // `find` is what makes the list survive names with newlines; a host
+        // without it must not look like a directory with no children.
+        `if ! command -v find >/dev/null 2>&1 ; then printf 'NOFIND\\n' ; ` +
+        `elif [ -d ${quote(path)} ] && [ -r ${quote(path)} ] && [ -x ${quote(path)} ] ; ` +
+        `then printf 'READY\\n' ; ` +
+        `find -L ${quote(path)} -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null ; ` +
+        `else printf 'UNREADABLE\\n' ; fi`,
+      onChunk: (chunk) => {
+        if (chunk.stream === 'stdout') stdout += chunk.data;
+      },
+      signal: new AbortController().signal,
+      timeoutMs: 10_000,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new ValidationError(`Could not list ${path}: ${reason}`);
+  }
+
+  if (stdout.startsWith('NOFIND')) {
+    throw new ValidationError('This host does not provide find, so directories cannot be browsed');
+  }
+  if (!stdout.startsWith('READY\n')) {
+    throw new ValidationError(`"${path}" is not a readable directory on this host`);
+  }
+
+  const entries = stdout
+    .slice('READY\n'.length)
+    .split('\0')
+    .filter((entry) => entry !== '')
+    .slice(0, MAX_DIRECTORY_ENTRIES)
+    .map((entry) => ({ name: entry.slice(entry.lastIndexOf('/') + 1), path: entry }))
+    .sort((left, right) => left.name.localeCompare(right.name, 'en'));
+
+  return {
+    path,
+    parent: path === '/' ? null : normalizePosix(`${path}/..`),
+    entries,
+  };
 }

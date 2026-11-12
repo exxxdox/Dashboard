@@ -9,7 +9,7 @@
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 
 /** Bump this and append a migration function when the schema changes. */
-const TARGET_VERSION = 14;
+const TARGET_VERSION = 15;
 
 type Migration = (db: SqliteDatabase) => void;
 
@@ -403,6 +403,12 @@ export const MIGRATIONS: Migration[] = [
       UPDATE scripts SET deleted_at = COALESCE(deleted_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
         WHERE format = 'ps1';
     `);
+  },
+  // v15 -- the working directory is a property of the run, chosen per script,
+  // not of the host. Historical execution rows keep the directory they used, so
+  // dropping the target column loses no recorded run.
+  (db) => {
+    db.exec('ALTER TABLE targets DROP COLUMN work_dir');
   },
 ];
 

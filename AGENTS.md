@@ -65,9 +65,9 @@ apps/web/src
 
 **Script storage = `DATA_DIR/scripts`.** Compose persists one `/data` mount; sources retain relative paths, so moving the old script root contents into `data/scripts` preserves source records. `SCRIPT_ROOT_CONTAINER` remains an explicit compatibility override. Entrypoint repairs app-state ownership but skips script repository contents.
 
-**Container own script; host run it.** Clone in container into bind-mounted dir; scan = filesystem work. Run uploads script to staging dir on host, runs with target `workDir` as cwd, deletes it. No path mean same thing both sides; old `mappingOk` nonce check gone with the requirement it verified. Replacement = readiness check: working dir enterable, staging dir creatable + removable.
+**Container own script; host run it.** Clone in container into bind-mounted dir; scan = filesystem work. Run uploads script to staging dir on host, runs with the run's `workDir` as cwd, deletes the staging dir. No path mean same thing both sides; old `mappingOk` nonce check gone with the requirement it verified. Replacement = readiness check: staging dir creatable + removable. WorkDir belong to one run, not target: default `/tmp`, each script's run form may name an exact absolute directory, browsed level by level over SSH (`GET /api/targets/:id/directories`). Selecting a directory require target first.
 
-Two consequences: only entry script uploaded (`source` sibling fail unless live in `workDir`); all runs on target share one workDir, per-target concurrency 2, two runs writing same output clash.
+Two consequences: only entry script uploaded (`source` sibling fail unless live in chosen workDir); runs on same target + workDir share it, per-target concurrency 2, two runs writing same output clash.
 
 **Source directory ownership is exclusive.** Creation and updates reject equal or ancestor/descendant source paths. Sync and file deletion also reject legacy overlaps before touching files; deleting only the source record remains a recovery path. This protects local files from another source’s recursive deletion or Git cleanup.
 
@@ -85,7 +85,7 @@ Two consequences: only entry script uploaded (`source` sibling fail unless live 
 
 **Cancel need process group.** SSH give channel, not process handle. Run the delivery wrapper under `setsid`, publish its pid before reading stdin, and release script bytes only after that handshake; runner later `kill -TERM -<pgid>`. `setsid` probed at runtime, not assumed — host without util-linux would fail every script with command-not-found. Fallback still publish pid: cancel degrade to process alone.
 
-**`TargetCheckResult.workDirOk` + `stagingOk` = load-bearing check.** Target answering SSH but unable to `cd` into workDir or create staging dir look healthy until first run. One probe establish both; writes under staging root, never inside `workDir`, so check can't litter data. Failed check does not block execution: `last_check_ok` = cached fact, host recover without button.
+**`TargetCheckResult.stagingOk` = load-bearing check.** Target answering SSH but unable to create staging dir look healthy until first run. Probe writes under staging root, never inside a user directory. No workDir check: directory vary per run, so target-wide fact cannot describe it. Failed check does not block execution: `last_check_ok` = cached fact, host recover without button.
 
 **Delivery = `ExecOptions.stdin` payload.** `Transport` gained `stdin` + `cleanupCommand`, not file transfer: "pipe bytes to command" = general form, future transports get it free from `spawn` stdio. `writeStdin` must run concurrent with output reading — awaiting it first deadlock against channel window remote end not draining — and stop once exec settle, else cancelled run hang on `drain`.
 
@@ -164,7 +164,7 @@ Moved here from README: user-facing defect list. README now only describe what p
 - **SSH host key not verified.** Connection trust whatever key peer present.
 - **Public GitHub repo only.** Clone over anonymous HTTPS.
 - **Entry script only uploaded.** `source ./lib.sh`, `cd "$(dirname "$0")"`, sibling shell files all broken — resolve relative to staged file in `/tmp`, not workDir.
-- **All runs on one target share one workDir**, two may run concurrently, so two script writing same output file overwrite each other.
+- **Runs on one target and one workDir share it**; two may run concurrently, so two scripts writing the same output file overwrite each other.
 - **Restart interrupt** queued + running task (script keep running on host, marked `interrupted` after).
 - **Cancel depend on `setsid`**; host without it can only kill script process, not children.
 - Stored output bounded by `MAX_LOG_BYTES`, over = marked truncated.

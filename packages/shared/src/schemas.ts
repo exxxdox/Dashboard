@@ -68,24 +68,30 @@ export const targetAuthSchema = z.discriminatedUnion('method', [
 ]);
 export type TargetAuth = z.infer<typeof targetAuthSchema>;
 
+/**
+ * Where a run executes on its target when the caller names no directory.
+ *
+ * A working directory belongs to one run, not to the host: two scripts may need
+ * different directories, and the host's temporary directory is a usable default
+ * that needs no configuration at all.
+ */
+export const DEFAULT_WORK_DIR = '/tmp';
+
+/** An absolute POSIX directory a run may use as its working directory. */
+export const workDirSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine((value) => value.startsWith('/'), {
+    message: 'Use an absolute path, e.g. /srv/scripts',
+  });
+
 export const createTargetSchema = z.object({
   name: z.string().min(1).max(100),
   host: z.string().min(1).max(255),
   port: z.number().int().min(1).max(65_535).default(22),
   username: z.string().min(1).max(100),
   auth: targetAuthSchema,
-  /**
-   * Absolute directory on the host that scripts run in. It has nothing to do
-   * with any path in this container: the script is pushed to a staging
-   * directory and merely run from here, so this only has to exist.
-   */
-  workDir: z
-    .string()
-    .min(1)
-    .max(1024)
-    .refine((value) => value.startsWith('/'), {
-      message: 'Use an absolute path, e.g. /srv/scripts',
-    }),
   connectTimeoutSec: z.number().int().min(1).max(120).default(15),
 });
 export type CreateTargetInput = z.infer<typeof createTargetSchema>;
@@ -133,6 +139,12 @@ export type UpdateSourceInput = z.infer<typeof updateSourceSchema>;
 export const executeScriptSchema = z.object({
   interactive: z.boolean().optional(),
   targetId: z.string().min(1),
+  /**
+   * Directory on the target this run executes in. Omitted means the host's
+   * temporary directory; it is a value of the run rather than of the target so
+   * each script can say where it needs to be.
+   */
+  workDir: workDirSchema.optional(),
   /** Parameter values, keyed by name. The script reads these from its environment. */
   params: z.record(z.string(), z.string()).default({}),
   /**
@@ -214,6 +226,8 @@ export const runDraftRowSchema = z.object({
  */
 export const runDraftSchema = z.object({
   interactive: z.boolean().optional(),
+  /** Raw box content, like `timeoutSec`: validation happens when the form submits. */
+  workDir: z.string().max(4096).optional(),
   /**
    * Parameter values, keyed by name.
    *
@@ -358,7 +372,6 @@ export type TargetSummary = {
   port: number;
   username: string;
   authMethod: 'key' | 'password';
-  workDir: string;
   connectTimeoutSec: number;
   createdAt: string;
   updatedAt: string;
@@ -471,14 +484,31 @@ export type TargetCheckResult = {
    * killed by pid, so child processes may survive.
    */
   hasSetsid: boolean;
-  /** The configured working directory exists and can be entered, so `cd` works. */
-  workDirOk: boolean;
   /**
    * A staging directory could be created, written, read back and removed. This
    * is the whole remote surface a run adds, so it is worth proving before the
    * first one rather than discovering it then.
    */
   stagingOk: boolean;
+};
+
+export type TargetDirectoryEntry = {
+  /** Last path segment, shown in the picker. */
+  name: string;
+  /** Absolute path on the target, used to descend or to select. */
+  path: string;
+};
+
+/**
+ * One level of a target's directory tree.
+ *
+ * `parent` is null at the filesystem root, so the picker knows "up" has nowhere
+ * to go instead of guessing from the path.
+ */
+export type TargetDirectoryListing = {
+  path: string;
+  parent: string | null;
+  entries: TargetDirectoryEntry[];
 };
 
 export type SyncResult = {

@@ -23,7 +23,6 @@ const check = (overrides: Partial<TargetCheckResult> = {}): TargetCheckResult =>
   hostShell: 'bash 5.2.15',
   hostUser: 'deploy',
   hasSetsid: true,
-  workDirOk: true,
   stagingOk: true,
   ...overrides,
 });
@@ -38,16 +37,14 @@ describe('targetCheckOutcome', () => {
     expect(outcome.detail).toContain('deploy');
   });
 
-  it('calls a host that cannot enter its working directory not ready', () => {
-    // The whole reason readiness is three facts: this host answers SSH, so
+  it('calls a host that cannot stage a script not ready', () => {
+    // The whole reason readiness is both facts: this host answers SSH, so
     // reachability alone would report a host every run would fail on.
-    const outcome = targetCheckOutcome(t, check({ workDirOk: false }));
+    const outcome = targetCheckOutcome(t, check({ stagingOk: false }));
 
     expect(outcome.tone).toBe('error');
     expect(outcome.message).toBe(t('targets.cannotRun'));
-    expect(outcome.detail).toContain(t('targets.fact.workDir') + ' ' + t('targets.fact.failed'));
-    // The advice names the config field, which is what makes it actionable.
-    expect(outcome.detail).toContain('workDir');
+    expect(outcome.detail).toContain(t('targets.fact.staging') + ' ' + t('targets.fact.failed'));
   });
 
   it('mentions setsid without treating it as a failure', () => {
@@ -58,10 +55,10 @@ describe('targetCheckOutcome', () => {
   });
 
   it('says the same thing in Chinese', () => {
-    const outcome = targetCheckOutcome(zh, check({ workDirOk: false }));
+    const outcome = targetCheckOutcome(zh, check({ stagingOk: false }));
 
     expect(outcome.message).toBe(translate('zh', 'targets.cannotRun'));
-    expect(outcome).not.toEqual(targetCheckOutcome(t, check({ workDirOk: false })));
+    expect(outcome).not.toEqual(targetCheckOutcome(t, check({ stagingOk: false })));
   });
 });
 

@@ -20,8 +20,8 @@ function seed(db: Db, params: ScriptParam[] = DECLARED): string {
   ).run(NOW, NOW);
   db.prepare(
     `INSERT INTO targets (id, name, host, port, username, auth_method, secret_encrypted,
-       work_dir, created_at, updated_at)
-     VALUES ('tgt_1', 'edge', '10.0.0.1', 22, 'deploy', 'key', 'x', '/srv', ?, ?)`,
+       created_at, updated_at)
+     VALUES ('tgt_1', 'edge', '10.0.0.1', 22, 'deploy', 'key', 'x', ?, ?)`,
   ).run(NOW, NOW);
   db.prepare(
     `INSERT INTO scripts (id, source_id, rel_path, rel_dir, file_name, format, size_bytes,
@@ -72,6 +72,8 @@ describe('getRunPrefill', () => {
       { name: '', value: '100', mode: 'argv' },
       { name: '', value: '200', mode: 'argv' },
     ]);
+    // The directory the run used comes back too, including the resolved default.
+    expect(prefill.draft.workDir).toBe('/srv');
   });
 
   test('returns the newest run, not the first one recorded', () => {
@@ -100,6 +102,7 @@ describe('getRunPrefill', () => {
       params: { ENV: 'canary' },
       custom: [{ name: '起始端口', value: '100', mode: 'argv' }],
       timeoutSec: '900',
+      workDir: '/srv/app',
     };
     saveRunDraft(db, scriptId, draft);
 

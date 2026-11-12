@@ -1,5 +1,6 @@
 import { Cron } from 'croner';
 import {
+  DEFAULT_WORK_DIR,
   executeScriptSchema,
   saveScriptScheduleSchema,
   validateParams,
@@ -184,6 +185,9 @@ export function createScriptScheduleService({ db, executions, logger, config }: 
       params: validation.env,
       argv: input.input.argv,
       timeoutSec: input.input.timeoutSec ?? metadata.timeoutSec ?? config.defaultTimeoutSec,
+      // Resolved now so the saved plan shows where it runs, not a blank that
+      // depends on a later default changing.
+      workDir: input.input.workDir ?? DEFAULT_WORK_DIR,
     };
     const timestamp = nowIso();
     db.prepare(`INSERT INTO script_schedules

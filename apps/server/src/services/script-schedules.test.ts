@@ -13,8 +13,8 @@ afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 function setup() {
   const db = openDatabase(':memory:');
   cleanups.push(() => db.close());
-  db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,work_dir,created_at,updated_at)
-    VALUES ('tgt_1','edge','edge.test','ops','password','unused','/srv',?,?)`).run(NOW, NOW);
+  db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,created_at,updated_at)
+    VALUES ('tgt_1','edge','edge.test','ops','password','unused',?,?)`).run(NOW, NOW);
   db.prepare(`INSERT INTO sources (id,name,kind,mount_path,created_at,updated_at)
     VALUES ('src_1','ops','local','local',?,?)`).run(NOW, NOW);
   db.prepare(`INSERT INTO scripts (id,source_id,rel_path,rel_dir,file_name,format,size_bytes,content_hash,display_name,params_json,timeout_sec,discovered_at,updated_at)
@@ -42,7 +42,7 @@ describe('script schedules', () => {
     h.input.input.argv.push('changed');
     h.db.prepare(`UPDATE scripts SET run_draft_json = '{"params":{"COUNT":"99"}}'`).run();
     expect(h.service.get(first.id)).toMatchObject({ scriptId: 'scr_1', name: 'Daily job', retentionDays: 30,
-      input: { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12 }, nextRunAt: '2026-11-10T00:01:00.000Z' });
+      input: { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12, workDir: '/tmp' }, nextRunAt: '2026-11-10T00:01:00.000Z' });
     expect(h.service.get(second.id)).toMatchObject({ name: 'Evening job', retentionDays: 0 });
     expect(h.service.list()).toHaveLength(2);
   });
@@ -92,7 +92,7 @@ describe('script schedules', () => {
     h.service.start();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(h.submit).toHaveBeenCalledTimes(2);
-    expect(h.submit).toHaveBeenCalledWith('scr_1', { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12 },
+    expect(h.submit).toHaveBeenCalledWith('scr_1', { targetId: 'tgt_1', params: { COUNT: '3' }, argv: ['a b'], timeoutSec: 12, workDir: '/tmp' },
       { scheduleId: first.id, scheduleName: 'Daily job', retentionDays: 30 });
     expect(h.submit).toHaveBeenCalledWith('scr_1', expect.anything(), { scheduleId: second.id, scheduleName: 'Second', retentionDays: 7 });
     await vi.advanceTimersByTimeAsync(60_000);

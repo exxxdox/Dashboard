@@ -78,7 +78,7 @@ function click(element: Element): void { (element.props.onClick as () => void)()
 
 const target: TargetSummary = {
   id: 'target', name: 'host', host: 'example.test', port: 22, username: 'ops', authMethod: 'key',
-  workDir: '/work', connectTimeoutSec: 15, createdAt: '', updatedAt: '',
+  connectTimeoutSec: 15, createdAt: '', updatedAt: '',
   lastCheckAt: null, lastCheckOk: null, lastCheckDetail: null,
 };
 const script: ScriptSummary = {
@@ -134,14 +134,14 @@ describe('target form', () => {
     return render(() => TargetForm({ target: existing, onDone }));
   }
   function fill(): void {
-    for (const [label, value] of Object.entries({ name: ' host ', host: ' example.test ', username: ' ops ', workDir: ' /work ' })) {
+    for (const [label, value] of Object.entries({ name: ' host ', host: ' example.test ', username: ' ops ' })) {
       edit(form(), `targets.form.${label}`, value);
     }
   }
   test('requires connection fields and a credential for a new target', () => {
     submit(form());
     expect(hooks.create.mutate).not.toHaveBeenCalled();
-    expect(elements(form()).filter((element) => element.props.error === 'targets.form.required')).toHaveLength(5);
+    expect(elements(form()).filter((element) => element.props.error === 'targets.form.required')).toHaveLength(4);
     fill(); submit(form());
     expect(hooks.create.mutate).not.toHaveBeenCalled();
   });
@@ -152,7 +152,7 @@ describe('target form', () => {
     edit(form(), 'targets.form.passphrase', ' phrase ');
     submit(form(null, done));
     expect(hooks.create.mutate).toHaveBeenCalledWith({
-      name: 'host', host: 'example.test', username: 'ops', port: 22, workDir: '/work', connectTimeoutSec: 15,
+      name: 'host', host: 'example.test', username: 'ops', port: 22, connectTimeoutSec: 15,
       auth: { method: 'key', privateKey: ' key\n', passphrase: ' phrase ' },
     }, { onSuccess: done });
   });
@@ -169,7 +169,7 @@ describe('target form', () => {
     const existing = { ...target, authMethod };
     submit(form(existing));
     expect(hooks.update.mutate).toHaveBeenCalledWith({ id: 'target', input: {
-      name: 'host', host: 'example.test', username: 'ops', port: 22, workDir: '/work', connectTimeoutSec: 15,
+      name: 'host', host: 'example.test', username: 'ops', port: 22, connectTimeoutSec: 15,
     } }, expect.any(Object));
     expect(hooks.create.mutate).not.toHaveBeenCalled();
   });

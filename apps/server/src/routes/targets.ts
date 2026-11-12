@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { createTargetSchema, updateTargetSchema } from '@dashboard/shared';
+import { z } from 'zod';
 
 import type { AppContext } from '../context.js';
 import {
@@ -7,9 +8,14 @@ import {
   createTarget,
   deleteTarget,
   getTarget,
+  listTargetDirectories,
   listTargets,
   updateTarget,
 } from '../services/targets.js';
+
+const directoryQuery = z.object({
+  path: z.string().min(1).max(4096).default('/'),
+});
 
 export function registerTargetRoutes(app: FastifyInstance, ctx: AppContext): void {
   app.get('/api/targets', () => listTargets(ctx.db));
@@ -35,5 +41,10 @@ export function registerTargetRoutes(app: FastifyInstance, ctx: AppContext): voi
 
   app.post<{ Params: { id: string } }>('/api/targets/:id/check', (request) =>
     checkTarget(ctx.db, ctx.box, request.params.id, { stagingRoot: ctx.config.stagingDir }),
+  );
+
+  // Browsing needs the target itself: what exists is a fact only the host can answer.
+  app.get<{ Params: { id: string } }>('/api/targets/:id/directories', (request) =>
+    listTargetDirectories(ctx.db, ctx.box, request.params.id, directoryQuery.parse(request.query).path),
   );
 }

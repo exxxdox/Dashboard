@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
+  DEFAULT_WORK_DIR,
   MAX_PARAM_COUNT,
   type ExecuteScriptInput,
   type ScriptParam,
   type ScriptSummary,
   type TargetSummary,
 } from '@dashboard/shared';
-import { ChevronRight, Plus, Trash } from 'lucide-react';
+import { ChevronRight, FolderOpen, Plus, Trash } from 'lucide-react';
 import { Button, IconButton } from '../components/Button';
 import { Select, Switch, TextInput } from '../components/Form';
 import {
@@ -33,6 +34,7 @@ import {
   type CustomParamRow,
 } from '../lib/run-params';
 import { toRunInput } from '../lib/run-submit';
+import { WorkDirPicker } from './WorkDirPicker';
 
 type ParamValues = Record<string, string>;
 
@@ -200,11 +202,14 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
   const [initial] = useState(() => initialInput ? formFromDraft({
     params: initialInput.params,
     interactive: initialInput.interactive,
+    workDir: initialInput.workDir ?? '',
     custom: initialInput.argv.map((value) => ({ name: '', value, mode: 'argv' as const })),
     timeoutSec: initialInput.timeoutSec === undefined ? '' : String(initialInput.timeoutSec),
   }, script.params) : null);
   const [interactive, setInteractive] = useState(initial?.interactive ?? false);
   const [targetId, setTargetId] = useState(initialInput?.targetId ?? '');
+  const [workDir, setWorkDir] = useState(initial?.workDir ?? '');
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [values, setValues] = useState<ParamValues>(() => initial?.values ?? seedValues(script.params));
   const [timeout, setTimeoutSec] = useState(initial?.timeoutSec ?? '');
   const [showErrors, setShowErrors] = useState(false);
@@ -237,7 +242,11 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
 
   const errors = validateValues(script.params, values, t);
   const customErrors = validateRows(customRows, script.params, t);
-  const hasErrors = Object.keys(errors).length > 0 || Object.keys(customErrors).length > 0;
+  // A blank directory is the target's default; anything else must be absolute.
+  const workDirError =
+    workDir.trim() !== '' && !workDir.trim().startsWith('/') ? t('runs.error.absolutePath') : null;
+  const hasErrors =
+    Object.keys(errors).length > 0 || Object.keys(customErrors).length > 0 || workDirError !== null;
   // The run dialog has no submit button, so `showErrors` alone would never flip
   // in run mode: a touched form reveals its errors, and the schedule editor's
   // save still turns them all on.
@@ -263,7 +272,13 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
   function currentInput(): ExecuteScriptInput | null {
     setShowErrors(true);
     if (hasErrors || effectiveTargetId === '') return null;
-    return toRunInput({ values, rows: customRows, timeoutSec: timeout, interactive: mode === 'run' && interactive }, effectiveTargetId);
+    return toRunInput({
+      values,
+      rows: customRows,
+      timeoutSec: timeout,
+      workDir,
+      interactive: mode === 'run' && interactive,
+    }, effectiveTargetId);
   }
 
   // The draft arrives once per script; it seeds the form and then stops being
@@ -277,6 +292,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
       setInteractive(restored.interactive ?? false);
       setValues(restored.values);
       setCustomRows(restored.rows);
+      setWorkDir(restored.workDir ?? '');
       if (restored.timeoutSec !== '') setTimeoutSec(restored.timeoutSec);
       setCustomOpen(script.params.length === 0 || restored.rows.length > 0);
     }
@@ -287,7 +303,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
   // something -- opening a script must not rewrite its draft.
   const savedDraft = prefill.data?.draft;
   const save = saveDraft.mutateAsync;
-  const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout, interactive });
+  const draft = draftFromForm({ values, rows: customRows, timeoutSec: timeout, workDir, interactive });
   const lastRequested = useRef('');
   const saveQueue = useRef<Promise<unknown> | null>(null);
   const serialized = JSON.stringify(draft);
@@ -316,7 +332,7 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
     if (!dirty) return;
     const timer = setTimeout(() => flushRef.current(), DRAFT_SAVE_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [dirty, values, customRows, timeout]);
+  }, [dirty, values, customRows, timeout, workDir]);
 
   // Only unmount flushes immediately; ordinary edits still share the debounce.
   useEffect(() => () => flushRef.current(), []);
@@ -369,6 +385,45 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
                 </option>
               ))}
             </Select>
+          )}
+        </RunRow>
+
+        <RunRow
+          label={t('runs.field.workDir')}
+          hint={
+            selectedTarget
+              ? t('runs.workDir.hint', { default: DEFAULT_WORK_DIR })
+              : t('runs.workDir.targetFirst')
+          }
+          error={revealErrors ? workDirError : null}
+        >
+          {({ id, describedBy }) => (
+            <div className="flex min-w-0 items-center gap-2">
+              <TextInput
+                id={id}
+                aria-describedby={describedBy}
+                className="mono min-w-0 flex-1"
+                value={workDir}
+                placeholder={DEFAULT_WORK_DIR}
+                spellCheck={false}
+                autoComplete="off"
+                disabled={!selectedTarget}
+                onChange={(event) => {
+                  setTouched(true);
+                  setWorkDir(event.target.value);
+                }}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<FolderOpen className="size-4" aria-hidden />}
+                disabled={!selectedTarget}
+                title={selectedTarget ? t('runs.workDir.browse') : t('runs.workDir.targetFirst')}
+                onClick={() => setPickerOpen(true)}
+              >
+                {t('runs.workDir.browse')}
+              </Button>
+            </div>
           )}
         </RunRow>
 
@@ -529,6 +584,19 @@ export function RunPanel({ script, mode = 'run', initialInput, active = true, ch
           )}
         </RunRow>
       </div>
+
+      <WorkDirPicker
+        targetId={effectiveTargetId}
+        targetName={selectedTarget?.name ?? ''}
+        value={workDir}
+        open={pickerOpen && selectedTarget !== undefined}
+        defaultPath={DEFAULT_WORK_DIR}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(path) => {
+          setTouched(true);
+          setWorkDir(path);
+        }}
+      />
 
       {children?.(currentInput)}
     </div>

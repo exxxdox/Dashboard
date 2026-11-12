@@ -124,7 +124,6 @@ function TargetRow({ target, onEdit }: { target: TargetSummary; onEdit: () => vo
             </span>
           </div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="mono text-mute text-meta">{target.workDir}</span>
             <TargetCheckStamp target={target} />
           </div>
         </div>

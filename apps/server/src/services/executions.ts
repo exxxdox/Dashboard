@@ -16,7 +16,7 @@ import type {
   ExecutionStream,
   ScriptSummary,
 } from '@dashboard/shared';
-import { resolveInterpreter, validateParams, type RunEnvName } from '@dashboard/shared';
+import { DEFAULT_WORK_DIR, resolveInterpreter, validateParams, type RunEnvName } from '@dashboard/shared';
 
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db/client.js';
@@ -289,6 +289,8 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
 
     const timeoutSec = input.timeoutSec ?? script.timeoutSec ?? config.defaultTimeoutSec;
     const interpreter = resolveInterpreter(`.${script.format}`, script.interpreterOverride, input.interactive ?? false);
+    // The run owns its working directory; the target only owns the host it is on.
+    const workDir = input.workDir ?? DEFAULT_WORK_DIR;
 
     // Typed by name so this list and `RUN_ENV_NAMES` -- which is what refuses a
     // parameter colliding with one of these -- cannot drift apart: a key present
@@ -301,10 +303,10 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       SD_SCRIPT_NAME: script.displayName,
       SD_SCRIPT_PATH: scriptPath,
       SD_SCRIPT_REL_PATH: script.relPath,
-      SD_WORK_DIR: target.work_dir,
+      SD_WORK_DIR: workDir,
       // Deprecated alias: the working directory used to be the script's own
       // directory, and scripts in the wild read this name for exactly that.
-      SD_SCRIPT_DIR: target.work_dir,
+      SD_SCRIPT_DIR: workDir,
       SD_TARGET_NAME: target.name,
       SD_SOURCE_NAME: source.name,
     };
@@ -314,7 +316,7 @@ export function createExecutionService(deps: ExecutionServiceDeps): ExecutionSer
       interactive: input.interactive ?? false,
       scriptPath,
       stagingDir,
-      workDir: target.work_dir,
+      workDir,
       interpreter,
       displayCommand: `${interpreter.label} ${script.relPath}`,
       scriptBytes: readScriptBytes(scriptContainerPath, script),

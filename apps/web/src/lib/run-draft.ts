@@ -17,16 +17,20 @@ export type RunFormState = {
   /** The custom rows, ids and all. */
   rows: CustomParamRow[];
   timeoutSec: string;
+  /** Blank means the run uses the target's default working directory. */
+  workDir?: string;
   interactive?: boolean;
 };
 
 export function draftFromForm(state: RunFormState): RunDraft {
+  const workDir = state.workDir?.trim() ?? '';
   return {
     ...(state.interactive === undefined ? {} : { interactive: state.interactive }),
     params: state.values,
     // Ids are the form's own bookkeeping; a restored row gets a fresh one.
     custom: state.rows.map(({ name, value, mode }) => ({ name, value, mode })),
     timeoutSec: state.timeoutSec,
+    ...(workDir === '' ? {} : { workDir }),
   };
 }
 
@@ -62,7 +66,13 @@ export function formFromDraft(draft: RunDraft, declared: ScriptParam[]): RunForm
     rows = updateRow(rows, added.id, { name: row.name, value: row.value, mode: row.mode });
   }
 
-  return { values, rows, timeoutSec: draft.timeoutSec, ...(draft.interactive === undefined ? {} : { interactive: draft.interactive }) };
+  return {
+    values,
+    rows,
+    timeoutSec: draft.timeoutSec,
+    workDir: draft.workDir ?? '',
+    ...(draft.interactive === undefined ? {} : { interactive: draft.interactive }),
+  };
 }
 
 /** Two drafts are the same if they would produce the same run. */

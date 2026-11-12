@@ -27,6 +27,7 @@ import type {
   SourceSummary,
   SyncResult,
   TargetCheckResult,
+  TargetDirectoryListing,
   TargetSummary,
   TestNotificationInput,
   NotificationTest,
@@ -202,6 +203,10 @@ export const api = {
     apiRequest<void>(`/targets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   checkTarget: (id: string) =>
     apiRequest<TargetCheckResult>(`/targets/${encodeURIComponent(id)}/check`, { method: 'POST' }),
+  listTargetDirectories: (id: string, path: string) =>
+    apiRequest<TargetDirectoryListing>(`/targets/${encodeURIComponent(id)}/directories`, {
+      query: { path },
+    }),
 
   listSources: () => apiRequest<SourceSummary[]>('/sources'),
   createSource: (body: CreateSourceInput) =>

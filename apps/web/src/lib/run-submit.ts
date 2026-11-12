@@ -15,10 +15,13 @@ import { collectArgv, collectParams } from './run-params';
  */
 export function toRunInput(state: RunFormState, targetId: string): ExecuteScriptInput {
   const timeout = state.timeoutSec.trim();
+  const workDir = state.workDir?.trim() ?? '';
 
   return {
     targetId,
     ...(state.interactive ? { interactive: true } : {}),
+    // Omitted rather than sent blank: the server owns the default directory.
+    ...(workDir === '' ? {} : { workDir }),
     // Custom rows come last, so a row shadows nothing: a row repeating a
     // declared name is refused by the form before it can get here.
     params: { ...state.values, ...collectParams(state.rows) },

@@ -160,7 +160,7 @@ test('deleting preserves execution history and recreating the file keeps its sch
   const h = setup();
   const content = 'echo hello';
   const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'test.sh', content } })).json();
-  h.db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,work_dir,created_at,updated_at) VALUES ('target','target','localhost','ops','password','unused','/tmp','','')`).run();
+  h.db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,created_at,updated_at) VALUES ('target','target','localhost','ops','password','unused','','')`).run();
   h.db.prepare(`INSERT INTO executions (id,script_id,target_id,status,command_display,target_name,script_name,script_rel_path,work_dir,queued_at) VALUES ('execution',?,'target','succeeded','echo hello','target','test','test.sh','/tmp','')`).run(script.id);
   h.db.prepare(`INSERT INTO script_schedules (id,script_id,name,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at) VALUES ('schedule',?,'Daily','target','* * * * *','UTC',1,'{}','2027-01-01','','')`).run(script.id);
   expect((await h.app.inject({ method: 'DELETE', url: `/api/scripts/${script.id}`, payload: { expectedHash: script.contentHash } })).statusCode).toBe(204);
@@ -233,7 +233,7 @@ test('editing a local name renames its file and preserves identity through a res
   const script = (await h.app.inject({ method: 'POST', url: `/api/sources/${h.source.id}/scripts`, payload: { relPath: 'folder/old.sh', content: 'echo original' } })).json();
   chmodSync(join(h.directory, 'folder/old.sh'), 0o755);
   h.db.prepare("UPDATE scripts SET run_draft_json = ? WHERE id = ?").run('{"interactive":true}', script.id);
-  h.db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,work_dir,created_at,updated_at) VALUES ('target','target','localhost','ops','password','unused','/tmp','','')`).run();
+  h.db.prepare(`INSERT INTO targets (id,name,host,username,auth_method,secret_encrypted,created_at,updated_at) VALUES ('target','target','localhost','ops','password','unused','','')`).run();
   h.db.prepare(`INSERT INTO executions (id,script_id,target_id,status,command_display,target_name,script_name,script_rel_path,work_dir,queued_at) VALUES ('execution',?,'target','succeeded','echo original','target','old','folder/old.sh','/tmp','')`).run(script.id);
   h.db.prepare(`INSERT INTO script_schedules (id,script_id,name,target_id,cron,time_zone,enabled,run_input_json,next_run_at,created_at,updated_at) VALUES ('schedule',?,'Daily','target','* * * * *','UTC',1,'{}','2027-01-01','','')`).run(script.id);
 

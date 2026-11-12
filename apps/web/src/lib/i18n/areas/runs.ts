@@ -122,6 +122,7 @@ const en = {
 
   // -- the run form --------------------------------------------------------
   'runs.error.pickTarget': 'Pick a target',
+  'runs.error.absolutePath': 'Use an absolute path, starting with /',
   'runs.error.required': 'Required',
   'runs.error.number': 'Expected a number',
   'runs.paramName.required': 'Name required',
@@ -142,6 +143,17 @@ const en = {
     'This script declares no environment variables, so the list below is the whole form: anything added there reaches it as an environment variable or a positional argument.',
   'runs.timeout.hint': "Seconds. Blank uses the script's own limit.",
   'runs.timeout.hintOwn': "Seconds. Blank uses the script's own limit ({seconds}s).",
+
+  'runs.workDir.hint': 'Absolute directory on the target host. Blank uses {default}.',
+  'runs.workDir.targetFirst': 'Select a target first.',
+  'runs.workDir.browse': 'Browse…',
+  'runs.workDir.browseTitle': 'Choose a working directory',
+  'runs.workDir.browseHint': 'Directories on {target}.',
+  'runs.workDir.pathLabel': 'Directory path',
+  'runs.workDir.up': 'Up',
+  'runs.workDir.select': 'Use this directory',
+  'runs.workDir.loading': 'Loading directories…',
+  'runs.workDir.empty': 'No subdirectories here.',
 
   'runs.custom.title': 'Custom parameters',
   'runs.custom.modeLabel': 'Custom parameter {index} mode',
@@ -272,6 +284,7 @@ const zh: Record<keyof typeof en, string> = {
   'runs.terminal.loading': '正在加载终端…',
 
   'runs.error.pickTarget': '请选择目标主机',
+  'runs.error.absolutePath': '请使用以 / 开头的绝对路径',
   'runs.error.required': '必填',
   'runs.error.number': '应为数字',
   'runs.paramName.required': '请填写名称',
@@ -292,6 +305,17 @@ const zh: Record<keyof typeof en, string> = {
     '该脚本未声明任何环境变量，因此下方列表就是完整表单：在那里添加的内容会以环境变量或位置参数的形式传给脚本。',
   'runs.timeout.hint': '单位秒。留空则使用脚本自身的限制。',
   'runs.timeout.hintOwn': '单位秒。留空则使用脚本自身的限制（{seconds} 秒）。',
+
+  'runs.workDir.hint': '目标主机上的绝对路径，留空则使用 {default}。',
+  'runs.workDir.targetFirst': '请先选择目标主机。',
+  'runs.workDir.browse': '浏览…',
+  'runs.workDir.browseTitle': '选择工作目录',
+  'runs.workDir.browseHint': '{target} 上的目录。',
+  'runs.workDir.pathLabel': '目录路径',
+  'runs.workDir.up': '上一级',
+  'runs.workDir.select': '使用此目录',
+  'runs.workDir.loading': '正在加载目录…',
+  'runs.workDir.empty': '此处没有子目录。',
 
   'runs.custom.title': '自定义参数',
   'runs.custom.modeLabel': '自定义参数 {index} 的类型',

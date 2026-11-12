@@ -5,6 +5,7 @@ export const queryKeys = {
   overview: () => ['overview'] as const,
 
   targets: () => ['targets'] as const,
+  targetDirectories: (id: string, path: string) => ['targets', id, 'directories', path] as const,
 
   sources: () => ['sources'] as const,
   sourceTree: (id: string) => ['sources', id, 'tree'] as const,

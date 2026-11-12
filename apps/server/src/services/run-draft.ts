@@ -52,7 +52,8 @@ export function emptyDraft(): RunDraft {
  * someone opened and left alone would freeze the last run's values out.
  */
 function hasContent(draft: RunDraft): boolean {
-  return Object.keys(draft.params).length > 0 || draft.custom.length > 0 || draft.timeoutSec !== '' || draft.interactive !== undefined;
+  return Object.keys(draft.params).length > 0 || draft.custom.length > 0 || draft.timeoutSec !== ''
+    || draft.interactive !== undefined || (draft.workDir !== undefined && draft.workDir !== '');
 }
 
 type ScriptDraftRow = {
@@ -77,6 +78,7 @@ type LastRunRow = {
   interactive: number;
   param_values_json: string;
   argv_json: string;
+  work_dir: string;
 };
 
 /**
@@ -91,7 +93,7 @@ type LastRunRow = {
 function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): RunDraft | null {
   const row = db
     .prepare<[string], LastRunRow>(
-      `SELECT param_values_json, argv_json, interactive FROM executions
+      `SELECT param_values_json, argv_json, interactive, work_dir FROM executions
        WHERE script_id = ? ORDER BY queued_at DESC LIMIT 1`,
     )
     .get(scriptId);
@@ -110,7 +112,15 @@ function draftFromLastRun(db: Db, scriptId: string, declared: ScriptParam[]): Ru
     custom.push({ name: '', value, mode: 'argv' });
   }
 
-  return { params, custom, timeoutSec: '', ...(row.interactive === 1 ? { interactive: true } : {}) };
+  // The execution stores the resolved directory, so restoring it is exact even
+  // when the last run used the host's temporary directory by default.
+  return {
+    params,
+    custom,
+    timeoutSec: '',
+    workDir: row.work_dir,
+    ...(row.interactive === 1 ? { interactive: true } : {}),
+  };
 }
 
 export function getRunPrefill(db: Db, scriptId: string): ScriptRunPrefill {

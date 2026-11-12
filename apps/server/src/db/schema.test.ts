@@ -257,7 +257,9 @@ describe('v2 migration', () => {
   test('backfills the working directory from the old host path', () => {
     const db = versionOneDatabase();
     try {
-      migrate(db);
+      const v2 = MIGRATIONS[1];
+      if (!v2) throw new Error('expected a v2 migration');
+      v2(db);
 
       // The old value proved the host could traverse that directory, which is
       // exactly what `cd` needs, so it is the best available backfill.
@@ -273,8 +275,9 @@ describe('v2 migration', () => {
     try {
       migrate(db);
 
-      expect(columnsOf(db, 'targets')).toContain('work_dir');
+      expect(columnsOf(db, 'targets')).not.toContain('work_dir');
       expect(columnsOf(db, 'targets')).not.toContain('script_root_host');
+      // History still records the directory each run used.
       expect(columnsOf(db, 'executions')).toContain('work_dir');
       expect(columnsOf(db, 'executions')).not.toContain('cwd_host');
     } finally {
@@ -282,12 +285,14 @@ describe('v2 migration', () => {
     }
   });
 
-  test('keeps the renamed column NOT NULL', () => {
+  test('keeps the renamed column NOT NULL until the target column is removed', () => {
     // A nullable column would push `string | null` through the row type and the
     // plan builder for a case that cannot occur.
     const db = versionOneDatabase();
     try {
-      migrate(db);
+      const v2 = MIGRATIONS[1];
+      if (!v2) throw new Error('expected a v2 migration');
+      v2(db);
 
       expect(notNullOf(db, 'targets', 'work_dir')).toBe(1);
     } finally {
@@ -319,8 +324,7 @@ describe('v2 migration', () => {
       expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
 
       expect(() => migrate(db)).not.toThrow();
-      const target = db.prepare<[], { work_dir: string }>('SELECT work_dir FROM targets').get();
-      expect(target?.work_dir).toBe('/srv/scripts');
+      expect(db.prepare('SELECT work_dir FROM executions').get()).toEqual({ work_dir: '/srv/scripts' });
     } finally {
       db.close();
     }

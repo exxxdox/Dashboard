@@ -2,16 +2,15 @@
  * The targets page and its form.
  *
  * The strings are shaped by one fact: a target is a host, so nothing here is
- * allowed to imply the script runs locally. "Working directory" is spelled
- * "on host", and the note under a failed check says outright that no path has
- * to mean the same thing on both sides.
+ * allowed to imply the script runs locally. The working directory is not part
+ * of a target any more; it belongs to the run and is chosen beside the script.
  */
 
 const en = {
   'targets.eyebrow': 'Infrastructure',
   'targets.title': 'Targets',
   'targets.description':
-    'A target is a Linux host reached over SSH. Scripts are uploaded to it and run from the working directory you configure.',
+    'A target is a Linux host reached over SSH. Scripts are uploaded to it and run in a working directory chosen per run.',
 
   'targets.add': 'Add target',
   'targets.newTitle': 'New target',
@@ -33,15 +32,9 @@ const en = {
   // -- the result of a check ----------------------------------------------
   'targets.cannotRun': 'This target cannot run anything yet',
   'targets.fact.reachable': 'Reachable',
-  'targets.fact.workDir': 'Working directory',
   'targets.fact.staging': 'Staging area',
   'targets.fact.ok': 'ok',
   'targets.fact.failed': 'failed',
-  // Split around the `workDir` code token the sentence points at.
-  'targets.workDirNote.before':
-    'A script is uploaded to a temporary directory on the host and run from',
-  'targets.workDirNote.after':
-    ', so that directory has to exist. Nothing here needs to match a path in this container.',
   // Follows the `setsid` token, which is why it starts mid-sentence.
   'targets.setsidNote':
     'is missing on this host. Cancelling a run kills only the top-level process, so anything it spawned may keep running.',
@@ -54,10 +47,6 @@ const en = {
   'targets.form.host': 'Host',
   'targets.form.hostPlaceholder': '10.0.0.12 or host.example.com',
   'targets.form.port': 'Port',
-  'targets.form.workDir': 'Working directory on host',
-  'targets.form.workDirHint':
-    'Absolute path the script runs in. It does not need to match anything in this container: the script is uploaded to a temporary directory and simply run from here, so this only has to exist. Files it reads by relative path must already live there.',
-  'targets.form.workDirPlaceholder': '/srv/scripts',
   'targets.form.auth': 'Authentication',
   'targets.form.privateKey': 'Private key',
   'targets.form.password': 'Password',
@@ -80,7 +69,7 @@ const zh: Record<keyof typeof en, string> = {
   'targets.eyebrow': '基础设施',
   'targets.title': '目标主机',
   'targets.description':
-    '目标主机是通过 SSH 连接的 Linux 主机。脚本会上传到该主机，并在你配置的工作目录中运行。',
+    '目标主机是通过 SSH 连接的 Linux 主机。脚本会上传到该主机，并在每次运行时选择的工作目录中运行。',
 
   'targets.add': '添加目标主机',
   'targets.newTitle': '新建目标主机',
@@ -99,12 +88,9 @@ const zh: Record<keyof typeof en, string> = {
 
   'targets.cannotRun': '该目标主机暂时无法运行任何脚本',
   'targets.fact.reachable': '可连接',
-  'targets.fact.workDir': '工作目录',
   'targets.fact.staging': '暂存目录',
   'targets.fact.ok': '正常',
   'targets.fact.failed': '失败',
-  'targets.workDirNote.before': '脚本会上传到主机上的临时目录，并从',
-  'targets.workDirNote.after': '运行，因此该目录必须存在。这里的路径不需要与容器内的任何路径一致。',
   'targets.setsidNote':
     '在这台主机上不可用。取消运行只能结束顶层进程，它启动的子进程可能仍在运行。',
 
@@ -115,10 +101,6 @@ const zh: Record<keyof typeof en, string> = {
   'targets.form.host': '主机',
   'targets.form.hostPlaceholder': '10.0.0.12 或 host.example.com',
   'targets.form.port': '端口',
-  'targets.form.workDir': '主机上的工作目录',
-  'targets.form.workDirHint':
-    '脚本运行所处的绝对路径。无需与容器内的路径一致：脚本会先上传到临时目录，再从该目录运行，所以只需这个目录存在即可。脚本用相对路径读取的文件必须已经放在该目录中。',
-  'targets.form.workDirPlaceholder': '/srv/scripts',
   'targets.form.auth': '身份验证',
   'targets.form.privateKey': '私钥',
   'targets.form.password': '密码',

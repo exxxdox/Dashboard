@@ -148,6 +148,21 @@ export function useCheckTarget() {
   });
 }
 
+/**
+ * One level of a target's directory tree, for the working-directory picker.
+ *
+ * Only requested while the picker is open and a target is selected: the answer
+ * comes from the host over SSH, so asking before it can be shown is wasted work.
+ */
+export function useTargetDirectories(targetId: string | null, path: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.targetDirectories(targetId ?? '', path),
+    queryFn: () => api.listTargetDirectories(targetId ?? '', path),
+    enabled: enabled && Boolean(targetId) && path.startsWith('/'),
+    retry: false,
+  });
+}
+
 export function useDeleteTarget() {
   const client = useQueryClient();
   return useMutation({

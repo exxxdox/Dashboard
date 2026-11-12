@@ -76,6 +76,7 @@ export function ScriptSchedulePanel({ scriptId, schedule, defaultName, getInput,
               <h4 className="font-semibold">{t('schedule.savedSettings')}</h4>
               <dl className="grid gap-2">
                 <div><dt className="text-faint">{t('schedule.target')}</dt><dd className="break-all">{schedule.targetName}</dd></div>
+                <div><dt className="text-faint">{t('schedule.workDir')}</dt><dd className="mono break-all">{schedule.input.workDir ?? t('schedule.none')}</dd></div>
                 <div><dt className="text-faint">{t('schedule.savedRule')}</dt><dd className="mono break-all">{schedule.cron} · {schedule.timeZone}</dd></div>
                 <div><dt className="text-faint">{t('schedule.params')}</dt><dd className="mono whitespace-pre-wrap break-all">{Object.entries(schedule.input.params).map(([name, value]) => `${name}=${value}`).join('\n') || t('schedule.none')}</dd></div>
                 <div><dt className="text-faint">{t('schedule.argv')}</dt><dd className="mono whitespace-pre-wrap break-all">{schedule.input.argv.map((value, index) => `$${index + 1}: ${value}`).join('\n') || t('schedule.none')}</dd></div>
