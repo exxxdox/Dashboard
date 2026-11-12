@@ -35,21 +35,22 @@ function render(): string {
   return renderToStaticMarkup(<ScriptsPage scriptId={state.linkedSourceId ? 'script' : null} />);
 }
 
+// The picker renders its current value as text now that it is a listbox.
 test('reopens the remembered source after leaving the scripts page', () => {
   saveScriptSource('b');
-  expect(render()).toContain('<option value="b" selected="">');
+  expect(render()).toContain('Source B (1)');
   expect(render()).toContain('b-task.sh');
 });
 
 test('a direct script link takes priority over the remembered source', () => {
   saveScriptSource('b');
   state.linkedSourceId = 'a';
-  expect(render()).toContain('<option value="a" selected="">');
+  expect(render()).toContain('Source A (1)');
 });
 
 test('a deleted source falls back to the first available source', () => {
   saveScriptSource('deleted');
-  expect(render()).toContain('<option value="a" selected="">');
+  expect(render()).toContain('Source A (1)');
 });
 
 test('restores the selected source directory expansion state', () => {

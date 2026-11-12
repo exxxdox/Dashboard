@@ -6,7 +6,6 @@ import { PageHeader } from '../components/PageHeader';
 import { Panel } from '../components/Panel';
 import { Button } from '../components/Button';
 import { EmptyState, ErrorBanner, LoadingBlock } from '../components/Feedback';
-import { Select } from '../components/Form';
 import { ScriptTree } from '../components/ScriptTree';
 import { SyncStatusLabel } from '../components/StatusDot';
 import { useScript, useSourceTree, useSources, useSyncSource } from '../api/queries';
@@ -15,6 +14,7 @@ import { useI18n, useT } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import { readScriptSource, saveScriptSource } from '../lib/script-browser';
 import { ScriptDetail, ScriptIdentityBar } from './ScriptDetail';
+import { SourcePicker } from './SourcePicker';
 import { CreateScriptButton } from './ScriptFileEditor';
 
 export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
@@ -82,21 +82,16 @@ export function ScriptsPage({ scriptId }: { scriptId: string | null }) {
         // needs rather than the ~350px a second column left it at 1024px.
         // The remaining viewport belongs to the panes; their content scrolls without sizing the page.
         <div className="mt-5 grid min-h-0 flex-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
-          <Select
-            aria-label={i18n.t('scripts.source')}
+          <SourcePicker
+            label={i18n.t('scripts.source')}
             // While the columns are stacked this is the only thing in its row, and
             // a select stretched the full width of a laptop reads as a band rather
             // than a control. At `xl` the column is narrower than the cap anyway.
             className="max-w-[420px] self-start xl:max-w-none"
+            sources={sources.data ?? []}
             value={selectedSourceId}
-            onChange={(event) => setChosenSourceId(event.target.value)}
-          >
-            {(sources.data ?? []).map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.name} ({source.scriptCount})
-              </option>
-            ))}
-          </Select>
+            onChange={setChosenSourceId}
+          />
 
           <ScriptIdentityBar
             script={script.data ?? null}
